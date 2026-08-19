@@ -7,6 +7,7 @@ too old for DHL to still have data on it).
 """
 from __future__ import annotations
 
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -56,7 +57,7 @@ async def async_setup_entry(
     _sync_entities()
 
 
-class DhlShipmentSensor(CoordinatorEntity[DhlDataUpdateCoordinator]):
+class DhlShipmentSensor(CoordinatorEntity[DhlDataUpdateCoordinator], SensorEntity):
     """Represents a single DHL shipment."""
 
     _attr_has_entity_name = True
