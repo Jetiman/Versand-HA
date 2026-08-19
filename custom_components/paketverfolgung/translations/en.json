@@ -2,33 +2,23 @@
   "config": {
     "step": {
       "user": {
-        "title": "Log in with your DHL account",
-        "description": "1. Open this link in Chrome or Edge and log in with your DHL account:\n\n{authorize_url}\n\n2. Open the developer console BEFORE or right after logging in (key F12 -> \"Console\" tab).\n\n3. After login, a red message appears there: \"Failed to launch 'dhllogin://...' because the scheme does not have a registered handler.\" The address bar stays unchanged - that's expected.\n\n4. Right-click the blue dhllogin://-link INSIDE THAT MESSAGE -> \"Copy link address\". Do NOT use the URL from the address bar.\n\n5. Paste the copied URL below.",
+        "title": "Add tracking numbers",
+        "description": "Add one or more DHL tracking numbers to track (press Enter after each). You can also start empty and add tracking numbers later via the integration's options.",
         "data": {
-          "dhl_login_url": "Copied dhllogin:// URL"
-        }
-      },
-      "reauth_confirm": {
-        "title": "Renew DHL login",
-        "description": "Your DHL login has expired. Please log in again in Chrome/Edge:\n\n{authorize_url}\n\nOpen the developer console (F12), right-click to copy the dhllogin:// URL from the red error message there (not from the address bar), and paste it below.",
-        "data": {
-          "dhl_login_url": "Copied dhllogin:// URL"
+          "tracking_numbers": "Tracking numbers"
         }
       }
     },
-    "error": {
-      "invalid_code": "Login failed. The code is invalid or expired - please open the link again and paste a fresh one.",
-      "no_code_in_url": "No code found in the pasted URL. You probably copied the address bar instead of the dhllogin:// URL from the developer console - see the instructions above."
-    },
     "abort": {
-      "already_configured": "This DHL account is already configured.",
-      "reauth_successful": "Login renewed successfully."
+      "already_configured": "Paketverfolgung is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
+        "description": "Add or remove tracking numbers and adjust the update interval.",
         "data": {
+          "tracking_numbers": "Tracking numbers",
           "update_interval_minutes": "Update interval (minutes)"
         }
       }

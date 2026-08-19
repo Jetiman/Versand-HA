@@ -1,7 +1,9 @@
 """Sensor platform for Paketverfolgung (DHL).
 
-Creates one sensor entity per active DHL shipment. Entities are added and
-removed dynamically as shipments appear in / disappear from the account.
+Creates one sensor entity per tracked DHL tracking number. Entities are
+added when a tracking number is configured and removed again if DHL no
+longer returns data for it (e.g. it was removed from the config, or is
+too old for DHL to still have data on it).
 """
 from __future__ import annotations
 

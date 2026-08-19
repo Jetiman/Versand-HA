@@ -13,7 +13,7 @@ PLATFORMS = ["sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up a DHL account for the Paketverfolgung integration."""
+    """Set up the Paketverfolgung integration."""
     minutes = entry.options.get(
         CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
     )
