@@ -1,7 +1,7 @@
-"""Constants for the DHL Paketverfolgung integration."""
+"""Constants for the Paketverfolgung integration."""
 from datetime import timedelta
 
-DOMAIN = "dhl_tracking"
+DOMAIN = "paketverfolgung"
 
 # Fixed values reverse-engineered from the official DHL app / login flow.
 # These are public client parameters (no per-user secret), the same ones

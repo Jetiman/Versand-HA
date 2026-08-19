@@ -1,4 +1,4 @@
-"""Config flow for the DHL Paketverfolgung integration."""
+"""Config flow for the Paketverfolgung integration (DHL account setup)."""
 from __future__ import annotations
 
 import base64
@@ -55,8 +55,8 @@ async def _exchange_and_build_entry_data(
     return data, _decode_email_from_id_token(tokens.id_token)
 
 
-class DhlTrackingConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for DHL Paketverfolgung."""
+class DhlAccountConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for a DHL account (Paketverfolgung integration)."""
 
     VERSION = 1
 
@@ -77,10 +77,10 @@ class DhlTrackingConfigFlow(ConfigFlow, domain=DOMAIN):
                 _LOGGER.debug("DHL login failed: %s", err)
                 errors["base"] = "invalid_code"
             else:
-                await self.async_set_unique_id(email or "dhl_tracking")
+                await self.async_set_unique_id(email or "dhl")
                 self._abort_if_unique_id_configured()
                 return self.async_create_entry(
-                    title=email or "DHL Paketverfolgung", data=data
+                    title=email or "DHL-Konto", data=data
                 )
 
         return self.async_show_form(

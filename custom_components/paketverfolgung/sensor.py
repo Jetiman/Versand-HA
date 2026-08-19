@@ -1,4 +1,4 @@
-"""Sensor platform for DHL Paketverfolgung.
+"""Sensor platform for Paketverfolgung (DHL).
 
 Creates one sensor entity per active DHL shipment. Entities are added and
 removed dynamically as shipments appear in / disappear from the account.

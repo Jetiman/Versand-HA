@@ -1,4 +1,4 @@
-"""DataUpdateCoordinator for the DHL Paketverfolgung integration."""
+"""DataUpdateCoordinator for a DHL account (Paketverfolgung integration)."""
 from __future__ import annotations
 
 import logging

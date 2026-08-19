@@ -1,4 +1,4 @@
-"""The DHL Paketverfolgung integration."""
+"""The Paketverfolgung integration."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -13,7 +13,7 @@ PLATFORMS = ["sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up DHL Paketverfolgung from a config entry."""
+    """Set up a DHL account for the Paketverfolgung integration."""
     minutes = entry.options.get(
         CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
     )

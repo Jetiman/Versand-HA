@@ -1,6 +1,6 @@
 {
-  "domain": "dhl_tracking",
-  "name": "DHL Paketverfolgung",
+  "domain": "paketverfolgung",
+  "name": "Paketverfolgung",
   "codeowners": ["@Jetiman"],
   "config_flow": true,
   "documentation": "https://github.com/Jetiman/Versand-HA",
