@@ -15,13 +15,16 @@ Für DHL: automatisch, ohne dass du Trackingnummern manuell eintragen musst – 
 
 ## Einrichtung (DHL)
 
-Der einzige etwas ungewöhnliche Schritt ist der einmalige Login, da DHL keinen normalen Redirect für Drittanbieter-Apps erlaubt:
+Der einzige etwas ungewöhnliche Schritt ist der einmalige Login, da DHL keinen normalen Redirect für Drittanbieter-Apps erlaubt. **Wichtig:** Die Ziel-URL taucht danach *nicht* in der Adressleiste auf, sondern nur in der Entwickler-Konsole des Browsers – bitte genau der Reihenfolge folgen:
 
 1. **Einstellungen → Geräte & Dienste → Integration hinzufügen → „Paketverfolgung“**.
-2. Der Dialog zeigt dir einen Login-Link. Öffne ihn **in einem Browser** und melde dich mit deinem DHL-Konto (den gleichen Zugangsdaten wie in der DHL-App) an.
-3. Nach dem Login versucht dein Browser, auf `dhllogin://de.deutschepost.dhl/login?code=...` weiterzuleiten. Das schlägt fehl ("Seite kann nicht geöffnet werden" o. Ä.) – **das ist erwartet**.
-4. Kopiere die komplette URL aus der Adressleiste (Chrome/Edge zeigen sie dort weiterhin an; alternativ über die Entwicklertools → Netzwerk-Tab den fehlgeschlagenen Request suchen).
-5. Füge die kopierte URL in das Textfeld im Home-Assistant-Dialog ein und bestätige.
+2. Der Dialog zeigt dir einen Login-Link. Öffne ihn **in Chrome oder Edge** (Firefox/Safari zeigen die Meldung aus Schritt 4 nicht auf die gleiche Weise) und melde dich mit deinem DHL-Konto (den gleichen Zugangsdaten wie in der DHL-App) an.
+3. Öffne **vor oder direkt nach** dem Login die Entwicklertools (Taste **F12**, oder Rechtsklick auf die Seite → „Untersuchen“) und wechsle zum Tab **„Konsole“ / „Console“**.
+4. Nach erfolgreichem Login versucht die Seite automatisch auf `dhllogin://...` weiterzuleiten. Das schlägt fehl – die Adressleiste bleibt unverändert (ggf. auf einer leeren/schwarzen Seite), **aber in der Konsole erscheint eine rote Meldung**: `Failed to launch 'dhllogin://de.deutschepost.dhl/login?code=...' because the scheme does not have a registered handler.`
+5. **Rechtsklick auf den blauen `dhllogin://...`-Link in dieser Meldung → „Link-Adresse kopieren“** (Copy link address). *Nicht* die URL aus der Adressleiste kopieren – die enthält keinen Code und führt zu „Anmeldung fehlgeschlagen“.
+6. Die kopierte URL in das Textfeld im Home-Assistant-Dialog einfügen und bestätigen.
+
+Falls in der Konsole nichts erscheint: Seite neu laden reicht meist nicht – dann den Login-Link erneut öffnen und den Ablauf mit bereits offener Konsole wiederholen.
 
 Danach werden automatisch Sensor-Entities für alle aktiven Sendungen deines Kontos angelegt und regelmäßig aktualisiert (Standard: alle 15 Minuten, im Optionen-Dialog der Integration änderbar).
 

@@ -3,21 +3,22 @@
     "step": {
       "user": {
         "title": "Mit DHL-Konto anmelden",
-        "description": "1. Öffne diesen Link in deinem Browser und melde dich mit deinem DHL-Konto an:\n\n{authorize_url}\n\n2. Nach dem Login schlägt die Weiterleitung fehl (Seite kann nicht geöffnet werden) – das ist normal. Kopiere die komplette URL aus der Adressleiste (beginnt mit `dhllogin://...`).\n\n3. Füge die kopierte URL unten ein.",
+        "description": "1. Öffne diesen Link in Chrome oder Edge und melde dich mit deinem DHL-Konto an:\n\n{authorize_url}\n\n2. Öffne VOR oder direkt nach dem Login die Entwicklerkonsole (Taste F12 → Tab \"Konsole\"/\"Console\").\n\n3. Nach dem Login erscheint dort eine rote Meldung: \"Failed to launch 'dhllogin://...' because the scheme does not have a registered handler.\" Die Adressleiste bleibt unverändert - das ist normal.\n\n4. Rechtsklick auf den blauen dhllogin://-Link IN DIESER MELDUNG → \"Link-Adresse kopieren\". NICHT die URL aus der Adressleiste verwenden.\n\n5. Die kopierte URL unten einfügen.",
         "data": {
           "dhl_login_url": "Kopierte dhllogin:// URL"
         }
       },
       "reauth_confirm": {
         "title": "DHL-Anmeldung erneuern",
-        "description": "Die DHL-Anmeldung ist abgelaufen. Bitte melde dich erneut an:\n\n{authorize_url}\n\nKopiere danach die fehlgeschlagene `dhllogin://...` URL und füge sie unten ein.",
+        "description": "Die DHL-Anmeldung ist abgelaufen. Bitte melde dich in Chrome/Edge erneut an:\n\n{authorize_url}\n\nÖffne dabei die Entwicklerkonsole (F12), kopiere per Rechtsklick die dhllogin://-URL aus der roten Fehlermeldung dort (nicht aus der Adressleiste) und füge sie unten ein.",
         "data": {
           "dhl_login_url": "Kopierte dhllogin:// URL"
         }
       }
     },
     "error": {
-      "invalid_code": "Anmeldung fehlgeschlagen. Der Code ist ungültig oder abgelaufen - bitte Link erneut öffnen und neu einfügen."
+      "invalid_code": "Anmeldung fehlgeschlagen. Der Code ist ungültig oder abgelaufen - bitte Link erneut öffnen und neu einfügen.",
+      "no_code_in_url": "Kein Code in der eingefügten URL gefunden. Das war wahrscheinlich die Adressleiste statt der dhllogin://-URL aus der Entwicklerkonsole - siehe Anleitung oben."
     },
     "abort": {
       "already_configured": "Dieses DHL-Konto ist bereits eingerichtet.",

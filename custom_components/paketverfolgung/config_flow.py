@@ -40,6 +40,12 @@ def _decode_email_from_id_token(id_token: str) -> str | None:
         return None
 
 
+def _error_key_for(err: Exception) -> str:
+    if isinstance(err, ValueError) and str(err) == "no_code_in_url":
+        return "no_code_in_url"
+    return "invalid_code"
+
+
 async def _exchange_and_build_entry_data(
     hass, dhl_login_url: str
 ) -> tuple[dict[str, Any], str | None]:
@@ -75,7 +81,7 @@ class DhlAccountConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
             except (ValueError, DhlAuthError) as err:
                 _LOGGER.debug("DHL login failed: %s", err)
-                errors["base"] = "invalid_code"
+                errors["base"] = _error_key_for(err)
             else:
                 await self.async_set_unique_id(email or "dhl")
                 self._abort_if_unique_id_configured()
@@ -107,7 +113,7 @@ class DhlAccountConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
             except (ValueError, DhlAuthError) as err:
                 _LOGGER.debug("DHL re-login failed: %s", err)
-                errors["base"] = "invalid_code"
+                errors["base"] = _error_key_for(err)
             else:
                 self.hass.config_entries.async_update_entry(
                     self._reauth_entry, data=data
@@ -127,10 +133,10 @@ class DhlAccountConfigFlow(ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(entry: ConfigEntry) -> OptionsFlow:
-        return DhlTrackingOptionsFlow(entry)
+        return DhlAccountOptionsFlow(entry)
 
 
-class DhlTrackingOptionsFlow(OptionsFlow):
+class DhlAccountOptionsFlow(OptionsFlow):
     """Handle options (update interval)."""
 
     def __init__(self, entry: ConfigEntry) -> None:

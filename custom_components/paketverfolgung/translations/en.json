@@ -3,21 +3,22 @@
     "step": {
       "user": {
         "title": "Log in with your DHL account",
-        "description": "1. Open this link in your browser and log in with your DHL account:\n\n{authorize_url}\n\n2. After login the redirect will fail to load (page cannot be opened) - that's expected. Copy the full URL from the address bar (starts with `dhllogin://...`).\n\n3. Paste the copied URL below.",
+        "description": "1. Open this link in Chrome or Edge and log in with your DHL account:\n\n{authorize_url}\n\n2. Open the developer console BEFORE or right after logging in (key F12 -> \"Console\" tab).\n\n3. After login, a red message appears there: \"Failed to launch 'dhllogin://...' because the scheme does not have a registered handler.\" The address bar stays unchanged - that's expected.\n\n4. Right-click the blue dhllogin://-link INSIDE THAT MESSAGE -> \"Copy link address\". Do NOT use the URL from the address bar.\n\n5. Paste the copied URL below.",
         "data": {
           "dhl_login_url": "Copied dhllogin:// URL"
         }
       },
       "reauth_confirm": {
         "title": "Renew DHL login",
-        "description": "Your DHL login has expired. Please log in again:\n\n{authorize_url}\n\nThen copy the failed `dhllogin://...` URL and paste it below.",
+        "description": "Your DHL login has expired. Please log in again in Chrome/Edge:\n\n{authorize_url}\n\nOpen the developer console (F12), right-click to copy the dhllogin:// URL from the red error message there (not from the address bar), and paste it below.",
         "data": {
           "dhl_login_url": "Copied dhllogin:// URL"
         }
       }
     },
     "error": {
-      "invalid_code": "Login failed. The code is invalid or expired - please open the link again and paste a fresh one."
+      "invalid_code": "Login failed. The code is invalid or expired - please open the link again and paste a fresh one.",
+      "no_code_in_url": "No code found in the pasted URL. You probably copied the address bar instead of the dhllogin:// URL from the developer console - see the instructions above."
     },
     "abort": {
       "already_configured": "This DHL account is already configured.",

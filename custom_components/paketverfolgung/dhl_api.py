@@ -55,14 +55,16 @@ class TokenSet:
 def extract_code(dhl_login_url_or_code: str) -> str:
     """Extract the authorization code from a pasted dhllogin:// URL.
 
-    Also accepts the bare code value directly.
+    Also accepts the bare code value directly (no "://" in it). Anything
+    that looks like a URL but has no "code" query parameter (e.g. the
+    browser's address bar, which never shows the dhllogin:// redirect) is
+    rejected explicitly instead of being misinterpreted as the code.
     """
     value = dhl_login_url_or_code.strip()
-    if "code=" not in value:
+    if "://" not in value:
         return value
     parsed = urlparse(value)
-    query = parsed.query or value.split("?", 1)[-1]
-    params = parse_qs(query)
+    params = parse_qs(parsed.query)
     codes = params.get("code")
     if not codes or not codes[0]:
         raise ValueError("no_code_in_url")
