@@ -7,7 +7,7 @@ import time
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -39,7 +39,11 @@ class DhlDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             update_interval=update_interval,
         )
         self.entry = entry
-        self.client = DhlApiClient(async_get_clientsession(hass))
+        # Dedicated session so this integration's cookies (login + the
+        # session/CSRF cookie DHL sets on first contact and expects back
+        # on the next request) aren't mixed into the HA-shared session's
+        # jar. Home Assistant closes it automatically on entry unload.
+        self.client = DhlApiClient(async_create_clientsession(hass))
         self._tokens = TokenSet(
             access_token=entry.data[CONF_ACCESS_TOKEN],
             id_token=entry.data[CONF_ID_TOKEN],

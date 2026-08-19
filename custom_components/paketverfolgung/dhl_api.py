@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
 
 from aiohttp import ClientError, ClientSession
+from yarl import URL
 
 from .const import (
     ARCHIVED_STATUS,
@@ -133,7 +134,16 @@ class DhlApiClient:
         Mirrors ioBroker.parcel's two-step approach: first fetch the
         overview to get the list of active shipment ids, then fetch the
         details (status, progress, ...) for exactly those ids.
+
+        The very first request to the search endpoint (per session) comes
+        back with an empty result even for accounts with real shipments -
+        DHL only issues a session/CSRF cookie (`verfolgenCsrfToken`) on
+        that first contact and apparently expects it back before serving
+        real data. So we "prime" the session with one throwaway call
+        before the request we actually use.
         """
+        self._seed_id_token_cookie(id_token)
+        await self._search(id_token)
         overview = await self._search(id_token)
         _LOGGER.debug("DHL overview returned %d shipment(s): %s", len(overview), overview)
         active_ids = [
@@ -147,6 +157,17 @@ class DhlApiClient:
         _LOGGER.debug("DHL details for %s: %s", active_ids, details)
         return details
 
+    def _seed_id_token_cookie(self, id_token: str) -> None:
+        """Put the login cookie into the session's cookie jar.
+
+        Done via the jar (instead of a manual Cookie header) so that
+        cookies DHL sends back (e.g. the CSRF/session cookie) are
+        automatically merged in and resent on the next request too.
+        """
+        self._session.cookie_jar.update_cookies(
+            {"dhli": id_token}, response_url=URL("https://www.dhl.de")
+        )
+
     async def _search(self, id_token: str, piececode: str | None = None) -> list[dict]:
         headers = {
             "accept": "application/json",
@@ -156,7 +177,6 @@ class DhlApiClient:
                 "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
             ),
             "accept-language": "de-de",
-            "cookie": f"dhli={id_token}",
         }
         params = {"noRedirect": "true", "language": "de", "cid": "app"}
         if piececode:
