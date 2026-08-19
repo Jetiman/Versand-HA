@@ -7,6 +7,7 @@ show up automatically, without entering tracking numbers manually.
 """
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
@@ -22,6 +23,8 @@ from .const import (
     TOKEN_URL,
     USER_AGENT,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class DhlApiError(Exception):
@@ -132,6 +135,7 @@ class DhlApiClient:
         details (status, progress, ...) for exactly those ids.
         """
         overview = await self._search(id_token)
+        _LOGGER.debug("DHL overview returned %d shipment(s): %s", len(overview), overview)
         active_ids = [
             s["id"]
             for s in overview
@@ -140,6 +144,7 @@ class DhlApiClient:
         if not active_ids:
             return []
         details = await self._search(id_token, piececode=",".join(active_ids))
+        _LOGGER.debug("DHL details for %s: %s", active_ids, details)
         return details
 
     async def _search(self, id_token: str, piececode: str | None = None) -> list[dict]:
@@ -160,10 +165,17 @@ class DhlApiClient:
             async with self._session.get(
                 SEARCH_URL, headers=headers, params=params, timeout=15
             ) as resp:
+                _LOGGER.debug(
+                    "DHL search request (piececode=%s) -> status %s",
+                    piececode,
+                    resp.status,
+                )
                 if resp.status != 200:
                     raise DhlApiError(
                         f"DHL shipment search failed with status {resp.status}"
                     )
+                raw_text = await resp.text()
+                _LOGGER.debug("DHL search raw response body: %s", raw_text)
                 payload = await resp.json(content_type=None)
         except ClientError as err:
             raise DhlApiError(f"Network error fetching DHL shipments: {err}") from err

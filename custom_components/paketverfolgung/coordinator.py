@@ -54,6 +54,7 @@ class DhlDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         except DhlApiError as err:
             raise UpdateFailed(f"Error fetching DHL shipments: {err}") from err
 
+        _LOGGER.debug("Paketverfolgung: %d active DHL shipment(s) found", len(shipments))
         return {s["id"]: s for s in shipments if s.get("id")}
 
     async def _ensure_valid_token(self) -> None:
