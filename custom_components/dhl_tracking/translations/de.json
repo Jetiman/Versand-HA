@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit DHL-Konto anmelden",
+        "description": "1. Öffne diesen Link in deinem Browser und melde dich mit deinem DHL-Konto an:\n\n{authorize_url}\n\n2. Nach dem Login schlägt die Weiterleitung fehl (Seite kann nicht geöffnet werden) – das ist normal. Kopiere die komplette URL aus der Adressleiste (beginnt mit `dhllogin://...`).\n\n3. Füge die kopierte URL unten ein.",
+        "data": {
+          "dhl_login_url": "Kopierte dhllogin:// URL"
+        }
+      },
+      "reauth_confirm": {
+        "title": "DHL-Anmeldung erneuern",
+        "description": "Die DHL-Anmeldung ist abgelaufen. Bitte melde dich erneut an:\n\n{authorize_url}\n\nKopiere danach die fehlgeschlagene `dhllogin://...` URL und füge sie unten ein.",
+        "data": {
+          "dhl_login_url": "Kopierte dhllogin:// URL"
+        }
+      }
+    },
+    "error": {
+      "invalid_code": "Anmeldung fehlgeschlagen. Der Code ist ungültig oder abgelaufen - bitte Link erneut öffnen und neu einfügen."
+    },
+    "abort": {
+      "already_configured": "Dieses DHL-Konto ist bereits eingerichtet.",
+      "reauth_successful": "Anmeldung erfolgreich erneuert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+        }
+      }
+    }
+  }
+}

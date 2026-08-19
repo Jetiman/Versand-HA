@@ -1,0 +1,11 @@
+{
+  "domain": "dhl_tracking",
+  "name": "DHL Paketverfolgung",
+  "codeowners": ["@your-github-username"],
+  "config_flow": true,
+  "documentation": "https://github.com/your-github-username/Versand-HA",
+  "issue_tracker": "https://github.com/your-github-username/Versand-HA/issues",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "0.1.0"
+}

@@ -1,0 +1,36 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Log in with your DHL account",
+        "description": "1. Open this link in your browser and log in with your DHL account:\n\n{authorize_url}\n\n2. After login the redirect will fail to load (page cannot be opened) - that's expected. Copy the full URL from the address bar (starts with `dhllogin://...`).\n\n3. Paste the copied URL below.",
+        "data": {
+          "dhl_login_url": "Copied dhllogin:// URL"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Renew DHL login",
+        "description": "Your DHL login has expired. Please log in again:\n\n{authorize_url}\n\nThen copy the failed `dhllogin://...` URL and paste it below.",
+        "data": {
+          "dhl_login_url": "Copied dhllogin:// URL"
+        }
+      }
+    },
+    "error": {
+      "invalid_code": "Login failed. The code is invalid or expired - please open the link again and paste a fresh one."
+    },
+    "abort": {
+      "already_configured": "This DHL account is already configured.",
+      "reauth_successful": "Login renewed successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "update_interval_minutes": "Update interval (minutes)"
+        }
+      }
+    }
+  }
+}
