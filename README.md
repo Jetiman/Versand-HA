@@ -30,6 +30,8 @@ Pro Sendungsnummer ein Sensor mit:
 
 Liefert DHL zu einer Sendungsnummer keine Daten mehr (z. B. weil sie sehr alt ist), verschwindet der zugehörige Sensor automatisch. Um eine Sendung nicht mehr zu verfolgen, die Sendungsnummer einfach aus den Optionen entfernen.
 
+Zusätzlich gibt es einen Sammel-Sensor **„Heute in Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Anzahl der Sendungen, die DHL aktuell im Zustellfahrzeug hat (Fortschrittsstufe 4 – das setzt DHL nur am Tag der tatsächlichen Zustellung), Attribut `shipments` enthält die Liste dieser Sendungen für eine Dashboard-Karte.
+
 ## Warum keine automatische Erkennung neuer Pakete?
 
 Ursprünglich sollte die Integration sich wie die DHL-App mit dem eigenen DHL-Konto anmelden und alle Sendungen automatisch erkennen – ganz ohne manuelle Eingabe. Das ist technisch möglich (reverse-engineerter Login-Flow, analog zu [ioBroker.parcel](https://github.com/TA2k/ioBroker.parcel)), aber der dafür nötige Endpunkt liefert aktuell (Stand 2026-08) trotz gültigem Login keine Sendungen zurück – vermutlich nutzt die App inzwischen einen anderen, internen Endpunkt. Die Sendungsnummer-Suche funktioniert dagegen zuverlässig und sogar ganz ohne Login.

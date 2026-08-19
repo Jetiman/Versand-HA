@@ -40,3 +40,7 @@ PROGRESS_ICONS = {
 }
 DEFAULT_STATUS = "Unbekannt"
 DEFAULT_ICON = "mdi:package-variant-closed"
+
+# fortschritt step meaning "out for delivery" (DHL only shows this on the
+# day the courier actually has the parcel loaded for delivery)
+PROGRESS_OUT_FOR_DELIVERY = 4

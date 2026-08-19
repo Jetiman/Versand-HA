@@ -18,6 +18,7 @@ from .const import (
     DEFAULT_STATUS,
     DOMAIN,
     PROGRESS_ICONS,
+    PROGRESS_OUT_FOR_DELIVERY,
     PROGRESS_STATUS,
     TRACKING_PAGE_URL,
 )
@@ -55,6 +56,8 @@ async def async_setup_entry(
 
     entry.async_on_unload(coordinator.async_add_listener(_sync_entities))
     _sync_entities()
+
+    async_add_entities([DhlOutForDeliveryTodaySensor(coordinator, entry.entry_id)])
 
 
 class DhlShipmentSensor(CoordinatorEntity[DhlDataUpdateCoordinator], SensorEntity):
@@ -114,4 +117,54 @@ class DhlShipmentSensor(CoordinatorEntity[DhlDataUpdateCoordinator], SensorEntit
             "delivery_window_from": zustellung.get("zustellzeitfensterVon"),
             "delivery_window_to": zustellung.get("zustellzeitfensterBis"),
             "tracking_url": TRACKING_PAGE_URL.format(id=self.shipment_id),
+        }
+
+
+class DhlOutForDeliveryTodaySensor(
+    CoordinatorEntity[DhlDataUpdateCoordinator], SensorEntity
+):
+    """Counts tracked shipments DHL currently has out for delivery.
+
+    DHL only sets the "In Zustellung" progress step on the day the
+    courier actually has the parcel loaded onto the delivery vehicle, so
+    this doubles as "out for delivery today".
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "Heute in Zustellung"
+    _attr_icon = "mdi:truck-delivery"
+    _attr_native_unit_of_measurement = "Sendungen"
+
+    def __init__(self, coordinator: DhlDataUpdateCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_out_for_delivery_today"
+
+    @property
+    def _out_for_delivery(self) -> list[dict]:
+        return [
+            shipment
+            for shipment in (self.coordinator.data or {}).values()
+            if shipment.get("sendungsdetails", {})
+            .get("sendungsverlauf", {})
+            .get("fortschritt")
+            == PROGRESS_OUT_FOR_DELIVERY
+        ]
+
+    @property
+    def native_value(self) -> int:
+        return len(self._out_for_delivery)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "shipments": [
+                {
+                    "tracking_id": shipment["id"],
+                    "status": shipment.get("sendungsdetails", {})
+                    .get("sendungsverlauf", {})
+                    .get("status"),
+                    "tracking_url": TRACKING_PAGE_URL.format(id=shipment["id"]),
+                }
+                for shipment in self._out_for_delivery
+            ]
         }
