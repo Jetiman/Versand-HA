@@ -166,9 +166,11 @@ class DhlApiClient:
                 SEARCH_URL, headers=headers, params=params, timeout=15
             ) as resp:
                 _LOGGER.debug(
-                    "DHL search request (piececode=%s) -> status %s",
+                    "DHL search request (piececode=%s, id_token_len=%d) -> status %s, headers=%s",
                     piececode,
+                    len(id_token),
                     resp.status,
+                    dict(resp.headers),
                 )
                 if resp.status != 200:
                     raise DhlApiError(
