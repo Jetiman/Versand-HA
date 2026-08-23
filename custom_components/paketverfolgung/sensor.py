@@ -110,6 +110,15 @@ class DhlShipmentSensor(CoordinatorEntity[DhlDataUpdateCoordinator], SensorEntit
         details = self._shipment.get("sendungsdetails", {})
         verlauf = details.get("sendungsverlauf", {})
         zustellung = details.get("zustellung", {})
+        # DHL always returns the shipment's full event history, even for
+        # tracking numbers added long after the shipment was on its way -
+        # expose it so past status updates aren't lost, newest first.
+        events = [
+            {"datum": event.get("datum"), "status": event.get("status")}
+            for event in verlauf.get("events", [])
+            if event.get("status")
+        ]
+        events.reverse()
         return {
             "tracking_id": self.shipment_id,
             "progress": verlauf.get("fortschritt"),
@@ -117,6 +126,7 @@ class DhlShipmentSensor(CoordinatorEntity[DhlDataUpdateCoordinator], SensorEntit
             "delivery_window_from": zustellung.get("zustellzeitfensterVon"),
             "delivery_window_to": zustellung.get("zustellzeitfensterBis"),
             "tracking_url": TRACKING_PAGE_URL.format(id=self.shipment_id),
+            "events": events,
         }
 
 
