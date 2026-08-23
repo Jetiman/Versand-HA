@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Parcel box, front-left-top isometric view -->
+  <g>
+    <!-- Top face -->
+    <polygon points="128,40 216,78 128,116 40,78" fill="#E3A96A"/>
+    <!-- Left face -->
+    <polygon points="40,78 128,116 128,208 40,170" fill="#B97A3D"/>
+    <!-- Right face -->
+    <polygon points="216,78 128,116 128,208 216,170" fill="#C9884B"/>
+
+    <!-- Tape: top face -->
+    <polygon points="128,40 152,50.5 128,61 104,50.5" fill="#F3D9B1"/>
+    <polygon points="86,63.4 170,63.4 170,72.6 86,72.6" fill="none"/>
+    <polygon points="118,44.4 138,53 138,103 118,94.4" fill="#F3D9B1"/>
+
+    <!-- Tape: left face vertical seam -->
+    <polygon points="118,94.4 128,98.8 128,204.8 118,200.4" fill="#8A5A2B" opacity="0.55"/>
+    <!-- Tape: right face vertical seam -->
+    <polygon points="128,98.8 138,103 138,209 128,204.8" fill="#8A5A2B" opacity="0.35"/>
+
+    <!-- Horizontal tape band on left face -->
+    <polygon points="40,116 128,153.4 128,164.6 40,127.2" fill="#F3D9B1" opacity="0.9"/>
+    <!-- Horizontal tape band on right face -->
+    <polygon points="128,153.4 216,116 216,127.2 128,164.6" fill="#F3D9B1" opacity="0.9"/>
+
+    <!-- Outline -->
+    <polygon points="128,40 216,78 216,170 128,208 40,170 40,78" fill="none" stroke="#6E4423" stroke-width="4" stroke-linejoin="round"/>
+    <polyline points="40,78 128,116 216,78" fill="none" stroke="#6E4423" stroke-width="4" stroke-linejoin="round"/>
+    <line x1="128" y1="116" x2="128" y2="208" stroke="#6E4423" stroke-width="4"/>
+  </g>
+
+  <!-- Location / tracking pin badge -->
+  <g transform="translate(168,150)">
+    <circle cx="34" cy="34" r="40" fill="#2F6FED"/>
+    <circle cx="34" cy="34" r="40" fill="none" stroke="#F5F8FF" stroke-width="5"/>
+    <path d="M34 14 C22 14 13 23 13 35 C13 50 34 62 34 62 C34 62 55 50 55 35 C55 23 46 14 34 14 Z" fill="#F5F8FF"/>
+    <circle cx="34" cy="34" r="8" fill="#2F6FED"/>
+  </g>
+</svg>
