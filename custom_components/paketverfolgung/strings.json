@@ -23,5 +23,17 @@
         }
       }
     }
+  },
+  "services": {
+    "add_tracking_number": {
+      "name": "Sendungsnummer hinzufügen",
+      "description": "Fügt eine DHL-Sendungsnummer zur Paketverfolgung hinzu, falls sie noch nicht verfolgt wird.",
+      "fields": {
+        "tracking_number": {
+          "name": "Sendungsnummer",
+          "description": "Die DHL-Sendungs-/Trackingnummer."
+        }
+      }
+    }
   }
 }

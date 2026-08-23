@@ -23,5 +23,17 @@
         }
       }
     }
+  },
+  "services": {
+    "add_tracking_number": {
+      "name": "Add tracking number",
+      "description": "Adds a DHL tracking number to Paketverfolgung, unless it's already tracked.",
+      "fields": {
+        "tracking_number": {
+          "name": "Tracking number",
+          "description": "The DHL tracking number."
+        }
+      }
+    }
   }
 }
