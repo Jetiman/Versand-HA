@@ -6,7 +6,7 @@ from datetime import timedelta
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 
 from .const import (
@@ -43,21 +43,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if not hass.services.has_service(DOMAIN, SERVICE_ADD_TRACKING_NUMBER):
 
-        async def _async_add_tracking_number(call: ServiceCall) -> None:
-            await _add_tracking_number(hass, call.data[ATTR_TRACKING_NUMBER])
+        async def _async_add_tracking_number(call: ServiceCall) -> ServiceResponse:
+            return await _add_tracking_number(hass, call.data[ATTR_TRACKING_NUMBER])
 
         hass.services.async_register(
             DOMAIN,
             SERVICE_ADD_TRACKING_NUMBER,
             _async_add_tracking_number,
             schema=_ADD_TRACKING_NUMBER_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
         )
 
     return True
 
 
-async def _add_tracking_number(hass: HomeAssistant, tracking_number: str) -> None:
-    """Add a tracking number to the (single) config entry if not already tracked."""
+async def _add_tracking_number(
+    hass: HomeAssistant, tracking_number: str
+) -> ServiceResponse:
+    """Add a tracking number to the (single) config entry if not already tracked.
+
+    Returns whether it was newly added, so callers (e.g. the Telegram
+    automation) can send an accurate confirmation instead of assuming success.
+    """
     entries = hass.config_entries.async_entries(DOMAIN)
     if not entries:
         raise ServiceValidationError("Paketverfolgung ist nicht eingerichtet.")
@@ -74,13 +81,14 @@ async def _add_tracking_number(hass: HomeAssistant, tracking_number: str) -> Non
     )
     if cleaned in current:
         _LOGGER.info("Paketverfolgung: %s wird bereits verfolgt", cleaned)
-        return
+        return {"added": False, "tracking_number": cleaned}
 
     current.append(cleaned)
     hass.config_entries.async_update_entry(
         entry, options={**entry.options, CONF_TRACKING_NUMBERS: current}
     )
     _LOGGER.info("Paketverfolgung: %s wurde hinzugefügt", cleaned)
+    return {"added": True, "tracking_number": cleaned}
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
