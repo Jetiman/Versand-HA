@@ -23,7 +23,12 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor"]
 
-_ADD_TRACKING_NUMBER_SCHEMA = vol.Schema({vol.Required(ATTR_TRACKING_NUMBER): str})
+_ADD_TRACKING_NUMBER_SCHEMA = vol.Schema(
+    # HA's automation templates render a purely-numeric string back into an
+    # int/float (native-type rendering), so accept anything and coerce to
+    # str here rather than fighting that on the caller side.
+    {vol.Required(ATTR_TRACKING_NUMBER): vol.Coerce(str)}
+)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
