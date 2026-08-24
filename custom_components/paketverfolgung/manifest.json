@@ -3,9 +3,9 @@
   "name": "Paketverfolgung",
   "codeowners": ["@Jetiman"],
   "config_flow": true,
-  "documentation": "https://github.com/Jetiman/Versand-HA",
+  "documentation": "https://github.com/SniperWCW/Versand-HA",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/Jetiman/Versand-HA/issues",
+  "issue_tracker": "https://github.com/SniperWCW/Versand-HA/issues",
   "requirements": [],
-  "version": "1.3.1"
+  "version": "1.4.0-beta.1"
 }
