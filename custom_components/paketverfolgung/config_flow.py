@@ -75,7 +75,7 @@ def _dhl_redirect_schema() -> vol.Schema:
     return vol.Schema(
         {
             vol.Required(CONF_DHL_REDIRECT): selector.TextSelector(
-                selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
+                selector.TextSelectorConfig()
             )
         }
     )
