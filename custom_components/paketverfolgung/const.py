@@ -3,19 +3,23 @@ from datetime import timedelta
 
 DOMAIN = "paketverfolgung"
 
-# DHL's public shipment-tracking search. Works fully anonymously for a
-# known tracking number (piececode) - no login required. Verified against
-# the real endpoint: https://www.dhl.de/int-verfolgen/data/search
 SEARCH_URL = "https://www.dhl.de/int-verfolgen/data/search"
+DHL_AUTH_BASE = "https://login.dhl.de/af5f9bb6-27ad-4af4-9445-008e7a5cddb8/login"
+DHL_CLIENT_ID = "83471082-5c13-4fce-8dcb-19d2a3fca413"
+DHL_REDIRECT_URI = "dhllogin://de.deutschepost.dhl/login"
 TRACKING_PAGE_URL = "https://www.dhl.de/de/privatkunden/dhl-sendungsverfolgung.html?piececode={id}"
 
 USER_AGENT = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 )
+APP_USER_AGENT = "DHLPaket_PROD/1367 CFNetwork/1240.0.4 Darwin/20.6.0"
 
 CONF_TRACKING_NUMBERS = "tracking_numbers"
 CONF_UPDATE_INTERVAL = "update_interval_minutes"
+CONF_DHL_SESSION = "dhl_session"
+CONF_AUTO_DISCOVERY = "auto_discovery"
+CONF_DHL_REDIRECT = "dhl_redirect"
 
 SERVICE_ADD_TRACKING_NUMBER = "add_tracking_number"
 ATTR_TRACKING_NUMBER = "tracking_number"
@@ -24,7 +28,6 @@ DEFAULT_UPDATE_INTERVAL_MINUTES = 15
 MIN_UPDATE_INTERVAL_MINUTES = 5
 DEFAULT_UPDATE_INTERVAL = timedelta(minutes=DEFAULT_UPDATE_INTERVAL_MINUTES)
 
-# "fortschritt" progress step (0-5) -> German status text + icon
 PROGRESS_STATUS = {
     0: "Auftrag erfasst",
     1: "Abgeholt",
@@ -43,7 +46,4 @@ PROGRESS_ICONS = {
 }
 DEFAULT_STATUS = "Unbekannt"
 DEFAULT_ICON = "mdi:package-variant-closed"
-
-# fortschritt step meaning "out for delivery" (DHL only shows this on the
-# day the courier actually has the parcel loaded for delivery)
 PROGRESS_OUT_FOR_DELIVERY = 4
