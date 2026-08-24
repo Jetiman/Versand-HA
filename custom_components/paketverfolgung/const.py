@@ -7,6 +7,12 @@ SEARCH_URL = "https://www.dhl.de/int-verfolgen/data/search"
 DHL_AUTH_BASE = "https://login.dhl.de/af5f9bb6-27ad-4af4-9445-008e7a5cddb8/login"
 DHL_CLIENT_ID = "83471082-5c13-4fce-8dcb-19d2a3fca413"
 DHL_REDIRECT_URI = "dhllogin://de.deutschepost.dhl/login"
+# DHL's mobile-app OAuth client currently expects this PKCE pair. Keep this in sync
+# with the login URL used by the official-app compatible browser flow.
+DHL_CODE_VERIFIER = "zmVs5AKfGvv45a9aUvuOid9a_erOirp7XL1sn9kWT_o"
+DHL_CODE_CHALLENGE = "MAhrhXXZP-Owy-R7ruyB7Fn-Z8ODW6qxCoHg4uXELCw"
+DHL_LOGIN_STATE = "eyJycyI6dHJ1ZSwicnYiOmZhbHNlLCJmaWQiOiJhcHAtbG9naW4tbWVoci1mb290ZXIiLCJoaWQiOiJhcHAtbG9naW4tbWVoci1oZWFkZXIiLCJycCI6ZmFsc2V9"
+DHL_LOGIN_CLAIMS = '{"id_token":{"email":null,"post_number":null,"twofa":null,"service_mask":null,"deactivate_account":null,"last_login":null,"customer_type":null,"display_name":null,"data_confirmation_required":null}}'
 TRACKING_PAGE_URL = "https://www.dhl.de/de/privatkunden/dhl-sendungsverfolgung.html?piececode={id}"
 
 USER_AGENT = (
