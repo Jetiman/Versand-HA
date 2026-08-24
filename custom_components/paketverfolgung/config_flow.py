@@ -84,7 +84,7 @@ def _dhl_redirect_schema() -> vol.Schema:
 class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Paketverfolgung."""
 
-    VERSION = 2
+    VERSION = 1
 
     def __init__(self) -> None:
         self._pending_data: dict[str, Any] = {}
