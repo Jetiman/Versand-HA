@@ -2,12 +2,23 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add tracking numbers",
-        "description": "Add one or more DHL tracking numbers to track (press Enter after each). You can also start empty and add tracking numbers later via the integration's options.",
+        "title": "Set up parcel tracking",
+        "description": "Optionally add DHL tracking numbers manually. If account auto-discovery is enabled, the DHL login follows in the next step.",
         "data": {
-          "tracking_numbers": "Tracking numbers"
+          "tracking_numbers": "Tracking numbers",
+          "auto_discovery": "Automatically discover shipments from my DHL account"
+        }
+      },
+      "dhl_login": {
+        "title": "Connect DHL account",
+        "description": "1. Open [DHL Login]({login_url}) and sign in. 2. After a successful login the browser attempts to open a `dhllogin://...` address. Copy that complete address and paste it below.",
+        "data": {
+          "dhl_redirect": "dhllogin:// redirect address"
         }
       }
+    },
+    "error": {
+      "dhl_auth": "DHL login failed. Generate a new login code using the link and try again."
     },
     "abort": {
       "already_configured": "Paketverfolgung is already configured."
@@ -16,12 +27,23 @@
   "options": {
     "step": {
       "init": {
-        "description": "Add or remove tracking numbers and adjust the update interval.",
+        "description": "Adjust tracking numbers, DHL account auto-discovery, and the update interval.",
         "data": {
           "tracking_numbers": "Tracking numbers",
-          "update_interval_minutes": "Update interval (minutes)"
+          "update_interval_minutes": "Update interval (minutes)",
+          "auto_discovery": "Automatically discover shipments from my DHL account"
+        }
+      },
+      "dhl_login": {
+        "title": "Connect DHL account",
+        "description": "1. Open [DHL Login]({login_url}) and sign in. 2. Copy the complete `dhllogin://...` redirect address and paste it below.",
+        "data": {
+          "dhl_redirect": "dhllogin:// redirect address"
         }
       }
+    },
+    "error": {
+      "dhl_auth": "DHL login failed. Generate a new login code using the link and try again."
     }
   },
   "services": {
