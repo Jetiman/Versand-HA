@@ -2,12 +2,23 @@
   "config": {
     "step": {
       "user": {
-        "title": "Sendungsnummern hinzufügen",
-        "description": "Füge eine oder mehrere DHL-Sendungsnummern hinzu, die verfolgt werden sollen (Enter nach jeder Nummer). Du kannst auch leer starten und später über die Optionen der Integration Sendungsnummern hinzufügen oder entfernen.",
+        "title": "Paketverfolgung einrichten",
+        "description": "Füge optional manuelle DHL-Sendungsnummern hinzu. Wenn du die automatische DHL-Kontoerkennung aktivierst, folgt im nächsten Schritt der DHL-Login.",
         "data": {
-          "tracking_numbers": "Sendungsnummern"
+          "tracking_numbers": "Sendungsnummern",
+          "auto_discovery": "Sendungen automatisch aus meinem DHL-Konto erkennen"
+        }
+      },
+      "dhl_login": {
+        "title": "Mit DHL verbinden",
+        "description": "1. Öffne [DHL Login]({login_url}) und melde dich an. 2. Nach erfolgreichem Login versucht der Browser eine `dhllogin://...` Adresse zu öffnen. Kopiere diese vollständige Adresse und füge sie unten ein.",
+        "data": {
+          "dhl_redirect": "dhllogin:// Weiterleitungsadresse"
         }
       }
+    },
+    "error": {
+      "dhl_auth": "DHL-Anmeldung fehlgeschlagen. Erzeuge bitte über den Link einen neuen Login-Code und versuche es erneut."
     },
     "abort": {
       "already_configured": "Paketverfolgung ist bereits eingerichtet."
@@ -16,12 +27,23 @@
   "options": {
     "step": {
       "init": {
-        "description": "Sendungsnummern hinzufügen oder entfernen und das Aktualisierungsintervall anpassen.",
+        "description": "Sendungsnummern, automatische DHL-Kontoerkennung und Aktualisierungsintervall anpassen.",
         "data": {
           "tracking_numbers": "Sendungsnummern",
-          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
+          "auto_discovery": "Sendungen automatisch aus meinem DHL-Konto erkennen"
+        }
+      },
+      "dhl_login": {
+        "title": "Mit DHL verbinden",
+        "description": "1. Öffne [DHL Login]({login_url}) und melde dich an. 2. Kopiere anschließend die vollständige `dhllogin://...` Weiterleitungsadresse und füge sie unten ein.",
+        "data": {
+          "dhl_redirect": "dhllogin:// Weiterleitungsadresse"
         }
       }
+    },
+    "error": {
+      "dhl_auth": "DHL-Anmeldung fehlgeschlagen. Erzeuge bitte über den Link einen neuen Login-Code und versuche es erneut."
     }
   },
   "services": {
