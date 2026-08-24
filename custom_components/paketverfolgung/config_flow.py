@@ -1,9 +1,6 @@
 """Config flow for the Paketverfolgung integration."""
 from __future__ import annotations
 
-import base64
-import hashlib
-import secrets
 from typing import Any
 from urllib.parse import urlencode
 
@@ -22,6 +19,10 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DHL_AUTH_BASE,
     DHL_CLIENT_ID,
+    DHL_CODE_CHALLENGE,
+    DHL_CODE_VERIFIER,
+    DHL_LOGIN_CLAIMS,
+    DHL_LOGIN_STATE,
     DHL_REDIRECT_URI,
     DOMAIN,
     MIN_UPDATE_INTERVAL_MINUTES,
@@ -42,33 +43,29 @@ def _clean_tracking_numbers(raw: list[str] | None) -> list[str]:
 
 def _tracking_numbers_schema(default: list[str]) -> dict:
     return {
-        vol.Optional(
-            CONF_TRACKING_NUMBERS, default=default
-        ): selector.TextSelector(selector.TextSelectorConfig(multiple=True)),
+        vol.Optional(CONF_TRACKING_NUMBERS, default=default): selector.TextSelector(
+            selector.TextSelectorConfig(multiple=True)
+        ),
     }
 
 
-def _new_pkce_login() -> tuple[str, str]:
-    """Create a fresh PKCE verifier and matching DHL authorization URL."""
-    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
-    challenge = (
-        base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
-        .decode()
-        .rstrip("=")
-    )
+def _dhl_login() -> tuple[str, str]:
+    """Return the official-app compatible PKCE verifier and browser login URL."""
     params = {
         "redirect_uri": DHL_REDIRECT_URI,
-        "state": secrets.token_urlsafe(24),
+        "state": DHL_LOGIN_STATE,
         "client_id": DHL_CLIENT_ID,
         "response_type": "code",
         "scope": "openid offline_access",
-        "nonce": secrets.token_urlsafe(24),
+        "claims": DHL_LOGIN_CLAIMS,
+        "nonce": "",
+        "login_hint": "",
         "prompt": "login",
         "ui_locales": "de-DE",
-        "code_challenge": challenge,
+        "code_challenge": DHL_CODE_CHALLENGE,
         "code_challenge_method": "S256",
     }
-    return verifier, f"{DHL_AUTH_BASE}/authorize?{urlencode(params)}"
+    return DHL_CODE_VERIFIER, f"{DHL_AUTH_BASE}/authorize?{urlencode(params)}"
 
 
 def _dhl_redirect_schema() -> vol.Schema:
@@ -91,9 +88,7 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
         self._pkce_verifier: str | None = None
         self._login_url: str | None = None
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> Any:
         if user_input is not None:
             numbers = _clean_tracking_numbers(user_input.get(CONF_TRACKING_NUMBERS))
             auto_discovery = bool(user_input.get(CONF_AUTO_DISCOVERY, False))
@@ -102,7 +97,7 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_AUTO_DISCOVERY: auto_discovery,
             }
             if auto_discovery:
-                self._pkce_verifier, self._login_url = _new_pkce_login()
+                self._pkce_verifier, self._login_url = _dhl_login()
                 return await self.async_step_dhl_login()
             return await self._create_entry(self._pending_data)
 
@@ -114,24 +109,20 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="user", data_schema=schema)
 
-    async def async_step_dhl_login(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
+    async def async_step_dhl_login(self, user_input: dict[str, Any] | None = None) -> Any:
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
                 code = extract_authorization_code(user_input[CONF_DHL_REDIRECT].strip())
                 client = DhlApiClient(async_get_clientsession(self.hass))
-                session = await client.exchange_code(code, self._pkce_verifier or "")
+                session = await client.exchange_code(code, self._pkce_verifier or DHL_CODE_VERIFIER)
             except DhlAuthError:
                 errors["base"] = "dhl_auth"
             else:
-                return await self._create_entry(
-                    {**self._pending_data, CONF_DHL_SESSION: session}
-                )
+                return await self._create_entry({**self._pending_data, CONF_DHL_SESSION: session})
 
         if not self._login_url:
-            self._pkce_verifier, self._login_url = _new_pkce_login()
+            self._pkce_verifier, self._login_url = _dhl_login()
         return self.async_show_form(
             step_id="dhl_login",
             data_schema=_dhl_redirect_schema(),
@@ -159,9 +150,7 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
         self._pkce_verifier: str | None = None
         self._login_url: str | None = None
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> Any:
         if user_input is not None:
             numbers = _clean_tracking_numbers(user_input.get(CONF_TRACKING_NUMBERS))
             auto_discovery = bool(user_input.get(CONF_AUTO_DISCOVERY, False))
@@ -171,52 +160,47 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                 CONF_AUTO_DISCOVERY: auto_discovery,
             }
             if auto_discovery and not self._entry.data.get(CONF_DHL_SESSION):
-                self._pkce_verifier, self._login_url = _new_pkce_login()
+                self._pkce_verifier, self._login_url = _dhl_login()
                 return await self.async_step_dhl_login()
             return self.async_create_entry(title="", data=self._pending_options)
 
         current_numbers = self._entry.options.get(
-            CONF_TRACKING_NUMBERS,
-            self._entry.data.get(CONF_TRACKING_NUMBERS, []),
+            CONF_TRACKING_NUMBERS, self._entry.data.get(CONF_TRACKING_NUMBERS, [])
         )
         current_interval = self._entry.options.get(
             CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
         )
         current_auto = self._entry.options.get(
-            CONF_AUTO_DISCOVERY,
-            self._entry.data.get(CONF_AUTO_DISCOVERY, False),
+            CONF_AUTO_DISCOVERY, self._entry.data.get(CONF_AUTO_DISCOVERY, False)
         )
         schema = vol.Schema(
             {
                 **_tracking_numbers_schema(current_numbers),
-                vol.Required(
-                    CONF_UPDATE_INTERVAL, default=current_interval
-                ): vol.All(vol.Coerce(int), vol.Range(min=MIN_UPDATE_INTERVAL_MINUTES)),
+                vol.Required(CONF_UPDATE_INTERVAL, default=current_interval): vol.All(
+                    vol.Coerce(int), vol.Range(min=MIN_UPDATE_INTERVAL_MINUTES)
+                ),
                 vol.Optional(CONF_AUTO_DISCOVERY, default=current_auto): bool,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
 
-    async def async_step_dhl_login(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
+    async def async_step_dhl_login(self, user_input: dict[str, Any] | None = None) -> Any:
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
                 code = extract_authorization_code(user_input[CONF_DHL_REDIRECT].strip())
                 client = DhlApiClient(async_get_clientsession(self.hass))
-                session = await client.exchange_code(code, self._pkce_verifier or "")
+                session = await client.exchange_code(code, self._pkce_verifier or DHL_CODE_VERIFIER)
             except DhlAuthError:
                 errors["base"] = "dhl_auth"
             else:
                 self.hass.config_entries.async_update_entry(
-                    self._entry,
-                    data={**self._entry.data, CONF_DHL_SESSION: session},
+                    self._entry, data={**self._entry.data, CONF_DHL_SESSION: session}
                 )
                 return self.async_create_entry(title="", data=self._pending_options)
 
         if not self._login_url:
-            self._pkce_verifier, self._login_url = _new_pkce_login()
+            self._pkce_verifier, self._login_url = _dhl_login()
         return self.async_show_form(
             step_id="dhl_login",
             data_schema=_dhl_redirect_schema(),
