@@ -36,6 +36,9 @@ class DhlDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         )
         self.entry = entry
         self.client = DhlApiClient(async_get_clientsession(hass))
+        # Keep a snapshot so the config-entry listener can distinguish a real
+        # options change from the internal persistence of refreshed OAuth tokens.
+        self.options_snapshot = dict(entry.options)
 
     async def _async_update_data(self) -> dict[str, dict]:
         tracking_numbers = list(
