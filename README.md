@@ -1,10 +1,10 @@
 # Paketverfolgung für Home Assistant
 
-Zeigt den Status deiner DHL-Sendungen als Sensoren in Home Assistant an. Du trägst die Sendungsnummern ein, die Integration fragt sie regelmäßig bei DHL ab.
+Zeigt den Status deiner DHL-Sendungen als Sensoren in Home Assistant an. Sendungen können entweder manuell per Sendungsnummer hinzugefügt oder nach einmaliger Anmeldung automatisch aus deinem DHL-Konto erkannt werden.
 
-Nutzt DHLs öffentliche Sendungsverfolgungs-Suche (dieselbe, die auch die Seite [dhl.de/sendungsverfolgung](https://www.dhl.de/de/privatkunden/dhl-sendungsverfolgung.html) verwendet) – **kein DHL-Login, keine Zugangsdaten, kein Konto nötig.**
+Die Integration nutzt inoffizielle DHL-Schnittstellen. Für manuell eingetragene Sendungsnummern ist kein DHL-Login erforderlich. Die optionale automatische Kontoerkennung verwendet einen Login-Flow analog zur DHL-App.
 
-> ⚠️ **Hinweis:** Es handelt sich um eine **inoffizielle** Schnittstelle (kein offiziell dokumentiertes API). DHL kann sie jederzeit ohne Vorwarnung ändern.
+> ⚠️ **Hinweis:** Es handelt sich um **inoffizielle, nicht dokumentierte Schnittstellen**. DHL kann diese jederzeit ohne Vorwarnung ändern.
 
 ## Installation über HACS
 
@@ -16,10 +16,39 @@ Nutzt DHLs öffentliche Sendungsverfolgungs-Suche (dieselbe, die auch die Seite 
 ## Einrichtung
 
 1. **Einstellungen → Geräte & Dienste → Integration hinzufügen → „Paketverfolgung“**.
-2. Eine oder mehrere Sendungsnummern eingeben (nach jeder Nummer Enter drücken). Der Schritt kann auch leer übersprungen werden.
-3. Fertig – pro Sendungsnummer wird automatisch ein Sensor angelegt.
+2. Optional eine oder mehrere Sendungsnummern eingeben (nach jeder Nummer Enter drücken).
+3. Optional **„Sendungen automatisch aus meinem DHL-Konto erkennen“** aktivieren.
+4. Ohne Kontoerkennung ist die Einrichtung damit abgeschlossen. Bei aktivierter Kontoerkennung dem DHL-Login-Dialog folgen.
 
-**Sendungsnummern später hinzufügen/entfernen:** Einstellungen → Geräte & Dienste → Paketverfolgung → Zahnrad-Symbol bei „Paketverfolgung“ → dort auch das Aktualisierungsintervall (Standard: alle 15 Minuten) anpassbar.
+**Sendungsnummern später hinzufügen/entfernen:** Einstellungen → Geräte & Dienste → Paketverfolgung → Zahnrad-Symbol bei „Paketverfolgung“. Dort können auch die automatische DHL-Kontoerkennung und das Aktualisierungsintervall angepasst werden.
+
+## Automatische Erkennung über das DHL-Konto
+
+Die Kontoerkennung ist optional. Home Assistant speichert nach erfolgreicher Anmeldung die DHL-Session und kann dadurch die im Konto vorhandenen Sendungen automatisch erkennen. Ein erneutes manuelles Eintragen der Sendungsnummern ist nicht erforderlich.
+
+### DHL-Anmeldung und `dhllogin://`-Weiterleitung
+
+DHL verwendet nach erfolgreicher Anmeldung eine benutzerdefinierte `dhllogin://`-Weiterleitungsadresse. Ein normaler Desktop-Browser kann diese Adresse nicht öffnen. Deshalb muss die vollständige Weiterleitungsadresse aus den Entwicklerwerkzeugen des Browsers kopiert und anschließend in Home Assistant eingefügt werden.
+
+Empfohlen wird ein Desktop-Browser mit Entwicklerwerkzeugen, z. B. Chrome oder Edge:
+
+1. Im Home-Assistant-Dialog **„Mit DHL verbinden“** den angezeigten **DHL Login** öffnen.
+2. **Vor bzw. während der Anmeldung die Entwicklerwerkzeuge öffnen** (`F12` bzw. `Strg`+`Shift`+`I`) und den Tab **Network / Netzwerk** auswählen.
+3. Bei DHL normal anmelden und die Anmeldung vollständig abschließen. Dass der Browser die abschließende DHL-App-Weiterleitung nicht öffnen kann, ist hierbei erwartbar.
+4. Im Tab **Network / Netzwerk** im Filterfeld nach `login?code` suchen.
+5. Den passenden Eintrag `login?code=...` anklicken.
+6. Rechts **Headers / Header** öffnen und im Abschnitt **General / Allgemein** die vollständige **Request URL** kopieren. Sie beginnt mit:
+
+   ```text
+   dhllogin://de.deutschepost.dhl/login?code=...
+   ```
+
+7. Diese **vollständige Request URL** in das Feld `dhllogin:// Weiterleitungsadresse` in Home Assistant einfügen und mit **OK** bestätigen.
+8. Nach erfolgreichem Token-Austausch ist das DHL-Konto verbunden. Die darin gefundenen Sendungen werden anschließend automatisch als Sensoren angelegt.
+
+> **Wichtig:** Nicht die vorherige `https://login.dhl.de/...`-Adresse aus der Browser-Adresszeile kopieren. Benötigt wird ausdrücklich die `dhllogin://...login?code=...`-**Request URL** aus dem Netzwerk-Tab.
+
+> **Sicherheit:** Die `dhllogin://...code=...`-URL enthält einen kurzfristig gültigen Autorisierungscode. Nicht öffentlich posten oder in Screenshots ungeschwärzt weitergeben.
 
 ## Was wird angezeigt?
 
@@ -28,18 +57,13 @@ Pro Sendungsnummer ein Sensor mit:
 - **Zustand:** Klartext-Status (z. B. „In Zustellung“, „Zugestellt“)
 - **Attribute:** Tracking-ID, Fortschrittsstufe (0–5), Richtung (eingehend/ausgehend), Zustellzeitfenster (falls verfügbar), Link zur DHL-Sendungsverfolgung
 
-Liefert DHL zu einer Sendungsnummer keine Daten mehr (z. B. weil sie sehr alt ist), verschwindet der zugehörige Sensor automatisch. Um eine Sendung nicht mehr zu verfolgen, die Sendungsnummer einfach aus den Optionen entfernen.
+Liefert DHL zu einer Sendungsnummer keine Daten mehr (z. B. weil sie sehr alt ist), verschwindet der zugehörige Sensor automatisch. Bei manueller Verfolgung kann eine Sendung außerdem über die Optionen entfernt werden.
 
 Zusätzlich gibt es einen Sammel-Sensor **„Heute in Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Anzahl der Sendungen, die DHL aktuell im Zustellfahrzeug hat (Fortschrittsstufe 4 – das setzt DHL nur am Tag der tatsächlichen Zustellung), Attribut `shipments` enthält die Liste dieser Sendungen für eine Dashboard-Karte.
-
-## Warum keine automatische Erkennung neuer Pakete?
-
-Ursprünglich sollte die Integration sich wie die DHL-App mit dem eigenen DHL-Konto anmelden und alle Sendungen automatisch erkennen – ganz ohne manuelle Eingabe. Das ist technisch möglich (reverse-engineerter Login-Flow, analog zu [ioBroker.parcel](https://github.com/TA2k/ioBroker.parcel)), aber der dafür nötige Endpunkt liefert aktuell (Stand 2026-08) trotz gültigem Login keine Sendungen zurück – vermutlich nutzt die App inzwischen einen anderen, internen Endpunkt. Die Sendungsnummer-Suche funktioniert dagegen zuverlässig und sogar ganz ohne Login.
-
-Der Login-basierte Ansatz ist in der Git-Historie dieses Repositories vollständig erhalten und kann bei Bedarf wieder aufgegriffen werden.
 
 ## Bekannte Einschränkungen
 
 - Aktuell ist nur DHL als Anbieter implementiert.
-- Sendungsnummern müssen manuell eingetragen werden, keine automatische Kontoerkennung.
-- Da inoffiziell: kann bei DHL-seitigen Änderungen brechen. Bitte in diesem Fall ein Issue öffnen.
+- Die automatische Kontoerkennung basiert auf einem inoffiziellen, reverse-engineerten DHL-App-Login und kann durch Änderungen bei DHL brechen.
+- Der `dhllogin://`-Callback muss derzeit manuell über die Entwicklerwerkzeuge des Browsers kopiert werden.
+- Die öffentliche Sendungsverfolgung und die Kontoerkennung sind keine offiziell dokumentierten DHL-APIs.
