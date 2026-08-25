@@ -24,9 +24,6 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["sensor"]
 
 _ADD_TRACKING_NUMBER_SCHEMA = vol.Schema(
-    # HA's automation templates render a purely-numeric string back into an
-    # int/float (native-type rendering), so accept anything and coerce to
-    # str here rather than fighting that on the caller side.
     {vol.Required(ATTR_TRACKING_NUMBER): vol.Coerce(str)}
 )
 
@@ -65,11 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _add_tracking_number(
     hass: HomeAssistant, tracking_number: str
 ) -> ServiceResponse:
-    """Add a tracking number to the (single) config entry if not already tracked.
-
-    Returns whether it was newly added, so callers (e.g. the Telegram
-    automation) can send an accurate confirmation instead of assuming success.
-    """
+    """Add a tracking number to the config entry if not already tracked."""
     entries = hass.config_entries.async_entries(DOMAIN)
     if not entries:
         raise ServiceValidationError("Paketverfolgung ist nicht eingerichtet.")
@@ -97,6 +90,10 @@ async def _add_tracking_number(
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload only for user-visible option changes, not OAuth token persistence."""
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if coordinator is not None and dict(entry.options) == coordinator.options_snapshot:
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 
