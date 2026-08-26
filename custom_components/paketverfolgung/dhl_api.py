@@ -113,7 +113,16 @@ class DhlApiClient:
             ) as resp:
                 payload = await resp.json(content_type=None)
                 if resp.status != 200 or not payload.get("id_token"):
-                    _LOGGER.debug("DHL token response (%s): %s", resp.status, payload)
+                    response_keys = (
+                        sorted(str(key) for key in payload)
+                        if isinstance(payload, dict)
+                        else []
+                    )
+                    _LOGGER.debug(
+                        "DHL token request failed (status=%s, response_keys=%s)",
+                        resp.status,
+                        response_keys,
+                    )
                     raise DhlAuthError(
                         f"DHL token request failed with status {resp.status}"
                     )
