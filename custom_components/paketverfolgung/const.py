@@ -51,7 +51,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.8.1"
+PANEL_VERSION = "1.8.2"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is
@@ -106,7 +106,7 @@ GROUP_ICONS = {
     GROUP_TRANSIT: "mdi:truck-outline",
     GROUP_OUT_FOR_DELIVERY: "mdi:truck-delivery",
     GROUP_DELIVERED: "mdi:package-variant-closed-check",
-    GROUP_UNKNOWN: "mdi:help-circle-outline",
+    GROUP_UNKNOWN: "mdi:package-variant-closed-remove",
 }
 
 # DPD StatusID (string) -> lifecycle group, from the app's Constant.smali /
@@ -154,4 +154,6 @@ PROGRESS_GROUP = {
 }
 DEFAULT_STATUS = "Unbekannt"
 DEFAULT_ICON = "mdi:package-variant-closed"
-NO_DATA_STATUS = "Noch keine Daten"
+# Shown for a number no carrier has (yet) claimed. It stays in the list
+# and keeps being re-checked every poll until the user removes it.
+NO_DATA_STATUS = "In Prüfung"

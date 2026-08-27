@@ -178,7 +178,8 @@ class PaketverfolgungPanel extends HTMLElement {
   _listHtml(shipments) {
     const total = shipments.length;
     const delivered = shipments.filter((s) => s.delivered).length;
-    const inTransit = total - delivered;
+    const inReview = shipments.filter((s) => s.group === "unknown").length;
+    const inTransit = total - delivered - inReview;
     let outForDelivery = shipments.filter((s) => s.out_for_delivery && !s.delivered)
       .length;
     const combined = this._hass.states["sensor.heute_in_zustellung"];
@@ -232,6 +233,13 @@ class PaketverfolgungPanel extends HTMLElement {
             ${resultMsg}`
           : ""
       }
+      ${
+        inReview
+          ? `<div class="pv-note">${inReview} Sendung${
+              inReview === 1 ? "" : "en"
+            } in Prüfung – noch keinem Anbieter zugeordnet. Bleibt in der Liste, bis gelöscht.</div>`
+          : ""
+      }
       <div class="pv-list">${rows}</div>
 
       <div class="pv-footer">
@@ -254,7 +262,7 @@ class PaketverfolgungPanel extends HTMLElement {
       Object.values(PROVIDER_LABELS).some(
         (p) => s.name === `${p} ${s.tracking_id}`
       );
-    const prov = s.provider === "?" ? "wird erkannt" : s.provider;
+    const prov = s.provider === "?" ? "" : s.provider;
     const dim = [prov, s.changed ? fmtShort(s.changed) : ""]
       .filter(Boolean)
       .map(esc)
@@ -268,7 +276,7 @@ class PaketverfolgungPanel extends HTMLElement {
           <div class="pv-row-id">${esc(s.tracking_id)}</div>
           <div class="pv-row-meta">
             <span class="pv-row-status ${s.delivered ? "done" : ""}">${esc(s.status)}</span>
-            <span class="pv-row-dim">${dim}</span>
+            ${dim ? `<span class="pv-row-dim">${dim}</span>` : ""}
           </div>
         </div>
         <ha-icon class="pv-chevron" icon="mdi:chevron-right"></ha-icon>
@@ -284,7 +292,7 @@ class PaketverfolgungPanel extends HTMLElement {
     }
 
     const meta = [
-      ["Anbieter", s.provider === "?" ? "wird erkannt" : s.provider],
+      ["Anbieter", s.provider === "?" ? "in Prüfung" : s.provider],
       ["Sendungsnummer", s.tracking_id],
       ["Richtung", directionLabel(s.direction)],
       [
@@ -304,7 +312,7 @@ class PaketverfolgungPanel extends HTMLElement {
       )
       .join("");
 
-    let timeline;
+    let timeline = "";
     if (s.events.length) {
       timeline = s.events
         .map(
@@ -318,7 +326,7 @@ class PaketverfolgungPanel extends HTMLElement {
         </li>`
         )
         .join("");
-    } else {
+    } else if (s.provider !== "?") {
       timeline = `
         <li class="pv-ev current">
           <div class="pv-ev-dot"></div>
@@ -333,10 +341,12 @@ class PaketverfolgungPanel extends HTMLElement {
     if (s.protected) {
       note = `<div class="pv-note">Diese DPD-Sendung ist geschützt. Hinterlege deine PLZ
         in den Optionen der Integration, damit der Verlauf abgerufen werden kann.</div>`;
+    } else if (s.provider === "?") {
+      note = `<div class="pv-note">Diese Sendung wird noch geprüft – kein Anbieter (DHL, DPD, Hermes)
+        hat bisher Daten dazu geliefert. Sie bleibt in der Liste und wird bei jeder Aktualisierung
+        erneut geprüft, bis du sie löschst oder oben den Anbieter manuell festlegst.</div>`;
     } else if (!s.events.length && (s.provider === "DPD" || s.provider === "Hermes")) {
       note = `<div class="pv-note">Für diese Sendung liegt noch kein Verlauf vor.</div>`;
-    } else if (!s.events.length && s.provider === "?") {
-      note = `<div class="pv-note">Der Anbieter wird bei der nächsten Aktualisierung erkannt.</div>`;
     }
 
     return `
@@ -394,9 +404,13 @@ class PaketverfolgungPanel extends HTMLElement {
 
       <div class="pv-meta">${meta}</div>
 
-      <div class="pv-section-title">Sendungsverlauf</div>
       ${note}
-      <ul class="pv-timeline">${timeline}</ul>
+      ${
+        timeline
+          ? `<div class="pv-section-title">Sendungsverlauf</div>
+             <ul class="pv-timeline">${timeline}</ul>`
+          : ""
+      }
     `;
   }
 

@@ -32,7 +32,7 @@ Liegt die Erkennung mal daneben, lässt sich der Anbieter pro Sendung fest vorge
 
 **Nummern später hinzufügen/entfernen:** Zahnrad-Symbol beim Eintrag „Sendungsnummern“ – dort auch PLZ und Aktualisierungsintervall (Standard: 15 Minuten). Oder über den Dienst `paketverfolgung.add_tracking_number` bzw. das Eingabefeld in der Oberfläche.
 
-Eine Nummer, zu der (noch) kein Anbieter Daten liefert, bleibt mit dem Status „Noch keine Daten“ bestehen, bis du sie entfernst oder Daten verfügbar sind.
+Eine Nummer, die keinem Anbieter zugeordnet werden kann, bleibt mit dem Status **„In Prüfung“** in der Liste und wird bei jeder Aktualisierung erneut bei allen Anbietern geprüft – solange, bis du sie löschst oder den Anbieter manuell festlegst.
 
 ## DPD-Konto
 
