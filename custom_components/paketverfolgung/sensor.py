@@ -7,6 +7,7 @@ shipments enter and leave the coordinators' data.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Callable
 
@@ -76,6 +77,16 @@ def _cleanup_singletons(hass: HomeAssistant, owner_id: str) -> None:
             uid in _CANONICAL_UIDS and entity.config_entry_id != owner_id
         ):
             registry.async_remove(entity.entity_id)
+
+    # Reclaim the plain entity_id if a "_2"/"_3" suffixed leftover still
+    # holds a canonical unique id.
+    for uid in _CANONICAL_UIDS:
+        eid = registry.async_get_entity_id("sensor", DOMAIN, uid)
+        if not eid:
+            continue
+        base = re.sub(r"_\d+$", "", eid)
+        if base != eid and registry.async_get(base) is None:
+            registry.async_update_entity(eid, new_entity_id=base)
 
 
 async def async_setup_entry(
