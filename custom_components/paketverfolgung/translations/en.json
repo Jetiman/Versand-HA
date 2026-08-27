@@ -2,23 +2,48 @@
   "config": {
     "step": {
       "user": {
+        "title": "Choose a provider",
+        "description": "Which parcel carrier do you want to add?",
+        "data": {
+          "provider": "Provider"
+        }
+      },
+      "dhl": {
         "title": "Add tracking numbers",
         "description": "Add one or more DHL tracking numbers to track (press Enter after each). You can also start empty and add tracking numbers later via the integration's options.",
         "data": {
           "tracking_numbers": "Tracking numbers"
         }
+      },
+      "dpd": {
+        "title": "Log in with your DPD account",
+        "description": "Log in with your myDPD account. All parcels (sent, received, returns) will then be detected automatically - unlike DHL, you don't need to enter tracking numbers manually.",
+        "data": {
+          "dpd_username": "Username / email",
+          "dpd_password": "Password"
+        }
       }
     },
+    "error": {
+      "invalid_auth": "Login failed. Please check your username and password.",
+      "cannot_connect": "Could not connect to DPD. Please try again later."
+    },
     "abort": {
-      "already_configured": "Paketverfolgung is already configured."
+      "already_configured": "This provider is already configured."
     }
   },
   "options": {
     "step": {
-      "init": {
+      "dhl_options": {
         "description": "Add or remove tracking numbers and adjust the update interval.",
         "data": {
           "tracking_numbers": "Tracking numbers",
+          "update_interval_minutes": "Update interval (minutes)"
+        }
+      },
+      "dpd_options": {
+        "description": "Adjust the update interval.",
+        "data": {
           "update_interval_minutes": "Update interval (minutes)"
         }
       }

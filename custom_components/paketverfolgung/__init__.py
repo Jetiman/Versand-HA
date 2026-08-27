@@ -11,13 +11,16 @@ from homeassistant.exceptions import ServiceValidationError
 
 from .const import (
     ATTR_TRACKING_NUMBER,
+    CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
     CONF_UPDATE_INTERVAL,
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
+    PROVIDER_DHL,
+    PROVIDER_DPD,
     SERVICE_ADD_TRACKING_NUMBER,
 )
-from .coordinator import DhlDataUpdateCoordinator
+from .coordinator import DhlDataUpdateCoordinator, DpdDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,9 +39,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     minutes = entry.options.get(
         CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
     )
-    coordinator = DhlDataUpdateCoordinator(
-        hass, entry, update_interval=timedelta(minutes=minutes)
-    )
+    provider = entry.data.get(CONF_PROVIDER, PROVIDER_DHL)
+    if provider == PROVIDER_DPD:
+        coordinator = DpdDataUpdateCoordinator(
+            hass, entry, update_interval=timedelta(minutes=minutes)
+        )
+    else:
+        coordinator = DhlDataUpdateCoordinator(
+            hass, entry, update_interval=timedelta(minutes=minutes)
+        )
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -46,7 +55,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    if not hass.services.has_service(DOMAIN, SERVICE_ADD_TRACKING_NUMBER):
+    if provider == PROVIDER_DHL and not hass.services.has_service(
+        DOMAIN, SERVICE_ADD_TRACKING_NUMBER
+    ):
 
         async def _async_add_tracking_number(call: ServiceCall) -> ServiceResponse:
             return await _add_tracking_number(hass, call.data[ATTR_TRACKING_NUMBER])
@@ -65,14 +76,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _add_tracking_number(
     hass: HomeAssistant, tracking_number: str
 ) -> ServiceResponse:
-    """Add a tracking number to the (single) config entry if not already tracked.
+    """Add a tracking number to the DHL config entry if not already tracked.
 
     Returns whether it was newly added, so callers (e.g. the Telegram
     automation) can send an accurate confirmation instead of assuming success.
     """
-    entries = hass.config_entries.async_entries(DOMAIN)
+    entries = [
+        e
+        for e in hass.config_entries.async_entries(DOMAIN)
+        if e.data.get(CONF_PROVIDER, PROVIDER_DHL) == PROVIDER_DHL
+    ]
     if not entries:
-        raise ServiceValidationError("Paketverfolgung ist nicht eingerichtet.")
+        raise ServiceValidationError("DHL-Paketverfolgung ist nicht eingerichtet.")
     entry = entries[0]
 
     cleaned = tracking_number.strip()

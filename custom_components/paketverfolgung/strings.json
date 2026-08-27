@@ -2,23 +2,48 @@
   "config": {
     "step": {
       "user": {
+        "title": "Anbieter wählen",
+        "description": "Welchen Paketdienst möchtest du hinzufügen?",
+        "data": {
+          "provider": "Anbieter"
+        }
+      },
+      "dhl": {
         "title": "Sendungsnummern hinzufügen",
         "description": "Füge eine oder mehrere DHL-Sendungsnummern hinzu, die verfolgt werden sollen (Enter nach jeder Nummer). Du kannst auch leer starten und später über die Optionen der Integration Sendungsnummern hinzufügen oder entfernen.",
         "data": {
           "tracking_numbers": "Sendungsnummern"
         }
+      },
+      "dpd": {
+        "title": "Mit DPD-Konto anmelden",
+        "description": "Melde dich mit deinem myDPD-Konto an. Alle Sendungen (gesendet, empfangen, Retouren) werden danach automatisch erkannt - anders als bei DHL musst du keine Sendungsnummern manuell eintragen.",
+        "data": {
+          "dpd_username": "Benutzername / E-Mail",
+          "dpd_password": "Passwort"
+        }
       }
     },
+    "error": {
+      "invalid_auth": "Anmeldung fehlgeschlagen. Bitte Benutzername und Passwort prüfen.",
+      "cannot_connect": "Verbindung zu DPD fehlgeschlagen. Bitte später erneut versuchen."
+    },
     "abort": {
-      "already_configured": "Paketverfolgung ist bereits eingerichtet."
+      "already_configured": "Dieser Anbieter ist bereits eingerichtet."
     }
   },
   "options": {
     "step": {
-      "init": {
+      "dhl_options": {
         "description": "Sendungsnummern hinzufügen oder entfernen und das Aktualisierungsintervall anpassen.",
         "data": {
           "tracking_numbers": "Sendungsnummern",
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+        }
+      },
+      "dpd_options": {
+        "description": "Aktualisierungsintervall anpassen.",
+        "data": {
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }
       }

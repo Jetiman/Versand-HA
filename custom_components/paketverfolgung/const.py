@@ -20,6 +20,57 @@ CONF_UPDATE_INTERVAL = "update_interval_minutes"
 SERVICE_ADD_TRACKING_NUMBER = "add_tracking_number"
 ATTR_TRACKING_NUMBER = "tracking_number"
 
+CONF_PROVIDER = "provider"
+PROVIDER_DHL = "dhl"
+PROVIDER_DPD = "dpd"
+
+CONF_DPD_USERNAME = "dpd_username"
+CONF_DPD_PASSWORD = "dpd_password"
+
+# DPD "Paketnavigator3" SOAP API (Android app v4.1.2, package de.dpd.mobile).
+# Partner credentials are public constants baked into the app, reverse
+# engineered via the open-source ioBroker.parcel adapter. Verified working
+# 2026-08-27. Unlike DHL, DPD's public tracking-number-only lookup requires
+# a ZIP code plus a CAPTCHA-guarded ASP.NET form - not worth automating -
+# so this uses a real myDPD account login instead, same as the app does.
+DPD_NS = "https://cloud.dpd.com/"
+DPD_SERVICE_URL = "https://api.paketnavigator.de/services/v1/Navigator3Service.asmx"
+DPD_PARTNER_NAME = "Android Paketnavigator3"
+DPD_PARTNER_TOKEN = "A33363237662F5945576"
+DPD_PARTNER_PASSWORD = "272 WetFd2mpXrgD"
+DPD_API_VERSION = 100
+DPD_LANGUAGE = "de_DE"
+DPD_TRACKING_PAGE_URL = "https://tracking.dpd.de/status/de_DE/parcel/{id}"
+
+# DPD StatusID (string) -> broad group, from the app's Constant.smali /
+# observed live responses.
+DPD_STATUS_GROUP = {
+    "NO_TRACKINGDATA": "registered",
+    "DATA_TRANSMITTED": "registered",
+    "ACCEPTED": "registered",
+    "START": "registered",
+    "COLLECTED": "transit",
+    "AT_SENDING_DEPOT": "transit",
+    "ON_THE_ROAD": "transit",
+    "AT_DELIVERY_DEPOT": "transit",
+    "SORTED": "transit",
+    "SORTED_TO_PICKUP_LOCATION": "transit",
+    "PARCEL_PROCESSING": "transit",
+    "OUT_FOR_DELIVERY": "out_for_delivery",
+    "IN_DELIVERY": "out_for_delivery",
+    "AT_PARCELSHOP": "out_for_delivery",
+    "DELIVERED": "delivered",
+    "PICKED_UP": "delivered",
+    "RETURN_TO_SENDER": "delivered",
+}
+DPD_GROUP_ICONS = {
+    "registered": "mdi:package-variant-closed",
+    "transit": "mdi:truck-outline",
+    "out_for_delivery": "mdi:truck-delivery",
+    "delivered": "mdi:package-variant-closed-check",
+}
+DPD_OUT_FOR_DELIVERY_STATUS_IDS = {"OUT_FOR_DELIVERY", "IN_DELIVERY"}
+
 DEFAULT_UPDATE_INTERVAL_MINUTES = 15
 MIN_UPDATE_INTERVAL_MINUTES = 5
 DEFAULT_UPDATE_INTERVAL = timedelta(minutes=DEFAULT_UPDATE_INTERVAL_MINUTES)

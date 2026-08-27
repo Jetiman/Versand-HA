@@ -1,9 +1,9 @@
-"""Sensor platform for Paketverfolgung (DHL).
+"""Sensor platform for Paketverfolgung (DHL tracking numbers, DPD account).
 
-Creates one sensor entity per tracked DHL tracking number. Entities are
-added when a tracking number is configured and removed again if DHL no
-longer returns data for it (e.g. it was removed from the config, or is
-too old for DHL to still have data on it).
+Creates one sensor entity per tracked shipment/parcel plus a summary
+"out for delivery today" sensor, for each config entry. Entities are added
+as items appear in the coordinator's data and removed again once they drop
+out (tracking number removed from config, DPD parcel no longer returned, ...).
 """
 from __future__ import annotations
 
@@ -14,23 +14,61 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    CONF_PROVIDER,
     DEFAULT_ICON,
     DEFAULT_STATUS,
     DOMAIN,
+    DPD_GROUP_ICONS,
+    DPD_OUT_FOR_DELIVERY_STATUS_IDS,
+    DPD_STATUS_GROUP,
+    DPD_TRACKING_PAGE_URL,
     PROGRESS_ICONS,
     PROGRESS_OUT_FOR_DELIVERY,
     PROGRESS_STATUS,
+    PROVIDER_DPD,
     TRACKING_PAGE_URL,
 )
-from .coordinator import DhlDataUpdateCoordinator
+from .coordinator import DhlDataUpdateCoordinator, DpdDataUpdateCoordinator
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    coordinator: DhlDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    if entry.data.get(CONF_PROVIDER) == PROVIDER_DPD:
+        _setup_dynamic_entities(
+            entry,
+            coordinator,
+            async_add_entities,
+            entity_cls=DpdParcelSensor,
+            summary_cls=DpdOutForDeliveryTodaySensor,
+        )
+    else:
+        _setup_dynamic_entities(
+            entry,
+            coordinator,
+            async_add_entities,
+            entity_cls=DhlShipmentSensor,
+            summary_cls=DhlOutForDeliveryTodaySensor,
+        )
+
+
+def _setup_dynamic_entities(
+    entry: ConfigEntry,
+    coordinator,
+    async_add_entities: AddEntitiesCallback,
+    *,
+    entity_cls: type,
+    summary_cls: type,
+) -> None:
+    """Add one entity per item key in coordinator.data, kept in sync.
+
+    Shared between DHL (shipments) and DPD (parcels): both coordinators
+    expose the same `dict[id, dict]` shape, just with different item
+    schemas, so the add/remove bookkeeping is identical.
+    """
     known_ids: set[str] = set()
-    entities: dict[str, "DhlShipmentSensor"] = {}
+    entities: dict[str, CoordinatorEntity] = {}
 
     @callback
     def _sync_entities() -> None:
@@ -39,25 +77,24 @@ async def async_setup_entry(
         new_ids = current_ids - known_ids
         if new_ids:
             new_entities = [
-                DhlShipmentSensor(coordinator, entry.entry_id, shipment_id)
-                for shipment_id in new_ids
+                entity_cls(coordinator, entry.entry_id, item_id) for item_id in new_ids
             ]
             for entity in new_entities:
-                entities[entity.shipment_id] = entity
+                entities[entity.item_id] = entity
             known_ids.update(new_ids)
             async_add_entities(new_entities)
 
         removed_ids = known_ids - current_ids
-        for shipment_id in removed_ids:
-            entity = entities.pop(shipment_id, None)
-            known_ids.discard(shipment_id)
+        for item_id in removed_ids:
+            entity = entities.pop(item_id, None)
+            known_ids.discard(item_id)
             if entity is not None:
-                hass.async_create_task(entity.async_remove())
+                coordinator.hass.async_create_task(entity.async_remove())
 
     entry.async_on_unload(coordinator.async_add_listener(_sync_entities))
     _sync_entities()
 
-    async_add_entities([DhlOutForDeliveryTodaySensor(coordinator, entry.entry_id)])
+    async_add_entities([summary_cls(coordinator, entry.entry_id)])
 
 
 class DhlShipmentSensor(CoordinatorEntity[DhlDataUpdateCoordinator], SensorEntity):
@@ -69,24 +106,24 @@ class DhlShipmentSensor(CoordinatorEntity[DhlDataUpdateCoordinator], SensorEntit
         self,
         coordinator: DhlDataUpdateCoordinator,
         entry_id: str,
-        shipment_id: str,
+        item_id: str,
     ) -> None:
         super().__init__(coordinator)
-        self.shipment_id = shipment_id
-        self._attr_unique_id = f"{entry_id}_{shipment_id}"
+        self.item_id = item_id
+        self._attr_unique_id = f"{entry_id}_{item_id}"
 
     @property
     def _shipment(self) -> dict:
-        return (self.coordinator.data or {}).get(self.shipment_id, {})
+        return (self.coordinator.data or {}).get(self.item_id, {})
 
     @property
     def available(self) -> bool:
-        return super().available and self.shipment_id in (self.coordinator.data or {})
+        return super().available and self.item_id in (self.coordinator.data or {})
 
     @property
     def name(self) -> str:
         info = self._shipment.get("sendungsinfo", {})
-        return info.get("sendungsname") or f"DHL {self.shipment_id}"
+        return info.get("sendungsname") or f"DHL {self.item_id}"
 
     @property
     def native_value(self) -> str:
@@ -120,12 +157,12 @@ class DhlShipmentSensor(CoordinatorEntity[DhlDataUpdateCoordinator], SensorEntit
         ]
         events.reverse()
         return {
-            "tracking_id": self.shipment_id,
+            "tracking_id": self.item_id,
             "progress": verlauf.get("fortschritt"),
             "direction": info.get("sendungsrichtung"),
             "delivery_window_from": zustellung.get("zustellzeitfensterVon"),
             "delivery_window_to": zustellung.get("zustellzeitfensterBis"),
-            "tracking_url": TRACKING_PAGE_URL.format(id=self.shipment_id),
+            "tracking_url": TRACKING_PAGE_URL.format(id=self.item_id),
             "events": events,
         }
 
@@ -176,5 +213,92 @@ class DhlOutForDeliveryTodaySensor(
                     "tracking_url": TRACKING_PAGE_URL.format(id=shipment["id"]),
                 }
                 for shipment in self._out_for_delivery
+            ]
+        }
+
+
+class DpdParcelSensor(CoordinatorEntity[DpdDataUpdateCoordinator], SensorEntity):
+    """Represents a single DPD parcel (sent, received, or a return)."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: DpdDataUpdateCoordinator,
+        entry_id: str,
+        item_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self.item_id = item_id
+        self._attr_unique_id = f"{entry_id}_{item_id}"
+
+    @property
+    def _parcel(self) -> dict:
+        return (self.coordinator.data or {}).get(self.item_id, {})
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.item_id in (self.coordinator.data or {})
+
+    @property
+    def name(self) -> str:
+        return self._parcel.get("name") or f"DPD {self.item_id}"
+
+    @property
+    def native_value(self) -> str:
+        return self._parcel.get("status") or DEFAULT_STATUS
+
+    @property
+    def icon(self) -> str:
+        group = DPD_STATUS_GROUP.get(self._parcel.get("status_id"))
+        return DPD_GROUP_ICONS.get(group, DEFAULT_ICON)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "tracking_id": self.item_id,
+            "status_id": self._parcel.get("status_id"),
+            "direction": self._parcel.get("direction"),
+            "delivered": self._parcel.get("delivered"),
+            "tracking_url": DPD_TRACKING_PAGE_URL.format(id=self.item_id),
+        }
+
+
+class DpdOutForDeliveryTodaySensor(
+    CoordinatorEntity[DpdDataUpdateCoordinator], SensorEntity
+):
+    """Counts DPD parcels currently out for delivery."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Heute in Zustellung"
+    _attr_icon = "mdi:truck-delivery"
+    _attr_native_unit_of_measurement = "Sendungen"
+
+    def __init__(self, coordinator: DpdDataUpdateCoordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_out_for_delivery_today"
+
+    @property
+    def _out_for_delivery(self) -> list[dict]:
+        return [
+            parcel
+            for parcel in (self.coordinator.data or {}).values()
+            if parcel.get("status_id") in DPD_OUT_FOR_DELIVERY_STATUS_IDS
+        ]
+
+    @property
+    def native_value(self) -> int:
+        return len(self._out_for_delivery)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "shipments": [
+                {
+                    "tracking_id": parcel["id"],
+                    "status": parcel.get("status"),
+                    "tracking_url": DPD_TRACKING_PAGE_URL.format(id=parcel["id"]),
+                }
+                for parcel in self._out_for_delivery
             ]
         }
