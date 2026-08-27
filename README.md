@@ -1,6 +1,9 @@
 # Paketverfolgung für Home Assistant
 
-Zeigt den Status deiner Paketsendungen als Sensoren in Home Assistant an. Unterstützt **DHL** (Sendungsnummern) und **DPD** (Konto-Login mit automatischer Erkennung aller Sendungen).
+Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten-Oberfläche in Home Assistant an. Zwei Wege, die sich beliebig kombinieren lassen:
+
+- **Sendungsnummern** – du trägst Nummern ein, der Anbieter (**DHL** oder **DPD**) wird pro Nummer automatisch erkannt.
+- **DPD-Konto** – Login mit deinem myDPD-Konto, alle Sendungen werden automatisch erkannt.
 
 ## Installation über HACS
 
@@ -9,63 +12,51 @@ Zeigt den Status deiner Paketsendungen als Sensoren in Home Assistant an. Unters
 3. „Paketverfolgung“ in HACS suchen und installieren.
 4. Home Assistant neu starten.
 
-Für jeden Anbieter separat **Einstellungen → Geräte & Dienste → Integration hinzufügen → „Paketverfolgung“** ausführen und den gewünschten Anbieter wählen. Beide können parallel eingerichtet sein.
+**Einstellungen → Geräte & Dienste → Integration hinzufügen → „Paketverfolgung“** ausführen und wählen, was du hinzufügen möchtest. „Sendungsnummern“ und „DPD-Konto“ können parallel eingerichtet sein.
 
-## DHL
+> ⚠️ **Hinweis:** Alle genutzten Schnittstellen sind **inoffiziell** (keine dokumentierten APIs). Sie können sich jederzeit ohne Vorwarnung ändern.
 
-Nutzt DHLs öffentliche Sendungsverfolgungs-Suche (dieselbe, die auch die Seite [dhl.de/sendungsverfolgung](https://www.dhl.de/de/privatkunden/dhl-sendungsverfolgung.html) verwendet) – **kein DHL-Login, keine Zugangsdaten, kein Konto nötig.**
+## Sendungsnummern (DHL & DPD)
 
-> ⚠️ **Hinweis:** Es handelt sich um eine **inoffizielle** Schnittstelle (kein offiziell dokumentiertes API). DHL kann sie jederzeit ohne Vorwarnung ändern.
+1. „Sendungsnummern (DHL & DPD)“ wählen.
+2. Eine oder mehrere Nummern eingeben (nach jeder Nummer Enter). Der Schritt kann leer übersprungen werden.
+3. Optional deine **PLZ** hinterlegen – manche DPD-Sendungen sind ohne Empfänger-PLZ nicht öffentlich abrufbar.
 
-### Einrichtung
+Bei der nächsten Aktualisierung wird jede Nummer bei DHL und – falls dort nichts gefunden wird – bei DPD nachgeschlagen. Der erkannte Anbieter wird gemerkt und danach nur noch dieser abgefragt.
 
-1. Anbieter „DHL“ wählen.
-2. Eine oder mehrere Sendungsnummern eingeben (nach jeder Nummer Enter drücken). Der Schritt kann auch leer übersprungen werden.
-3. Fertig – pro Sendungsnummer wird automatisch ein Sensor angelegt.
+- **DHL:** öffentliche Sendungsverfolgungs-Suche (kein Login), inkl. komplettem Verlauf und Zustellzeitfenster.
+- **DPD:** öffentliche „Parcel Life Cycle“-Verfolgung von tracking.dpd.de, inkl. Verlauf.
 
-**Sendungsnummern später hinzufügen/entfernen:** Einstellungen → Geräte & Dienste → Paketverfolgung → Zahnrad-Symbol beim DHL-Eintrag → dort auch das Aktualisierungsintervall (Standard: alle 15 Minuten) anpassbar.
+**Nummern später hinzufügen/entfernen:** Zahnrad-Symbol beim Eintrag „Sendungsnummern“ – dort auch PLZ und Aktualisierungsintervall (Standard: 15 Minuten). Oder über den Dienst `paketverfolgung.add_tracking_number` bzw. das Eingabefeld in der Oberfläche.
 
-Liefert DHL zu einer Sendungsnummer keine Daten mehr (z. B. weil sie sehr alt ist), verschwindet der zugehörige Sensor automatisch.
+Eine Nummer, zu der (noch) kein Anbieter Daten liefert, bleibt mit dem Status „Noch keine Daten“ bestehen, bis du sie entfernst oder Daten verfügbar sind.
 
-### Warum keine automatische Erkennung neuer DHL-Pakete?
+## DPD-Konto
 
-Ursprünglich sollte die Integration sich wie die DHL-App mit dem eigenen DHL-Konto anmelden und alle Sendungen automatisch erkennen – ganz ohne manuelle Eingabe. Das ist technisch möglich (reverse-engineerter Login-Flow, analog zu [ioBroker.parcel](https://github.com/TA2k/ioBroker.parcel)), aber der dafür nötige Endpunkt liefert aktuell (Stand 2026-08) trotz gültigem Login keine Sendungen zurück – vermutlich nutzt die App inzwischen einen anderen, internen Endpunkt. Die Sendungsnummer-Suche funktioniert dagegen zuverlässig und sogar ganz ohne Login. Der Login-basierte Ansatz ist in der Git-Historie dieses Repositories vollständig erhalten und kann bei Bedarf wieder aufgegriffen werden.
-
-## DPD
-
-Meldet sich mit deinem **myDPD-Konto** an (SOAP-API der offiziellen DPD-App "Paketnavigator") und zeigt automatisch **alle** Sendungen (gesendet, empfangen, Retouren) an – keine manuelle Eingabe von Sendungsnummern nötig.
-
-> ⚠️ **Hinweis:** Ebenfalls eine **inoffizielle** Schnittstelle (Partner-Zugangsdaten aus der Android-App extrahiert). Kann bei DPD-seitigen Änderungen brechen.
-
-### Einrichtung
-
-1. Anbieter „DPD“ wählen.
-2. Mit Benutzername/E-Mail und Passwort deines myDPD-Kontos anmelden.
-3. Fertig – alle Sendungen werden automatisch als Sensoren angelegt und bei jeder Aktualisierung neu abgeglichen.
+Meldet sich mit deinem **myDPD-Konto** an (SOAP-API der offiziellen DPD-App „Paketnavigator“) und zeigt automatisch **alle** Sendungen (gesendet, empfangen, Retouren) an – keine manuelle Eingabe nötig. Der vollständige Verlauf wird zusätzlich über die öffentliche DPD-Verfolgung nachgeladen; bei geschützten Sendungen hilft die in den Optionen hinterlegte PLZ.
 
 Das Passwort wird nur lokal in Home Assistant gespeichert (wie bei jeder anderen Cloud-Integration).
 
 ## Was wird angezeigt?
 
-Pro Sendung (DHL) bzw. Paket (DPD) ein Sensor mit:
+Pro Sendung ein Sensor mit:
 
 - **Zustand:** Klartext-Status (z. B. „In Zustellung“, „Zugestellt“)
-- **Attribute:** Tracking-ID, Status/Fortschritt, Richtung, Link zur Sendungsverfolgung (bei DHL zusätzlich Zustellzeitfenster und komplette Verlaufshistorie)
+- **Attribute:** `tracking_id`, `carrier` (`dhl`/`dpd`), `group` (Phase), `direction`, `delivered`, `tracking_url`, `events` (kompletter Verlauf, neueste zuerst), bei DHL zusätzlich `delivery_window_from`/`_to`
 
-Zusätzlich ein **anbieterübergreifender** Sammel-Sensor **„Heute in Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Gesamtzahl der Sendungen (DHL + DPD zusammen), die gerade im Zustellfahrzeug sind, Attribut `shipments` enthält die Liste dieser Sendungen (inkl. Anbieter) für eine Dashboard-Karte.
+Zusätzlich der **anbieterübergreifende** Sammel-Sensor **„Heute in Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Gesamtzahl der Sendungen, die gerade im Zustellfahrzeug sind; Attribut `shipments` enthält die Liste (inkl. Anbieter).
 
 ## Oberfläche („Paketverfolgung“ in der Seitenleiste)
 
-Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolgung** in der Home-Assistant-Seitenleiste:
+Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolgung**:
 
-- **Übersicht:** Kacheln mit Gesamtzahl, „Unterwegs“, „Heute in Zustellung“ und „Zugestellt“, darunter die Liste aller Sendungen (DHL + DPD gemeinsam), unzugestellte zuerst.
-- **Detailseite:** Ein Klick auf eine Sendung öffnet eine Seite mit aktuellem Status, Sendungsnummer, Richtung, Zustellzeitfenster (DHL), einem Link zur Anbieter-Seite und dem **kompletten Sendungsverlauf** als Zeitleiste.
-- **DHL-Sendungsnummer hinzufügen:** direkt über das Eingabefeld in der Übersicht (nutzt den Dienst `paketverfolgung.add_tracking_number`).
+- **Übersicht:** Kacheln (Gesamt / Unterwegs / Heute in Zustellung / Zugestellt), Eingabefeld „Sendungsnummer hinzufügen (DHL oder DPD)“ und die Liste aller Sendungen, unzugestellte zuerst.
+- **Detailseite:** Klick auf eine Sendung → aktueller Status, Eckdaten, Link zur Anbieter-Seite, Button „Jetzt aktualisieren“ und der **komplette Sendungsverlauf** als Zeitleiste.
 
-Die Oberfläche ist eine reine Weboberfläche ohne zusätzliche Abfragen – sie zeigt dieselben Daten wie die Sensoren, nur aufbereitet. DPD liefert über die genutzte Schnittstelle nur den aktuellen Status, daher zeigt die Zeitleiste dort nur einen Eintrag.
+Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie die Sensoren, nur aufbereitet.
 
 ## Bekannte Einschränkungen
 
-- Beide Schnittstellen sind inoffiziell und können bei anbieterseitigen Änderungen brechen. Bitte in diesem Fall ein Issue öffnen.
-- DHL: Sendungsnummern müssen manuell eingetragen werden, keine automatische Kontoerkennung (siehe oben).
-- DPD: nur ein myDPD-Konto pro eingerichtetem Eintrag; mehrere Konten können durch mehrfaches Hinzufügen der Integration verfolgt werden.
+- Alle Schnittstellen sind inoffiziell und können bei anbieterseitigen Änderungen brechen. Bitte in diesem Fall ein Issue öffnen.
+- DHL: keine automatische Kontoerkennung – Sendungsnummern müssen eingetragen werden.
+- DPD: manche Sendungen sind ohne Empfänger-PLZ nicht öffentlich abrufbar; nur ein myDPD-Konto pro Eintrag.

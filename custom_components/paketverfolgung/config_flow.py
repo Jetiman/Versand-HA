@@ -11,6 +11,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
+    CONF_DEFAULT_POSTCODE,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
     CONF_PROVIDER,
@@ -19,8 +20,8 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
     MIN_UPDATE_INTERVAL_MINUTES,
-    PROVIDER_DHL,
     PROVIDER_DPD,
+    PROVIDER_NUMBERS,
 )
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError
 
@@ -38,12 +39,17 @@ def _clean_tracking_numbers(raw: list[str] | None) -> list[str]:
     return seen
 
 
-def _tracking_numbers_schema(default: list[str]) -> vol.Schema:
+def _tracking_numbers_schema(
+    default: list[str], postcode: str | None = None
+) -> vol.Schema:
     return vol.Schema(
         {
             vol.Optional(
                 CONF_TRACKING_NUMBERS, default=default
             ): selector.TextSelector(selector.TextSelectorConfig(multiple=True)),
+            vol.Optional(
+                CONF_DEFAULT_POSTCODE, default=postcode or ""
+            ): selector.TextSelector(),
         }
     )
 
@@ -85,23 +91,36 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_PROVIDER, default=PROVIDER_DHL): vol.In(
-                        [PROVIDER_DHL, PROVIDER_DPD]
+                    vol.Required(
+                        CONF_PROVIDER, default=PROVIDER_NUMBERS
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[PROVIDER_NUMBERS, PROVIDER_DPD],
+                            translation_key="provider",
+                        )
                     ),
                 }
             ),
         )
 
+    # step_id stays "dhl" for config-entry / translation stability; it's
+    # really the carrier-neutral tracking-number list now.
     async def async_step_dhl(
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
         if user_input is not None:
-            await self.async_set_unique_id(PROVIDER_DHL)
+            await self.async_set_unique_id(PROVIDER_NUMBERS)
             self._abort_if_unique_id_configured()
             numbers = _clean_tracking_numbers(user_input.get(CONF_TRACKING_NUMBERS))
             return self.async_create_entry(
-                title="DHL",
-                data={CONF_PROVIDER: PROVIDER_DHL, CONF_TRACKING_NUMBERS: numbers},
+                title="Sendungsnummern",
+                data={
+                    CONF_PROVIDER: PROVIDER_NUMBERS,
+                    CONF_TRACKING_NUMBERS: numbers,
+                    CONF_DEFAULT_POSTCODE: (
+                        user_input.get(CONF_DEFAULT_POSTCODE) or ""
+                    ).strip(),
+                },
             )
 
         return self.async_show_form(
@@ -156,9 +175,12 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
-        if self._entry.data.get(CONF_PROVIDER, PROVIDER_DHL) == PROVIDER_DPD:
+        if self._entry.data.get(CONF_PROVIDER, PROVIDER_NUMBERS) == PROVIDER_DPD:
             return await self.async_step_dpd_options(user_input)
         return await self.async_step_dhl_options(user_input)
+
+    def _current(self, key, default=None):
+        return self._entry.options.get(key, self._entry.data.get(key, default))
 
     async def async_step_dhl_options(
         self, user_input: dict[str, Any] | None = None
@@ -169,19 +191,20 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                 title="",
                 data={
                     CONF_TRACKING_NUMBERS: numbers,
+                    CONF_DEFAULT_POSTCODE: (
+                        user_input.get(CONF_DEFAULT_POSTCODE) or ""
+                    ).strip(),
                     CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
                 },
             )
 
-        current_numbers = self._entry.options.get(
-            CONF_TRACKING_NUMBERS,
-            self._entry.data.get(CONF_TRACKING_NUMBERS, []),
-        )
-        current_interval = self._entry.options.get(
-            CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
-        )
-        schema = _tracking_numbers_schema(current_numbers).extend(
-            _update_interval_schema(current_interval).schema
+        schema = _tracking_numbers_schema(
+            self._current(CONF_TRACKING_NUMBERS, []),
+            self._current(CONF_DEFAULT_POSTCODE),
+        ).extend(
+            _update_interval_schema(
+                self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
+            ).schema
         )
         return self.async_show_form(step_id="dhl_options", data_schema=schema)
 
@@ -190,13 +213,23 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
     ) -> Any:
         if user_input is not None:
             return self.async_create_entry(
-                title="", data={CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL]}
+                title="",
+                data={
+                    CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
+                    CONF_DEFAULT_POSTCODE: (
+                        user_input.get(CONF_DEFAULT_POSTCODE) or ""
+                    ).strip(),
+                },
             )
 
-        current_interval = self._entry.options.get(
-            CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
+        schema = _update_interval_schema(
+            self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
+        ).extend(
+            {
+                vol.Optional(
+                    CONF_DEFAULT_POSTCODE,
+                    default=self._current(CONF_DEFAULT_POSTCODE) or "",
+                ): selector.TextSelector(),
+            }
         )
-        return self.async_show_form(
-            step_id="dpd_options",
-            data_schema=_update_interval_schema(current_interval),
-        )
+        return self.async_show_form(step_id="dpd_options", data_schema=schema)

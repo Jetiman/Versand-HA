@@ -1,12 +1,12 @@
 add_tracking_number:
   name: Sendungsnummer hinzufügen
   description: >-
-    Fügt eine DHL-Sendungsnummer zur Paketverfolgung hinzu, falls sie noch
-    nicht verfolgt wird.
+    Fügt eine Sendungsnummer zur Paketverfolgung hinzu, falls sie noch nicht
+    verfolgt wird. Der Anbieter (DHL oder DPD) wird automatisch erkannt.
   fields:
     tracking_number:
       name: Sendungsnummer
-      description: Die DHL-Sendungs-/Trackingnummer.
+      description: Die Sendungs-/Trackingnummer (DHL oder DPD).
       required: true
       example: "00340434123456789012"
       selector:

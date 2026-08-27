@@ -12,11 +12,6 @@
  * (one per shipment/parcel, identified by the `tracking_id` attribute).
  */
 
-const OUT_FOR_DELIVERY_ICON = "mdi:truck-delivery";
-const DELIVERED_ICONS = new Set([
-  "mdi:package-variant-closed-check",
-]);
-
 class PaketverfolgungPanel extends HTMLElement {
   constructor() {
     super();
@@ -75,27 +70,26 @@ class PaketverfolgungPanel extends HTMLElement {
       const a = stateObj.attributes || {};
       if (!a.tracking_id) continue;
       const url = a.tracking_url || "";
-      const provider = url.includes("dpd") ? "DPD" : "DHL";
-      const delivered =
-        a.delivered === true ||
-        a.progress === 5 ||
-        DELIVERED_ICONS.has(a.icon);
+      const carrier = (a.carrier || (url.includes("dpd") ? "dpd" : "dhl")) + "";
+      const group = a.group || "";
+      const delivered = a.delivered === true || group === "delivered";
       out.push({
         entity_id: stateObj.entity_id,
         name: a.friendly_name || stateObj.entity_id,
         status: stateObj.state,
         icon: a.icon || "mdi:package-variant-closed",
         tracking_id: String(a.tracking_id),
-        provider,
+        provider: carrier === "dpd" ? "DPD" : carrier === "dhl" ? "DHL" : "?",
+        carrier,
+        group,
         direction: a.direction || null,
         delivery_from: a.delivery_window_from || null,
         delivery_to: a.delivery_window_to || null,
         tracking_url: url || null,
         events: Array.isArray(a.events) ? a.events : [],
         delivered,
-        out_for_delivery:
-          a.icon === OUT_FOR_DELIVERY_ICON ||
-          ["OUT_FOR_DELIVERY", "IN_DELIVERY"].includes(a.status_id),
+        protected: a.protected === true,
+        out_for_delivery: group === "out_for_delivery" && !delivered,
         last_updated: stateObj.last_updated,
         last_changed: stateObj.last_changed,
       });
@@ -129,6 +123,8 @@ class PaketverfolgungPanel extends HTMLElement {
       items: shipments.map((s) => [
         s.entity_id,
         s.status,
+        s.group,
+        s.carrier,
         s.last_updated,
         s.events.length,
       ]),
@@ -191,8 +187,8 @@ class PaketverfolgungPanel extends HTMLElement {
 
     const rows = shipments.length
       ? shipments.map((s) => this._rowHtml(s)).join("")
-      : `<div class="pv-empty">Noch keine Sendungen. Füge unten eine DHL-Sendungsnummer hinzu
-          oder richte DPD ein.</div>`;
+      : `<div class="pv-empty">Noch keine Sendungen. Füge unten eine Sendungsnummer hinzu
+          oder richte das DPD-Konto ein.</div>`;
 
     let resultMsg = "";
     if (this._addResult) {
@@ -207,7 +203,7 @@ class PaketverfolgungPanel extends HTMLElement {
         canAdd
           ? `<form class="pv-add" autocomplete="off">
               <input name="tracking" type="text" inputmode="numeric"
-                placeholder="DHL-Sendungsnummer hinzufügen" />
+                placeholder="Sendungsnummer hinzufügen (DHL oder DPD)" />
               <button type="submit" ${this._addBusy ? "disabled" : ""}>
                 ${this._addBusy ? "…" : "Hinzufügen"}
               </button>
@@ -225,7 +221,9 @@ class PaketverfolgungPanel extends HTMLElement {
         <ha-icon class="pv-row-icon" icon="${esc(s.icon)}"></ha-icon>
         <div class="pv-row-main">
           <div class="pv-row-name">${esc(s.name)}</div>
-          <div class="pv-row-sub">${esc(s.provider)} · ${esc(s.tracking_id)}</div>
+          <div class="pv-row-sub">${esc(
+            s.provider === "?" ? "Anbieter wird erkannt" : s.provider
+          )} · ${esc(s.tracking_id)}</div>
         </div>
         <div class="pv-row-status ${s.delivered ? "done" : ""}">${esc(s.status)}</div>
         <ha-icon class="pv-chevron" icon="mdi:chevron-right"></ha-icon>
@@ -241,7 +239,7 @@ class PaketverfolgungPanel extends HTMLElement {
     }
 
     const meta = [
-      ["Anbieter", s.provider],
+      ["Anbieter", s.provider === "?" ? "wird erkannt" : s.provider],
       ["Sendungsnummer", s.tracking_id],
       ["Richtung", directionLabel(s.direction)],
       [
@@ -286,11 +284,15 @@ class PaketverfolgungPanel extends HTMLElement {
         </li>`;
     }
 
-    const noHistoryNote =
-      !s.events.length && s.provider === "DPD"
-        ? `<div class="pv-note">DPD liefert über diese Schnittstelle nur den aktuellen Status,
-            keinen vollständigen Verlauf.</div>`
-        : "";
+    let note = "";
+    if (s.protected) {
+      note = `<div class="pv-note">Diese DPD-Sendung ist geschützt. Hinterlege deine PLZ
+        in den Optionen der Integration, damit der Verlauf abgerufen werden kann.</div>`;
+    } else if (!s.events.length && s.provider === "DPD") {
+      note = `<div class="pv-note">Für diese Sendung liegt noch kein Verlauf vor.</div>`;
+    } else if (!s.events.length && s.provider === "?") {
+      note = `<div class="pv-note">Der Anbieter wird bei der nächsten Aktualisierung erkannt.</div>`;
+    }
 
     return `
       <a class="pv-back" data-back>← Übersicht</a>
@@ -317,7 +319,7 @@ class PaketverfolgungPanel extends HTMLElement {
       <div class="pv-meta">${meta}</div>
 
       <div class="pv-section-title">Sendungsverlauf</div>
-      ${noHistoryNote}
+      ${note}
       <ul class="pv-timeline">${timeline}</ul>
     `;
   }
@@ -376,7 +378,7 @@ class PaketverfolgungPanel extends HTMLElement {
         text:
           added === false
             ? `${value} wird bereits verfolgt.`
-            : `${value} hinzugefügt. Der Sensor erscheint nach der nächsten Abfrage.`,
+            : `${value} hinzugefügt. Anbieter wird bei der nächsten Aktualisierung erkannt.`,
       };
       this._draftTracking = "";
     } catch (err) {

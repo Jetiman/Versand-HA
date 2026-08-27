@@ -3,16 +3,17 @@
     "step": {
       "user": {
         "title": "Choose a provider",
-        "description": "Which parcel carrier do you want to add?",
+        "description": "What do you want to add?",
         "data": {
           "provider": "Provider"
         }
       },
       "dhl": {
-        "title": "Add tracking numbers",
-        "description": "Add one or more DHL tracking numbers to track (press Enter after each). You can also start empty and add tracking numbers later via the integration's options.",
+        "title": "Track parcel numbers",
+        "description": "Add one or more tracking numbers (press Enter after each). The carrier (DHL or DPD) is detected automatically per number. You can also start empty and add numbers later via the options.",
         "data": {
-          "tracking_numbers": "Tracking numbers"
+          "tracking_numbers": "Tracking numbers",
+          "default_postcode": "Your postcode (optional, for protected DPD parcels)"
         }
       },
       "dpd": {
@@ -29,21 +30,31 @@
       "cannot_connect": "Could not connect to DPD. Please try again later."
     },
     "abort": {
-      "already_configured": "This provider is already configured."
+      "already_configured": "This is already configured."
+    }
+  },
+  "selector": {
+    "provider": {
+      "options": {
+        "dhl": "Tracking numbers (DHL & DPD)",
+        "dpd": "DPD account (all parcels automatically)"
+      }
     }
   },
   "options": {
     "step": {
       "dhl_options": {
-        "description": "Add or remove tracking numbers and adjust the update interval.",
+        "description": "Add or remove tracking numbers, set a postcode for protected DPD parcels, and adjust the update interval.",
         "data": {
           "tracking_numbers": "Tracking numbers",
+          "default_postcode": "Your postcode (optional, for protected DPD parcels)",
           "update_interval_minutes": "Update interval (minutes)"
         }
       },
       "dpd_options": {
-        "description": "Adjust the update interval.",
+        "description": "Set a postcode for protected parcels and adjust the update interval.",
         "data": {
+          "default_postcode": "Your postcode (optional, for protected DPD parcels)",
           "update_interval_minutes": "Update interval (minutes)"
         }
       }
@@ -52,11 +63,11 @@
   "services": {
     "add_tracking_number": {
       "name": "Add tracking number",
-      "description": "Adds a DHL tracking number to Paketverfolgung, unless it's already tracked.",
+      "description": "Adds a tracking number to Paketverfolgung, unless it's already tracked. The carrier (DHL or DPD) is detected automatically.",
       "fields": {
         "tracking_number": {
           "name": "Tracking number",
-          "description": "The DHL tracking number."
+          "description": "The tracking number (DHL or DPD)."
         }
       }
     }

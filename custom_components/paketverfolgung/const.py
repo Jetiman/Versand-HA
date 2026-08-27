@@ -20,9 +20,20 @@ USER_AGENT = (
 
 CONF_TRACKING_NUMBERS = "tracking_numbers"
 CONF_UPDATE_INTERVAL = "update_interval_minutes"
+# Optional recipient ZIP, used as a fallback for DPD parcels whose public
+# tracking is postcode-protected (both on the tracking-number entry and
+# the DPD-account entry).
+CONF_DEFAULT_POSTCODE = "default_postcode"
 
 SERVICE_ADD_TRACKING_NUMBER = "add_tracking_number"
 ATTR_TRACKING_NUMBER = "tracking_number"
+
+# Carrier a tracking number was detected to belong to. Kept per number in
+# the tracking-number coordinator (in memory - re-detected after a
+# restart, which is cheap).
+CARRIER_DHL = "dhl"
+CARRIER_DPD = "dpd"
+CARRIER_UNKNOWN = "unknown"
 
 # Custom sidebar panel (buildless web component served from ./frontend).
 PANEL_URL_PATH = "paketverfolgung"
@@ -30,10 +41,14 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.6.0"
+PANEL_VERSION = "1.7.0"
 
 CONF_PROVIDER = "provider"
-PROVIDER_DHL = "dhl"
+# Historic value "dhl" kept for config-entry stability: this provider is
+# now a carrier-neutral tracking-number list (DHL *and* DPD numbers, with
+# the carrier auto-detected per number).
+PROVIDER_NUMBERS = "dhl"
+PROVIDER_DHL = PROVIDER_NUMBERS
 PROVIDER_DPD = "dpd"
 
 CONF_DPD_USERNAME = "dpd_username"
@@ -42,9 +57,9 @@ CONF_DPD_PASSWORD = "dpd_password"
 # DPD "Paketnavigator3" SOAP API (Android app v4.1.2, package de.dpd.mobile).
 # Partner credentials are public constants baked into the app, reverse
 # engineered via the open-source ioBroker.parcel adapter. Verified working
-# 2026-08-27. Unlike DHL, DPD's public tracking-number-only lookup requires
-# a ZIP code plus a CAPTCHA-guarded ASP.NET form - not worth automating -
-# so this uses a real myDPD account login instead, same as the app does.
+# 2026-08-27. Used for the myDPD *account* login (auto-detects all of an
+# account's parcels). Tracking single numbers without an account goes
+# through DPD_PLC_URL above instead.
 DPD_NS = "https://cloud.dpd.com/"
 DPD_SERVICE_URL = "https://api.paketnavigator.de/services/v1/Navigator3Service.asmx"
 DPD_PARTNER_NAME = "Android Paketnavigator3"
@@ -54,40 +69,55 @@ DPD_API_VERSION = 100
 DPD_LANGUAGE = "de_DE"
 DPD_TRACKING_PAGE_URL = "https://tracking.dpd.de/status/de_DE/parcel/{id}"
 
-# DPD StatusID (string) -> broad group, from the app's Constant.smali /
+# DPD's public "parcel life cycle" JSON endpoint - the one the consumer
+# tracking page (tracking.dpd.de) itself calls. Works by parcel number
+# without a login; some parcels are postcode-protected and need `?zip=`.
+# This gives the full scan history the SOAP account API doesn't return.
+DPD_PLC_URL = "https://tracking.dpd.de/rest/plc/de_DE/{id}"
+
+# Broad lifecycle group shared by both carriers - drives the icon and the
+# combined "out for delivery" count regardless of provider.
+GROUP_REGISTERED = "registered"
+GROUP_TRANSIT = "transit"
+GROUP_OUT_FOR_DELIVERY = "out_for_delivery"
+GROUP_DELIVERED = "delivered"
+GROUP_UNKNOWN = "unknown"
+
+GROUP_ICONS = {
+    GROUP_REGISTERED: "mdi:package-variant-closed",
+    GROUP_TRANSIT: "mdi:truck-outline",
+    GROUP_OUT_FOR_DELIVERY: "mdi:truck-delivery",
+    GROUP_DELIVERED: "mdi:package-variant-closed-check",
+    GROUP_UNKNOWN: "mdi:help-circle-outline",
+}
+
+# DPD StatusID (string) -> lifecycle group, from the app's Constant.smali /
 # observed live responses.
 DPD_STATUS_GROUP = {
-    "NO_TRACKINGDATA": "registered",
-    "DATA_TRANSMITTED": "registered",
-    "ACCEPTED": "registered",
-    "START": "registered",
-    "COLLECTED": "transit",
-    "AT_SENDING_DEPOT": "transit",
-    "ON_THE_ROAD": "transit",
-    "AT_DELIVERY_DEPOT": "transit",
-    "SORTED": "transit",
-    "SORTED_TO_PICKUP_LOCATION": "transit",
-    "PARCEL_PROCESSING": "transit",
-    "OUT_FOR_DELIVERY": "out_for_delivery",
-    "IN_DELIVERY": "out_for_delivery",
-    "AT_PARCELSHOP": "out_for_delivery",
-    "DELIVERED": "delivered",
-    "PICKED_UP": "delivered",
-    "RETURN_TO_SENDER": "delivered",
+    "NO_TRACKINGDATA": GROUP_REGISTERED,
+    "DATA_TRANSMITTED": GROUP_REGISTERED,
+    "ACCEPTED": GROUP_REGISTERED,
+    "START": GROUP_REGISTERED,
+    "COLLECTED": GROUP_TRANSIT,
+    "AT_SENDING_DEPOT": GROUP_TRANSIT,
+    "ON_THE_ROAD": GROUP_TRANSIT,
+    "AT_DELIVERY_DEPOT": GROUP_TRANSIT,
+    "SORTED": GROUP_TRANSIT,
+    "SORTED_TO_PICKUP_LOCATION": GROUP_TRANSIT,
+    "PARCEL_PROCESSING": GROUP_TRANSIT,
+    "OUT_FOR_DELIVERY": GROUP_OUT_FOR_DELIVERY,
+    "IN_DELIVERY": GROUP_OUT_FOR_DELIVERY,
+    "AT_PARCELSHOP": GROUP_OUT_FOR_DELIVERY,
+    "DELIVERED": GROUP_DELIVERED,
+    "PICKED_UP": GROUP_DELIVERED,
+    "RETURN_TO_SENDER": GROUP_DELIVERED,
 }
-DPD_GROUP_ICONS = {
-    "registered": "mdi:package-variant-closed",
-    "transit": "mdi:truck-outline",
-    "out_for_delivery": "mdi:truck-delivery",
-    "delivered": "mdi:package-variant-closed-check",
-}
-DPD_OUT_FOR_DELIVERY_STATUS_IDS = {"OUT_FOR_DELIVERY", "IN_DELIVERY"}
 
 DEFAULT_UPDATE_INTERVAL_MINUTES = 15
 MIN_UPDATE_INTERVAL_MINUTES = 5
 DEFAULT_UPDATE_INTERVAL = timedelta(minutes=DEFAULT_UPDATE_INTERVAL_MINUTES)
 
-# "fortschritt" progress step (0-5) -> German status text + icon
+# DHL "fortschritt" progress step (0-5) -> German status text + lifecycle group
 PROGRESS_STATUS = {
     0: "Auftrag erfasst",
     1: "Abgeholt",
@@ -96,17 +126,14 @@ PROGRESS_STATUS = {
     4: "In Zustellung",
     5: "Zugestellt",
 }
-PROGRESS_ICONS = {
-    0: "mdi:package-variant-closed",
-    1: "mdi:package-variant-closed",
-    2: "mdi:truck-outline",
-    3: "mdi:truck-outline",
-    4: "mdi:truck-delivery",
-    5: "mdi:package-variant-closed-check",
+PROGRESS_GROUP = {
+    0: GROUP_REGISTERED,
+    1: GROUP_TRANSIT,
+    2: GROUP_TRANSIT,
+    3: GROUP_TRANSIT,
+    4: GROUP_OUT_FOR_DELIVERY,
+    5: GROUP_DELIVERED,
 }
 DEFAULT_STATUS = "Unbekannt"
 DEFAULT_ICON = "mdi:package-variant-closed"
-
-# fortschritt step meaning "out for delivery" (DHL only shows this on the
-# day the courier actually has the parcel loaded for delivery)
-PROGRESS_OUT_FOR_DELIVERY = 4
+NO_DATA_STATUS = "Noch keine Daten"

@@ -3,16 +3,17 @@
     "step": {
       "user": {
         "title": "Anbieter wählen",
-        "description": "Welchen Paketdienst möchtest du hinzufügen?",
+        "description": "Was möchtest du hinzufügen?",
         "data": {
           "provider": "Anbieter"
         }
       },
       "dhl": {
-        "title": "Sendungsnummern hinzufügen",
-        "description": "Füge eine oder mehrere DHL-Sendungsnummern hinzu, die verfolgt werden sollen (Enter nach jeder Nummer). Du kannst auch leer starten und später über die Optionen der Integration Sendungsnummern hinzufügen oder entfernen.",
+        "title": "Sendungsnummern verfolgen",
+        "description": "Füge eine oder mehrere Sendungsnummern hinzu (Enter nach jeder Nummer). Der Anbieter (DHL oder DPD) wird pro Nummer automatisch erkannt. Du kannst auch leer starten und Nummern später über die Optionen hinzufügen oder entfernen.",
         "data": {
-          "tracking_numbers": "Sendungsnummern"
+          "tracking_numbers": "Sendungsnummern",
+          "default_postcode": "Deine PLZ (optional, für geschützte DPD-Sendungen)"
         }
       },
       "dpd": {
@@ -29,21 +30,31 @@
       "cannot_connect": "Verbindung zu DPD fehlgeschlagen. Bitte später erneut versuchen."
     },
     "abort": {
-      "already_configured": "Dieser Anbieter ist bereits eingerichtet."
+      "already_configured": "Das ist bereits eingerichtet."
+    }
+  },
+  "selector": {
+    "provider": {
+      "options": {
+        "dhl": "Sendungsnummern (DHL & DPD)",
+        "dpd": "DPD-Konto (alle Sendungen automatisch)"
+      }
     }
   },
   "options": {
     "step": {
       "dhl_options": {
-        "description": "Sendungsnummern hinzufügen oder entfernen und das Aktualisierungsintervall anpassen.",
+        "description": "Sendungsnummern hinzufügen oder entfernen, PLZ für geschützte DPD-Sendungen und Aktualisierungsintervall anpassen.",
         "data": {
           "tracking_numbers": "Sendungsnummern",
+          "default_postcode": "Deine PLZ (optional, für geschützte DPD-Sendungen)",
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }
       },
       "dpd_options": {
-        "description": "Aktualisierungsintervall anpassen.",
+        "description": "PLZ für geschützte Sendungen und Aktualisierungsintervall anpassen.",
         "data": {
+          "default_postcode": "Deine PLZ (optional, für geschützte DPD-Sendungen)",
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }
       }
@@ -52,11 +63,11 @@
   "services": {
     "add_tracking_number": {
       "name": "Sendungsnummer hinzufügen",
-      "description": "Fügt eine DHL-Sendungsnummer zur Paketverfolgung hinzu, falls sie noch nicht verfolgt wird.",
+      "description": "Fügt eine Sendungsnummer zur Paketverfolgung hinzu, falls sie noch nicht verfolgt wird. Der Anbieter (DHL oder DPD) wird automatisch erkannt.",
       "fields": {
         "tracking_number": {
           "name": "Sendungsnummer",
-          "description": "Die DHL-Sendungs-/Trackingnummer."
+          "description": "Die Sendungs-/Trackingnummer (DHL oder DPD)."
         }
       }
     }

@@ -25,11 +25,14 @@ from .const import (
     PANEL_TITLE,
     PANEL_URL_PATH,
     PANEL_VERSION,
-    PROVIDER_DHL,
     PROVIDER_DPD,
+    PROVIDER_NUMBERS,
     SERVICE_ADD_TRACKING_NUMBER,
 )
-from .coordinator import DhlDataUpdateCoordinator, DpdDataUpdateCoordinator
+from .coordinator import (
+    DpdAccountDataUpdateCoordinator,
+    TrackingNumbersDataUpdateCoordinator,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,13 +86,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     minutes = entry.options.get(
         CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
     )
-    provider = entry.data.get(CONF_PROVIDER, PROVIDER_DHL)
+    provider = entry.data.get(CONF_PROVIDER, PROVIDER_NUMBERS)
     if provider == PROVIDER_DPD:
-        coordinator = DpdDataUpdateCoordinator(
+        coordinator = DpdAccountDataUpdateCoordinator(
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
     else:
-        coordinator = DhlDataUpdateCoordinator(
+        coordinator = TrackingNumbersDataUpdateCoordinator(
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
     await coordinator.async_config_entry_first_refresh()
@@ -100,7 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    if provider == PROVIDER_DHL and not hass.services.has_service(
+    if provider == PROVIDER_NUMBERS and not hass.services.has_service(
         DOMAIN, SERVICE_ADD_TRACKING_NUMBER
     ):
 
@@ -121,18 +124,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def _add_tracking_number(
     hass: HomeAssistant, tracking_number: str
 ) -> ServiceResponse:
-    """Add a tracking number to the DHL config entry if not already tracked.
+    """Add a tracking number to the tracking-number entry if not already tracked.
 
-    Returns whether it was newly added, so callers (e.g. the Telegram
-    automation) can send an accurate confirmation instead of assuming success.
+    The carrier (DHL or DPD) is auto-detected on the next coordinator
+    refresh. Returns whether it was newly added, so callers (e.g. the
+    Telegram automation) can send an accurate confirmation instead of
+    assuming success.
     """
     entries = [
         e
         for e in hass.config_entries.async_entries(DOMAIN)
-        if e.data.get(CONF_PROVIDER, PROVIDER_DHL) == PROVIDER_DHL
+        if e.data.get(CONF_PROVIDER, PROVIDER_NUMBERS) == PROVIDER_NUMBERS
     ]
     if not entries:
-        raise ServiceValidationError("DHL-Paketverfolgung ist nicht eingerichtet.")
+        raise ServiceValidationError(
+            "Die Sendungsnummern-Verfolgung ist nicht eingerichtet."
+        )
     entry = entries[0]
 
     cleaned = tracking_number.strip()
