@@ -13,12 +13,14 @@ shape so the sensor/panel code is carrier-agnostic:
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CARRIER_DHL,
@@ -152,7 +154,22 @@ def _placeholder(number: str, carrier: str) -> dict:
     }
 
 
-class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
+class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
+    """Adds "when is the next poll" bookkeeping for the panel countdown."""
+
+    last_poll: datetime | None = None
+
+    @property
+    def next_poll(self) -> datetime | None:
+        if self.last_poll is None or self.update_interval is None:
+            return None
+        return self.last_poll + self.update_interval
+
+    def _mark_polled(self) -> None:
+        self.last_poll = dt_util.utcnow()
+
+
+class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
     """Tracks a manually-managed list of DHL / DPD / Hermes tracking numbers."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
@@ -170,6 +187,7 @@ class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]
         return self.entry.options.get(key, self.entry.data.get(key, default))
 
     async def _async_update_data(self) -> dict[str, dict]:
+        self._mark_polled()
         numbers = [
             str(n).strip()
             for n in self._config(CONF_TRACKING_NUMBERS, [])
@@ -280,7 +298,7 @@ class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]
         return existing if existing and existing.get("carrier") == carrier else None
 
 
-class DpdAccountDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
+class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
     """Fetches every parcel on a myDPD account, with full scan history."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
@@ -298,6 +316,7 @@ class DpdAccountDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self._events: dict[str, list[dict]] = {}
 
     async def _async_update_data(self) -> dict[str, dict]:
+        self._mark_polled()
         if self._session is None:
             await self._login()
 

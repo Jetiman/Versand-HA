@@ -29,6 +29,8 @@ class PaketverfolgungPanel extends HTMLElement {
     this._onSubmit = this._onSubmit.bind(this);
     this._onChange = this._onChange.bind(this);
     this._onPopState = () => this._render();
+    this._nextUpdate = null;
+    this._tick = null;
   }
 
   connectedCallback() {
@@ -37,11 +39,18 @@ class PaketverfolgungPanel extends HTMLElement {
     this.addEventListener("input", this._onInput);
     this.addEventListener("submit", this._onSubmit);
     this.addEventListener("change", this._onChange);
+    this._tick = setInterval(() => this._tickCountdown(), 15000);
     this._render(true);
   }
 
   disconnectedCallback() {
     window.removeEventListener("popstate", this._onPopState);
+    if (this._tick) clearInterval(this._tick);
+  }
+
+  _tickCountdown() {
+    const el = this.querySelector(".pv-next-value");
+    if (el) el.textContent = fmtCountdown(this._nextUpdate);
   }
 
   set hass(hass) {
@@ -135,10 +144,14 @@ class PaketverfolgungPanel extends HTMLElement {
     if (!this._hass) return;
     const shipments = this._shipments();
     const entityId = this._currentEntityId();
+    const combined = this._hass.states["sensor.heute_in_zustellung"];
+    const nextIso = combined && combined.attributes && combined.attributes.next_update;
+    this._nextUpdate = nextIso ? new Date(nextIso) : null;
     const sig = JSON.stringify({
       entityId,
       busy: this._addBusy,
       result: this._addResult,
+      nextIso: nextIso || null,
       items: shipments.map((s) => [
         s.entity_id,
         s.name,
@@ -221,6 +234,13 @@ class PaketverfolgungPanel extends HTMLElement {
 
     return `
       <div class="pv-stats">${stats}</div>
+      <button class="pv-next" data-refresh-all>
+        <ha-icon icon="mdi:timer-sync-outline"></ha-icon>
+        <span>Nächste Aktualisierung <b class="pv-next-value">${esc(
+          fmtCountdown(this._nextUpdate)
+        )}</b></span>
+        <span class="pv-next-now">jetzt aktualisieren</span>
+      </button>
       ${
         canAdd
           ? `<form class="pv-add" autocomplete="off">
@@ -432,6 +452,19 @@ class PaketverfolgungPanel extends HTMLElement {
       this._navigate(nav.getAttribute("data-nav"));
       return;
     }
+    const refreshAll = ev.target.closest("[data-refresh-all]");
+    if (refreshAll) {
+      const ids = this._shipments().map((s) => s.entity_id);
+      if (ids.length) {
+        this._hass.callService("homeassistant", "update_entity", {
+          entity_id: ids,
+        });
+      }
+      refreshAll.classList.add("busy");
+      const v = refreshAll.querySelector(".pv-next-value");
+      if (v) v.textContent = "wird aktualisiert …";
+      return;
+    }
     const refresh = ev.target.closest("[data-refresh]");
     if (refresh) {
       this._hass.callService("homeassistant", "update_entity", {
@@ -550,6 +583,18 @@ function fmtTime(value) {
   return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 }
 
+function fmtCountdown(target) {
+  if (!target || Number.isNaN(target.getTime())) return "– unbekannt";
+  const ms = target.getTime() - Date.now();
+  if (ms <= 5000) return "läuft …";
+  const min = Math.round(ms / 60000);
+  if (min < 1) return "in unter 1 Min";
+  return `in ~${min} Min (${target.toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  })})`;
+}
+
 function fmtDateTime(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -612,6 +657,18 @@ const STYLES = `
   }
   .pv-stat-value { font-size: 26px; font-weight: 600; color: var(--primary-text-color); }
   .pv-stat-label { font-size: 12px; color: var(--secondary-text-color); margin-top: 2px; }
+
+  .pv-next {
+    display: flex; align-items: center; gap: 8px; width: 100%; cursor: pointer;
+    background: transparent; border: none; padding: 4px 2px 12px; text-align: left;
+    font-size: 13px; color: var(--secondary-text-color);
+  }
+  .pv-next ha-icon { --mdc-icon-size: 18px; color: var(--primary-color); }
+  .pv-next b { font-weight: 500; color: var(--primary-text-color); }
+  .pv-next-now { margin-left: auto; color: var(--primary-color); }
+  .pv-next:hover .pv-next-now { text-decoration: underline; }
+  .pv-next.busy { opacity: .6; pointer-events: none; }
+  .pv-next.busy .pv-next-now { display: none; }
 
   .pv-add { display: flex; gap: 8px; margin-bottom: 12px; }
   .pv-add input {

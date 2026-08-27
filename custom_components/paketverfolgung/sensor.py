@@ -9,8 +9,14 @@ from __future__ import annotations
 
 from typing import Callable
 
-from homeassistant.components.sensor import SensorEntity
+from datetime import datetime
+
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -47,7 +53,12 @@ async def async_setup_entry(
     # the owner's copy is still alive.
     if hass.data[DOMAIN].get(COMBINED_SENSOR_ADDED_KEY) is None:
         hass.data[DOMAIN][COMBINED_SENSOR_ADDED_KEY] = entry.entry_id
-        async_add_entities([CombinedOutForDeliveryTodaySensor(hass)])
+        async_add_entities(
+            [
+                CombinedOutForDeliveryTodaySensor(hass),
+                NextRefreshSensor(hass),
+            ]
+        )
 
 
 def _setup_dynamic_entities(
@@ -150,28 +161,27 @@ def _out_for_delivery(coordinator) -> list[dict]:
     return out
 
 
-class CombinedOutForDeliveryTodaySensor(SensorEntity):
-    """Counts shipments currently out for delivery, across *all* providers."""
+class _AllCoordinatorsSensor(SensorEntity):
+    """Base for the summary sensors that span every configured provider.
+
+    Not a CoordinatorEntity - it manually subscribes to every shipment
+    coordinator present when it's added and recomputes on any of them.
+    """
 
     _attr_has_entity_name = True
-    _attr_name = "Heute in Zustellung"
-    _attr_icon = "mdi:truck-delivery"
-    _attr_native_unit_of_measurement = "Sendungen"
     _attr_should_poll = False
 
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
-        self._attr_unique_id = f"{DOMAIN}_out_for_delivery_today"
         self._unsub_listeners: list[Callable[[], None]] = []
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         for coordinator in self.hass.data[DOMAIN].values():
-            if not isinstance(coordinator, _SHIPMENT_COORDINATORS):
-                continue
-            self._unsub_listeners.append(
-                coordinator.async_add_listener(self._handle_coordinator_update)
-            )
+            if isinstance(coordinator, _SHIPMENT_COORDINATORS):
+                self._unsub_listeners.append(
+                    coordinator.async_add_listener(self._handle_coordinator_update)
+                )
 
     async def async_will_remove_from_hass(self) -> None:
         for unsub in self._unsub_listeners:
@@ -182,11 +192,29 @@ class CombinedOutForDeliveryTodaySensor(SensorEntity):
     def _handle_coordinator_update(self) -> None:
         self.async_write_ha_state()
 
+    def _coordinators(self):
+        return [
+            c
+            for c in self.hass.data[DOMAIN].values()
+            if isinstance(c, _SHIPMENT_COORDINATORS)
+        ]
+
+
+class CombinedOutForDeliveryTodaySensor(_AllCoordinatorsSensor):
+    """Counts shipments currently out for delivery, across *all* providers."""
+
+    _attr_name = "Heute in Zustellung"
+    _attr_icon = "mdi:truck-delivery"
+    _attr_native_unit_of_measurement = "Sendungen"
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        super().__init__(hass)
+        self._attr_unique_id = f"{DOMAIN}_out_for_delivery_today"
+
     def _shipments(self) -> list[dict]:
         items: list[dict] = []
-        for coordinator in self.hass.data[DOMAIN].values():
-            if isinstance(coordinator, _SHIPMENT_COORDINATORS):
-                items.extend(_out_for_delivery(coordinator))
+        for coordinator in self._coordinators():
+            items.extend(_out_for_delivery(coordinator))
         return items
 
     @property
@@ -201,4 +229,27 @@ class CombinedOutForDeliveryTodaySensor(SensorEntity):
         # shown directly as a dashboard tile's secondary line via
         # state_content, without a template needing to unpack `shipments`.
         carriers = sorted({s["provider"] for s in shipments if s.get("provider")})
-        return {"shipments": shipments, "carriers": ", ".join(carriers)}
+        next_polls = [c.next_poll for c in self._coordinators() if c.next_poll]
+        return {
+            "shipments": shipments,
+            "carriers": ", ".join(carriers),
+            "next_update": min(next_polls).isoformat() if next_polls else None,
+        }
+
+
+class NextRefreshSensor(_AllCoordinatorsSensor):
+    """When the shipment data is next refreshed (soonest across providers)."""
+
+    _attr_name = "Nächste Aktualisierung"
+    _attr_icon = "mdi:timer-sync-outline"
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        super().__init__(hass)
+        self._attr_unique_id = f"{DOMAIN}_next_refresh"
+
+    @property
+    def native_value(self) -> datetime | None:
+        next_polls = [c.next_poll for c in self._coordinators() if c.next_poll]
+        return min(next_polls) if next_polls else None
