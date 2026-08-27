@@ -50,7 +50,7 @@ Zusätzlich der **anbieterübergreifende** Sammel-Sensor **„Heute in Zustellun
 
 Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolgung**:
 
-- **Übersicht:** Kacheln (Gesamt / Unterwegs / Heute in Zustellung / Zugestellt), Eingabefeld „Sendungsnummer hinzufügen (DHL oder DPD)“ und die Liste aller Sendungen – zuletzt geändert zuerst, mit Datum und Uhrzeit der letzten Änderung.
+- **Übersicht:** Kacheln (Gesamt / Unterwegs / Heute in Zustellung / Zugestellt), Eingabefeld „Sendungsnummer hinzufügen (DHL oder DPD)“ und die nummerierte Liste aller Sendungen – zuletzt geändert zuerst, mit Datum und Uhrzeit der letzten Änderung.
 - **Detailseite:** Klick auf eine Sendung → aktueller Status, Eckdaten, Link zur Anbieter-Seite, Button „Jetzt aktualisieren“ und der **komplette Sendungsverlauf** als Zeitleiste.
 - **Einstellungen:** Button am Ende der Übersicht öffnet die Integration – dort beim jeweiligen Eintrag über das Zahnrad PLZ und Sendungsnummern eingeben, oder per „Eintrag hinzufügen“ den DPD-Login.
 

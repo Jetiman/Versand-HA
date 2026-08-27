@@ -28,6 +28,7 @@ from .const import (
     PROVIDER_DPD,
     PROVIDER_NUMBERS,
     SERVICE_ADD_TRACKING_NUMBER,
+    SERVICE_REMOVE_TRACKING_NUMBER,
 )
 from .coordinator import (
     DpdAccountDataUpdateCoordinator,
@@ -92,6 +93,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
     else:
+        # The number list used to be DHL-only; rename the old default title
+        # so its options dialog (which now covers DPD too) isn't confusing.
+        if entry.title == "DHL":
+            hass.config_entries.async_update_entry(entry, title="Sendungsnummern")
         coordinator = TrackingNumbersDataUpdateCoordinator(
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
@@ -110,6 +115,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async def _async_add_tracking_number(call: ServiceCall) -> ServiceResponse:
             return await _add_tracking_number(hass, call.data[ATTR_TRACKING_NUMBER])
 
+        async def _async_remove_tracking_number(call: ServiceCall) -> ServiceResponse:
+            return await _remove_tracking_number(hass, call.data[ATTR_TRACKING_NUMBER])
+
         hass.services.async_register(
             DOMAIN,
             SERVICE_ADD_TRACKING_NUMBER,
@@ -117,8 +125,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             schema=_ADD_TRACKING_NUMBER_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
         )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_REMOVE_TRACKING_NUMBER,
+            _async_remove_tracking_number,
+            schema=_ADD_TRACKING_NUMBER_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
 
     return True
+
+
+def _numbers_entry(hass: HomeAssistant):
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if entry.data.get(CONF_PROVIDER, PROVIDER_NUMBERS) == PROVIDER_NUMBERS:
+            return entry
+    raise ServiceValidationError(
+        "Die Sendungsnummern-Verfolgung ist nicht eingerichtet."
+    )
+
+
+def _current_numbers(entry) -> list[str]:
+    return list(
+        entry.options.get(
+            CONF_TRACKING_NUMBERS, entry.data.get(CONF_TRACKING_NUMBERS, [])
+        )
+    )
 
 
 async def _add_tracking_number(
@@ -131,26 +163,13 @@ async def _add_tracking_number(
     Telegram automation) can send an accurate confirmation instead of
     assuming success.
     """
-    entries = [
-        e
-        for e in hass.config_entries.async_entries(DOMAIN)
-        if e.data.get(CONF_PROVIDER, PROVIDER_NUMBERS) == PROVIDER_NUMBERS
-    ]
-    if not entries:
-        raise ServiceValidationError(
-            "Die Sendungsnummern-Verfolgung ist nicht eingerichtet."
-        )
-    entry = entries[0]
+    entry = _numbers_entry(hass)
 
     cleaned = tracking_number.strip()
     if not cleaned:
         raise ServiceValidationError("Leere Sendungsnummer.")
 
-    current = list(
-        entry.options.get(
-            CONF_TRACKING_NUMBERS, entry.data.get(CONF_TRACKING_NUMBERS, [])
-        )
-    )
+    current = _current_numbers(entry)
     if cleaned in current:
         _LOGGER.info("Paketverfolgung: %s wird bereits verfolgt", cleaned)
         return {"added": False, "tracking_number": cleaned}
@@ -161,6 +180,28 @@ async def _add_tracking_number(
     )
     _LOGGER.info("Paketverfolgung: %s wurde hinzugefügt", cleaned)
     return {"added": True, "tracking_number": cleaned}
+
+
+async def _remove_tracking_number(
+    hass: HomeAssistant, tracking_number: str
+) -> ServiceResponse:
+    """Remove a tracking number from the tracking-number entry.
+
+    Returns whether it was actually tracked, so callers can give an
+    accurate confirmation.
+    """
+    entry = _numbers_entry(hass)
+    cleaned = tracking_number.strip()
+    current = _current_numbers(entry)
+    if cleaned not in current:
+        return {"removed": False, "tracking_number": cleaned}
+
+    current = [n for n in current if n != cleaned]
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_TRACKING_NUMBERS: current}
+    )
+    _LOGGER.info("Paketverfolgung: %s wurde entfernt", cleaned)
+    return {"removed": True, "tracking_number": cleaned}
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:

@@ -26,6 +26,7 @@ CONF_UPDATE_INTERVAL = "update_interval_minutes"
 CONF_DEFAULT_POSTCODE = "default_postcode"
 
 SERVICE_ADD_TRACKING_NUMBER = "add_tracking_number"
+SERVICE_REMOVE_TRACKING_NUMBER = "remove_tracking_number"
 ATTR_TRACKING_NUMBER = "tracking_number"
 
 # Carrier a tracking number was detected to belong to. Kept per number in
@@ -41,7 +42,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.7.1"
+PANEL_VERSION = "1.7.2"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is

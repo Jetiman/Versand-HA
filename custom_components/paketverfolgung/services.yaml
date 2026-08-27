@@ -11,3 +11,16 @@ add_tracking_number:
       example: "00340434123456789012"
       selector:
         text:
+
+remove_tracking_number:
+  name: Sendungsnummer entfernen
+  description: >-
+    Entfernt eine Sendungsnummer aus der Paketverfolgung.
+  fields:
+    tracking_number:
+      name: Sendungsnummer
+      description: Die zu entfernende Sendungs-/Trackingnummer.
+      required: true
+      example: "00340434123456789012"
+      selector:
+        text:

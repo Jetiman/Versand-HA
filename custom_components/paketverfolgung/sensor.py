@@ -120,6 +120,9 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
             "tracking_id": self.item_id,
             "carrier": s.get("carrier"),
             "group": s.get("group"),
+            "removable": isinstance(
+                self.coordinator, TrackingNumbersDataUpdateCoordinator
+            ),
             "direction": s.get("direction"),
             "delivered": s.get("delivered"),
             "protected": s.get("protected"),

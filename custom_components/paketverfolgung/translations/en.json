@@ -9,11 +9,11 @@
         }
       },
       "dhl": {
-        "title": "Track parcel numbers",
-        "description": "Add one or more tracking numbers (press Enter after each). The carrier (DHL or DPD) is detected automatically per number. You can also start empty and add numbers later via the options.",
+        "title": "Track parcel numbers (DHL & DPD)",
+        "description": "Add one or more tracking numbers (press Enter after each). Whether a number belongs to DHL or DPD is detected automatically - this entry covers both carriers. You can also start empty and add numbers later via the options.",
         "data": {
-          "tracking_numbers": "Tracking numbers",
-          "default_postcode": "Your postcode (optional, for protected DPD parcels)"
+          "tracking_numbers": "Tracking numbers (DHL or DPD)",
+          "default_postcode": "Your postcode (only needed if a DPD number is protected)"
         }
       },
       "dpd": {
@@ -44,10 +44,10 @@
   "options": {
     "step": {
       "dhl_options": {
-        "description": "Add or remove tracking numbers, set a postcode for protected DPD parcels, and adjust the update interval.",
+        "description": "Tracking numbers for DHL and DPD - this entry covers both carriers. Add or remove numbers, optionally set your postcode (only for protected DPD parcels), and adjust the update interval.",
         "data": {
-          "tracking_numbers": "Tracking numbers",
-          "default_postcode": "Your postcode (optional, for protected DPD parcels)",
+          "tracking_numbers": "Tracking numbers (DHL or DPD)",
+          "default_postcode": "Your postcode (only needed if a DPD number is protected)",
           "update_interval_minutes": "Update interval (minutes)"
         }
       },
@@ -68,6 +68,16 @@
         "tracking_number": {
           "name": "Tracking number",
           "description": "The tracking number (DHL or DPD)."
+        }
+      }
+    },
+    "remove_tracking_number": {
+      "name": "Remove tracking number",
+      "description": "Removes a tracking number from Paketverfolgung.",
+      "fields": {
+        "tracking_number": {
+          "name": "Tracking number",
+          "description": "The tracking number to remove."
         }
       }
     }

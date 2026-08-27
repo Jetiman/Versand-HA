@@ -94,6 +94,7 @@ class PaketverfolgungPanel extends HTMLElement {
         events,
         delivered,
         protected: a.protected === true,
+        removable: a.removable === true,
         out_for_delivery: group === "out_for_delivery" && !delivered,
         changed,
         last_updated: stateObj.last_updated,
@@ -193,7 +194,7 @@ class PaketverfolgungPanel extends HTMLElement {
     );
 
     const rows = shipments.length
-      ? shipments.map((s) => this._rowHtml(s)).join("")
+      ? shipments.map((s, i) => this._rowHtml(s, i + 1)).join("")
       : `<div class="pv-empty">Noch keine Sendungen. Füge unten eine Sendungsnummer hinzu
           oder richte das DPD-Konto ein.</div>`;
 
@@ -233,9 +234,10 @@ class PaketverfolgungPanel extends HTMLElement {
     `;
   }
 
-  _rowHtml(s) {
+  _rowHtml(s, pos) {
     return `
       <button class="pv-row" data-entity="${esc(s.entity_id)}">
+        <div class="pv-row-num">${pos}</div>
         <ha-icon class="pv-row-icon" icon="${esc(s.icon)}"></ha-icon>
         <div class="pv-row-main">
           <div class="pv-row-name">${esc(s.name)}</div>
@@ -339,6 +341,11 @@ class PaketverfolgungPanel extends HTMLElement {
                 rel="noreferrer noopener">Beim Anbieter öffnen</a>`
             : ""
         }
+        ${
+          s.removable
+            ? `<button class="pv-delete" data-delete="${esc(s.tracking_id)}">Löschen</button>`
+            : ""
+        }
       </div>
 
       <div class="pv-meta">${meta}</div>
@@ -374,6 +381,17 @@ class PaketverfolgungPanel extends HTMLElement {
       });
       refresh.disabled = true;
       refresh.textContent = "Wird aktualisiert …";
+      return;
+    }
+    const del = ev.target.closest("[data-delete]");
+    if (del) {
+      const num = del.getAttribute("data-delete");
+      if (window.confirm(`Sendung ${num} aus der Liste entfernen?`)) {
+        this._hass.callService("paketverfolgung", "remove_tracking_number", {
+          tracking_number: num,
+        });
+        this._navigate("/paketverfolgung");
+      }
     }
   }
 
@@ -540,6 +558,10 @@ const STYLES = `
     box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.1));
   }
   .pv-row:hover { background: var(--secondary-background-color); }
+  .pv-row-num {
+    flex: none; min-width: 20px; text-align: center; font-size: 13px;
+    font-weight: 500; color: var(--secondary-text-color);
+  }
   .pv-row-icon { color: var(--primary-color); --mdc-icon-size: 28px; }
   .pv-row-main { flex: 1; min-width: 0; }
   .pv-row-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -582,6 +604,10 @@ const STYLES = `
     padding: 10px 16px; border-radius: 8px; font-size: 14px; text-decoration: none;
     background: var(--secondary-background-color); color: var(--primary-text-color);
     border: 1px solid var(--divider-color);
+  }
+  .pv-actions button.pv-delete {
+    background: transparent; color: var(--error-color, #c62828);
+    border: 1px solid var(--error-color, #c62828); margin-left: auto;
   }
 
   .pv-meta {
