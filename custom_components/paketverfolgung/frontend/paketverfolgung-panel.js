@@ -75,6 +75,23 @@ class PaketverfolgungPanel extends HTMLElement {
 
   /* ---------- data ---------- */
 
+  _combinedSensor() {
+    // The "Heute in Zustellung" summary sensor - found by its `shipments`
+    // attribute rather than a fixed entity_id (which can be suffixed
+    // _2/_3 after registry churn from older versions).
+    if (!this._hass) return null;
+    for (const s of Object.values(this._hass.states)) {
+      if (
+        s.entity_id.startsWith("sensor.") &&
+        s.attributes &&
+        Array.isArray(s.attributes.shipments)
+      ) {
+        return s;
+      }
+    }
+    return null;
+  }
+
   _shipments() {
     if (!this._hass) return [];
     const out = [];
@@ -144,7 +161,7 @@ class PaketverfolgungPanel extends HTMLElement {
     if (!this._hass) return;
     const shipments = this._shipments();
     const entityId = this._currentEntityId();
-    const combined = this._hass.states["sensor.heute_in_zustellung"];
+    const combined = this._combinedSensor();
     const nextIso = combined && combined.attributes && combined.attributes.next_update;
     this._nextUpdate = nextIso ? new Date(nextIso) : null;
     const sig = JSON.stringify({
@@ -195,7 +212,7 @@ class PaketverfolgungPanel extends HTMLElement {
     const inTransit = total - delivered - inReview;
     let outForDelivery = shipments.filter((s) => s.out_for_delivery && !s.delivered)
       .length;
-    const combined = this._hass.states["sensor.heute_in_zustellung"];
+    const combined = this._combinedSensor();
     if (combined && !Number.isNaN(Number(combined.state))) {
       outForDelivery = Number(combined.state);
     }

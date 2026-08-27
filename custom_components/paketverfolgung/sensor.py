@@ -7,27 +7,25 @@ shipments enter and leave the coordinators' data.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Callable
 
-from datetime import datetime
-
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-)
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    COMBINED_SENSOR_ADDED_KEY,
+    CONF_PROVIDER,
     DEFAULT_ICON,
     DEFAULT_STATUS,
     DOMAIN,
     GROUP_ICONS,
     GROUP_OUT_FOR_DELIVERY,
+    PROVIDER_NUMBERS,
 )
 from .coordinator import (
     DpdAccountDataUpdateCoordinator,
@@ -39,6 +37,46 @@ _SHIPMENT_COORDINATORS = (
     DpdAccountDataUpdateCoordinator,
 )
 
+_DELIVERY_TODAY_UID = f"{DOMAIN}_out_for_delivery_today"
+_NEXT_REFRESH_UID = f"{DOMAIN}_next_refresh"
+_CANONICAL_UIDS = {_DELIVERY_TODAY_UID, _NEXT_REFRESH_UID}
+
+
+def _singleton_owner_id(hass: HomeAssistant) -> str | None:
+    """The one config entry that owns the cross-provider summary sensors.
+
+    Deterministic (tracking-number entry first, else lowest entry_id) so
+    the singletons don't hop between entries on restart and pile up
+    "_2"/"_3" registry duplicates.
+    """
+    entries = sorted(
+        hass.config_entries.async_entries(DOMAIN), key=lambda e: e.entry_id
+    )
+    for entry in entries:
+        if entry.data.get(CONF_PROVIDER, PROVIDER_NUMBERS) == PROVIDER_NUMBERS:
+            return entry.entry_id
+    return entries[0].entry_id if entries else None
+
+
+def _cleanup_singletons(hass: HomeAssistant, owner_id: str) -> None:
+    """Drop stale summary-sensor registry entries (old per-entry unique
+    ids, or a canonical one stuck on the wrong entry) so the freshly
+    added ones reclaim the plain `sensor.heute_in_zustellung` /
+    `sensor.naechste_aktualisierung` ids."""
+    registry = er.async_get(hass)
+    legacy = {
+        f"{entry.entry_id}_out_for_delivery_today"
+        for entry in hass.config_entries.async_entries(DOMAIN)
+    }
+    for entity in list(registry.entities.values()):
+        if entity.platform != DOMAIN or entity.domain != "sensor":
+            continue
+        uid = entity.unique_id
+        if uid in legacy or (
+            uid in _CANONICAL_UIDS and entity.config_entry_id != owner_id
+        ):
+            registry.async_remove(entity.entity_id)
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -46,18 +84,12 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][entry.entry_id]
     _setup_dynamic_entities(entry, coordinator, async_add_entities)
 
-    # One combined summary entity for all providers together, added under
-    # whichever entry sets up first - guarded (by that owning entry_id, not
-    # just a bool) so a second provider entry doesn't add a duplicate, and
-    # so a *different* entry reloading doesn't wrongly re-trigger it while
-    # the owner's copy is still alive.
-    if hass.data[DOMAIN].get(COMBINED_SENSOR_ADDED_KEY) is None:
-        hass.data[DOMAIN][COMBINED_SENSOR_ADDED_KEY] = entry.entry_id
+    # The combined summary sensors span every provider; exactly one entry
+    # owns them.
+    if entry.entry_id == _singleton_owner_id(hass):
+        _cleanup_singletons(hass, entry.entry_id)
         async_add_entities(
-            [
-                CombinedOutForDeliveryTodaySensor(hass),
-                NextRefreshSensor(hass),
-            ]
+            [CombinedOutForDeliveryTodaySensor(hass), NextRefreshSensor(hass)]
         )
 
 

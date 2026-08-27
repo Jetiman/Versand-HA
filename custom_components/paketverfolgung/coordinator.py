@@ -116,6 +116,21 @@ def normalize_dpd_parcel(raw: dict, events: list[dict] | None) -> dict:
     }
 
 
+def _has_data(item: dict | None) -> bool:
+    """True if a lookup returned real tracking substance (so the number can
+    be *locked* to that carrier). A soft result - a DPD "postcode needed"
+    placeholder, an empty shell - is shown but must not lock, so the other
+    carriers still get probed next cycle.
+    """
+    if not item or item.get("protected"):
+        return False
+    return bool(
+        item.get("events")
+        or item.get("delivered")
+        or item.get("group") not in (None, GROUP_UNKNOWN)
+    )
+
+
 def _dhl_has_data(raw: dict) -> bool:
     """True if DHL actually knows this shipment (not just an echo shell).
 
@@ -218,7 +233,8 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         result: dict[str, dict] = {}
         for number in numbers:
             forced = overrides.get(number)
-            carrier = forced or self.carriers.get(number, CARRIER_UNKNOWN)
+            known = self.carriers.get(number, CARRIER_UNKNOWN)
+            carrier = forced or known
             item: dict | None = None
 
             raw_dhl = dhl_by_id.get(number)
@@ -231,29 +247,17 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             elif forced == CARRIER_HERMES:
                 item = await self._hermes_lookup(number)
             elif dhl_confirmed:
-                item = normalize_dhl_shipment(raw_dhl)
-                carrier = CARRIER_DHL
+                item, carrier = normalize_dhl_shipment(raw_dhl), CARRIER_DHL
             else:
-                # DHL isn't a confirmed hit - (re)detect via DPD then Hermes.
-                if carrier == CARRIER_DHL:
-                    carrier = CARRIER_UNKNOWN
-                if carrier in (CARRIER_UNKNOWN, CARRIER_DPD):
-                    item = await self._dpd_lookup(number, postcode)
-                    if item is not None:
-                        carrier = CARRIER_DPD
-                if item is None and carrier in (CARRIER_UNKNOWN, CARRIER_HERMES):
-                    item = await self._hermes_lookup(number)
-                    if item is not None:
-                        carrier = CARRIER_HERMES
+                item, carrier = await self._detect(number, postcode, known)
 
             if item is None:
-                # Nothing resolved this cycle - keep the last real data
-                # (transient carrier outage, or still-propagating number)
-                # rather than blanking the sensor.
+                # Nothing this cycle - keep the last real data (transient
+                # carrier outage, still-propagating number) over blanking.
                 previous = (self.data or {}).get(number)
                 if previous and previous.get("status") != NO_DATA_STATUS:
                     item = previous
-                    if not forced:
+                    if not forced and carrier == CARRIER_UNKNOWN:
                         carrier = previous.get("carrier", carrier)
                 else:
                     item = _placeholder(number, carrier)
@@ -266,6 +270,39 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         for stale in [n for n in self.carriers if n not in numbers]:
             self.carriers.pop(stale, None)
         return result
+
+    async def _detect(
+        self, number: str, postcode: str | None, known: str
+    ) -> tuple[dict | None, str]:
+        """Probe DPD then Hermes and return (item, carrier).
+
+        A carrier is *locked* only on a substantive result. A soft result
+        (DPD "postcode needed", an empty shell) is shown but leaves the
+        number open for re-detection. An already-known carrier is probed
+        first (cheap path) and its lock is kept through a transient
+        failure as long as we still hold substantive history for it.
+        """
+        order = [CARRIER_HERMES, CARRIER_DPD] if known == CARRIER_HERMES else [
+            CARRIER_DPD,
+            CARRIER_HERMES,
+        ]
+        soft: dict | None = None
+        for candidate in order:
+            if candidate == CARRIER_DPD:
+                res = await self._dpd_lookup(number, postcode)
+            else:
+                res = await self._hermes_lookup(number)
+            if _has_data(res):
+                return res, candidate
+            if res is not None and soft is None:
+                soft = res
+
+        previous = (self.data or {}).get(number)
+        if known in (CARRIER_DPD, CARRIER_HERMES) and _has_data(previous):
+            return previous, known  # transient blip - keep the lock
+        if soft is not None:
+            return soft, CARRIER_UNKNOWN  # show it, stay open for re-detection
+        return None, CARRIER_UNKNOWN
 
     async def _dhl_lookup(self, candidates: list[str]) -> dict[str, dict]:
         if not candidates:
@@ -280,22 +317,20 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         return {s["id"]: s for s in shipments if s.get("id")}
 
     async def _dpd_lookup(self, number: str, postcode: str | None) -> dict | None:
+        """Fresh DPD result, or None on any failure (the caller decides
+        whether to fall back to the last-known data)."""
         try:
             return await self.dpd.fetch(number, postcode)
         except DpdTrackingApiError as err:
             _LOGGER.warning("DPD lookup for %s failed: %s", number, err)
-            return self._keep_previous(number, CARRIER_DPD)
+            return None
 
     async def _hermes_lookup(self, number: str) -> dict | None:
         try:
             return await self.hermes.fetch(number)
         except HermesTrackingApiError as err:
             _LOGGER.warning("Hermes lookup for %s failed: %s", number, err)
-            return self._keep_previous(number, CARRIER_HERMES)
-
-    def _keep_previous(self, number: str, carrier: str) -> dict | None:
-        existing = (self.data or {}).get(number)
-        return existing if existing and existing.get("carrier") == carrier else None
+            return None
 
 
 class DpdAccountDataUpdateCoordinator(_BaseCoordinator):

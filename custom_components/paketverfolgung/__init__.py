@@ -17,7 +17,6 @@ from .const import (
     ATTR_TRACKING_NUMBER,
     CARRIER_AUTO,
     CARRIERS,
-    COMBINED_SENSOR_ADDED_KEY,
     CONF_CARRIER_OVERRIDES,
     CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
@@ -275,12 +274,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-        # The combined "Heute in Zustellung" sensor was added under
-        # *some* entry's platform setup - only clear the guard if that was
-        # *this* entry (it just got torn down along with it), so the next
-        # setup re-adds it. If a different entry owns it, its copy is
-        # still alive and must not be duplicated.
-        if hass.data[DOMAIN].get(COMBINED_SENSOR_ADDED_KEY) == entry.entry_id:
-            hass.data[DOMAIN].pop(COMBINED_SENSOR_ADDED_KEY, None)
+        hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok

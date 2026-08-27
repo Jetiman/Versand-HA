@@ -3,10 +3,6 @@ from datetime import timedelta
 
 DOMAIN = "paketverfolgung"
 
-# Sentinel key (alongside the entry_id keys) in hass.data[DOMAIN] marking
-# that the one shared "Heute in Zustellung" sensor has already been added.
-COMBINED_SENSOR_ADDED_KEY = "_combined_out_for_delivery_sensor_added"
-
 # DHL's public shipment-tracking search. Works fully anonymously for a
 # known tracking number (piececode) - no login required. Verified against
 # the real endpoint: https://www.dhl.de/int-verfolgen/data/search
@@ -51,7 +47,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.8.3"
+PANEL_VERSION = "1.9.0"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is
@@ -85,10 +81,10 @@ DPD_TRACKING_PAGE_URL = "https://tracking.dpd.de/status/de_DE/parcel/{id}"
 # This gives the full scan history the SOAP account API doesn't return.
 DPD_PLC_URL = "https://tracking.dpd.de/rest/plc/de_DE/{id}"
 
-# Hermes Germany's public tracking JSON endpoint (the one myhermes.de's
-# "Sendungsverfolgung" page calls). Works by parcel number, no login, no
-# postcode. Unofficial - schema undocumented.
-HERMES_PLC_URL = "https://api.my-deliveries.de/tnt/parcelservice/parceldetails/{id}"
+# Hermes Germany's public tracking JSON endpoint (the v2 API the
+# myhermes.de "Sendungsverfolgung" page calls). Works by parcel number,
+# no login, no postcode. Unofficial - schema undocumented.
+HERMES_PLC_URL = "https://api.my-deliveries.de/tnt/v2/shipments/search/{id}"
 HERMES_TRACKING_PAGE_URL = (
     "https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation/#{id}"
 )
