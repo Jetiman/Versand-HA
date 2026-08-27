@@ -54,6 +54,16 @@ Pro Sendung (DHL) bzw. Paket (DPD) ein Sensor mit:
 
 Zusätzlich ein **anbieterübergreifender** Sammel-Sensor **„Heute in Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Gesamtzahl der Sendungen (DHL + DPD zusammen), die gerade im Zustellfahrzeug sind, Attribut `shipments` enthält die Liste dieser Sendungen (inkl. Anbieter) für eine Dashboard-Karte.
 
+## Oberfläche („Paketverfolgung“ in der Seitenleiste)
+
+Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolgung** in der Home-Assistant-Seitenleiste:
+
+- **Übersicht:** Kacheln mit Gesamtzahl, „Unterwegs“, „Heute in Zustellung“ und „Zugestellt“, darunter die Liste aller Sendungen (DHL + DPD gemeinsam), unzugestellte zuerst.
+- **Detailseite:** Ein Klick auf eine Sendung öffnet eine Seite mit aktuellem Status, Sendungsnummer, Richtung, Zustellzeitfenster (DHL), einem Link zur Anbieter-Seite und dem **kompletten Sendungsverlauf** als Zeitleiste.
+- **DHL-Sendungsnummer hinzufügen:** direkt über das Eingabefeld in der Übersicht (nutzt den Dienst `paketverfolgung.add_tracking_number`).
+
+Die Oberfläche ist eine reine Weboberfläche ohne zusätzliche Abfragen – sie zeigt dieselben Daten wie die Sensoren, nur aufbereitet. DPD liefert über die genutzte Schnittstelle nur den aktuellen Status, daher zeigt die Zeitleiste dort nur einen Eintrag.
+
 ## Bekannte Einschränkungen
 
 - Beide Schnittstellen sind inoffiziell und können bei anbieterseitigen Änderungen brechen. Bitte in diesem Fall ein Issue öffnen.

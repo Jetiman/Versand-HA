@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
+from pathlib import Path
 
 import voluptuous as vol
+from homeassistant.components import panel_custom
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
@@ -17,6 +20,11 @@ from .const import (
     CONF_UPDATE_INTERVAL,
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
+    PANEL_ICON,
+    PANEL_STATIC_URL,
+    PANEL_TITLE,
+    PANEL_URL_PATH,
+    PANEL_VERSION,
     PROVIDER_DHL,
     PROVIDER_DPD,
     SERVICE_ADD_TRACKING_NUMBER,
@@ -26,6 +34,41 @@ from .coordinator import DhlDataUpdateCoordinator, DpdDataUpdateCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor"]
+
+_PANEL_REGISTERED_KEY = "_panel_registered"
+
+
+async def _async_register_panel(hass: HomeAssistant) -> None:
+    """Register the Paketverfolgung sidebar panel once per HA start.
+
+    Serves the buildless web component straight from the integration's
+    `frontend/` folder and adds it as a sidebar page. Guarded so multiple
+    config entries (DHL + DPD) don't try to register it twice.
+    """
+    if hass.data[DOMAIN].get(_PANEL_REGISTERED_KEY):
+        return
+    hass.data[DOMAIN][_PANEL_REGISTERED_KEY] = True
+
+    frontend_dir = Path(__file__).parent / "frontend"
+    try:
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(PANEL_STATIC_URL, str(frontend_dir), False)]
+        )
+        await panel_custom.async_register_panel(
+            hass,
+            frontend_url_path=PANEL_URL_PATH,
+            webcomponent_name="paketverfolgung-panel",
+            module_url=(
+                f"{PANEL_STATIC_URL}/paketverfolgung-panel.js?v={PANEL_VERSION}"
+            ),
+            sidebar_title=PANEL_TITLE,
+            sidebar_icon=PANEL_ICON,
+            require_admin=False,
+        )
+    except ValueError:
+        # Already registered (e.g. integration reloaded without a restart).
+        _LOGGER.debug("Paketverfolgung panel already registered")
+
 
 _ADD_TRACKING_NUMBER_SCHEMA = vol.Schema(
     # HA's automation templates render a purely-numeric string back into an
@@ -52,6 +95,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    await _async_register_panel(hass)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

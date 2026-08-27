@@ -24,6 +24,14 @@ CONF_UPDATE_INTERVAL = "update_interval_minutes"
 SERVICE_ADD_TRACKING_NUMBER = "add_tracking_number"
 ATTR_TRACKING_NUMBER = "tracking_number"
 
+# Custom sidebar panel (buildless web component served from ./frontend).
+PANEL_URL_PATH = "paketverfolgung"
+PANEL_STATIC_URL = "/paketverfolgung_static"
+PANEL_TITLE = "Paketverfolgung"
+PANEL_ICON = "mdi:package-variant-closed"
+# Bump on every panel .js change to bust the browser cache.
+PANEL_VERSION = "1.6.0"
+
 CONF_PROVIDER = "provider"
 PROVIDER_DHL = "dhl"
 PROVIDER_DPD = "dpd"
