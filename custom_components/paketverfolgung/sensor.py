@@ -194,4 +194,10 @@ class CombinedOutForDeliveryTodaySensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        return {"shipments": self._shipments()}
+        shipments = self._shipments()
+        # Distinct carriers among today's deliveries, as a plain
+        # comma-joined string (e.g. "DHL" / "DPD" / "DHL, DPD") so it can be
+        # shown directly as a dashboard tile's secondary line via
+        # state_content, without a template needing to unpack `shipments`.
+        carriers = sorted({s["provider"] for s in shipments if s.get("provider")})
+        return {"shipments": shipments, "carriers": ", ".join(carriers)}
