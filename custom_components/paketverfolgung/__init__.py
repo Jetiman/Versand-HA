@@ -6,7 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import voluptuous as vol
-from homeassistant.components import panel_custom
+from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
@@ -39,25 +39,33 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor"]
 
-_PANEL_REGISTERED_KEY = "_panel_registered"
+_STATIC_PATH_KEY = "_static_path_registered"
 
 
 async def _async_register_panel(hass: HomeAssistant) -> None:
-    """Register the Paketverfolgung sidebar panel once per HA start.
+    """Register (or refresh) the Paketverfolgung sidebar panel.
 
     Serves the buildless web component straight from the integration's
-    `frontend/` folder and adds it as a sidebar page. Guarded so multiple
-    config entries (DHL + DPD) don't try to register it twice.
+    `frontend/` folder. The static path can only be registered once per HA
+    run, but the panel itself is re-registered on every setup so an
+    integration *reload* is enough to pick up a bumped PANEL_VERSION
+    (i.e. new panel JS) - no full restart needed.
     """
-    if hass.data[DOMAIN].get(_PANEL_REGISTERED_KEY):
-        return
-    hass.data[DOMAIN][_PANEL_REGISTERED_KEY] = True
+    if not hass.data[DOMAIN].get(_STATIC_PATH_KEY):
+        hass.data[DOMAIN][_STATIC_PATH_KEY] = True
+        frontend_dir = Path(__file__).parent / "frontend"
+        try:
+            await hass.http.async_register_static_paths(
+                [StaticPathConfig(PANEL_STATIC_URL, str(frontend_dir), False)]
+            )
+        except RuntimeError:
+            # Path already registered earlier this run.
+            pass
 
-    frontend_dir = Path(__file__).parent / "frontend"
+    if PANEL_URL_PATH in hass.data.get(frontend.DATA_PANELS, {}):
+        frontend.async_remove_panel(hass, PANEL_URL_PATH)
+
     try:
-        await hass.http.async_register_static_paths(
-            [StaticPathConfig(PANEL_STATIC_URL, str(frontend_dir), False)]
-        )
         await panel_custom.async_register_panel(
             hass,
             frontend_url_path=PANEL_URL_PATH,
@@ -70,7 +78,6 @@ async def _async_register_panel(hass: HomeAssistant) -> None:
             require_admin=False,
         )
     except ValueError:
-        # Already registered (e.g. integration reloaded without a restart).
         _LOGGER.debug("Paketverfolgung panel already registered")
 
 

@@ -249,7 +249,7 @@ class PaketverfolgungPanel extends HTMLElement {
           <div class="pv-row-status ${s.delivered ? "done" : ""}">${esc(s.status)}</div>
           ${
             s.changed
-              ? `<div class="pv-row-time">${esc(fmtDateTime(s.changed))}</div>`
+              ? `<div class="pv-row-time">${esc(fmtShort(s.changed))}</div>`
               : ""
           }
         </div>
@@ -494,6 +494,19 @@ function fmtDateTime(value) {
   });
 }
 
+function fmtShort(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  const date = d.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    ...(d.getFullYear() === new Date().getFullYear() ? {} : { year: "2-digit" }),
+  });
+  const time = d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return `${date} ${time}`;
+}
+
 function fmtRelative(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -552,28 +565,38 @@ const STYLES = `
 
   .pv-list { display: flex; flex-direction: column; gap: 8px; }
   .pv-row {
-    display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
     background: var(--card-background-color); border: none; border-radius: 12px;
-    padding: 12px 14px; cursor: pointer; color: var(--primary-text-color);
+    padding: 12px; cursor: pointer; color: var(--primary-text-color);
     box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.1));
   }
   .pv-row:hover { background: var(--secondary-background-color); }
   .pv-row-num {
-    flex: none; min-width: 20px; text-align: center; font-size: 13px;
+    flex: none; width: 18px; text-align: center; font-size: 13px;
     font-weight: 500; color: var(--secondary-text-color);
   }
-  .pv-row-icon { color: var(--primary-color); --mdc-icon-size: 28px; }
-  .pv-row-main { flex: 1; min-width: 0; }
-  .pv-row-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pv-row-sub { font-size: 12px; color: var(--secondary-text-color); }
+  .pv-row-icon { flex: none; color: var(--primary-color); --mdc-icon-size: 26px; }
+  .pv-row-main { flex: 1 1 auto; min-width: 0; }
+  .pv-row-name {
+    font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pv-row-sub {
+    font-size: 12px; color: var(--secondary-text-color);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .pv-row-right {
     display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
-    max-width: 45%; flex: none;
+    flex: none; width: 40%; max-width: 220px; min-width: 0;
   }
-  .pv-row-status { font-size: 13px; color: var(--secondary-text-color); text-align: right; }
+  .pv-row-status {
+    font-size: 13px; color: var(--secondary-text-color); text-align: right;
+    overflow-wrap: anywhere;
+  }
   .pv-row-status.done { color: var(--success-color, #2e7d32); }
-  .pv-row-time { font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; }
-  .pv-chevron { color: var(--secondary-text-color); flex: none; }
+  .pv-row-time {
+    font-size: 11px; color: var(--secondary-text-color); white-space: nowrap;
+  }
+  .pv-chevron { flex: none; color: var(--secondary-text-color); }
 
   .pv-empty { color: var(--secondary-text-color); padding: 32px 8px; text-align: center; }
 
