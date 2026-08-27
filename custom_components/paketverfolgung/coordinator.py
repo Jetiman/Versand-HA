@@ -4,8 +4,9 @@ Two coordinators, both producing the same normalized ``dict[id, shipment]``
 shape so the sensor/panel code is carrier-agnostic:
 
 * ``TrackingNumbersDataUpdateCoordinator`` - a manually-managed list of
-  tracking numbers. Each number's carrier (DHL or DPD) is auto-detected
-  and remembered, then only that carrier is queried on later refreshes.
+  tracking numbers. Each number's carrier (DHL, DPD or Hermes) is
+  auto-detected and remembered, then only that carrier is queried on
+  later refreshes.
 * ``DpdAccountDataUpdateCoordinator`` - every parcel on a myDPD account,
   enriched with the full scan history from DPD's public tracking API.
 """
@@ -22,6 +23,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from .const import (
     CARRIER_DHL,
     CARRIER_DPD,
+    CARRIER_HERMES,
     CARRIER_UNKNOWN,
     CONF_DEFAULT_POSTCODE,
     CONF_DPD_PASSWORD,
@@ -42,6 +44,7 @@ from .const import (
 from .dhl_api import DhlApiClient, DhlApiError
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError, DpdSession
 from .dpd_tracking_api import DpdTrackingApiClient, DpdTrackingApiError
+from .hermes_tracking_api import HermesTrackingApiClient, HermesTrackingApiError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,7 +131,7 @@ def _placeholder(number: str, carrier: str) -> dict:
 
 
 class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
-    """Tracks a manually-managed list of DHL/DPD tracking numbers."""
+    """Tracks a manually-managed list of DHL / DPD / Hermes tracking numbers."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
@@ -136,6 +139,7 @@ class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]
         session = async_get_clientsession(hass)
         self.dhl = DhlApiClient(session)
         self.dpd = DpdTrackingApiClient(session)
+        self.hermes = HermesTrackingApiClient(session)
         # number -> detected carrier; kept in memory (re-detected after a
         # restart, which just means one extra probe per number).
         self.carriers: dict[str, str] = {}
@@ -155,7 +159,12 @@ class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]
             return {}
 
         dhl_by_id = await self._dhl_lookup(
-            [n for n in numbers if self.carriers.get(n, CARRIER_UNKNOWN) != CARRIER_DPD]
+            [
+                n
+                for n in numbers
+                if self.carriers.get(n, CARRIER_UNKNOWN)
+                not in (CARRIER_DPD, CARRIER_HERMES)
+            ]
         )
 
         result: dict[str, dict] = {}
@@ -167,9 +176,15 @@ class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]
                 item = normalize_dhl_shipment(dhl_by_id[number])
                 carrier = CARRIER_DHL
             elif carrier != CARRIER_DHL:
-                item = await self._dpd_lookup(number, postcode)
-                if item is not None:
-                    carrier = CARRIER_DPD
+                # Try DPD then Hermes, respecting an already-detected carrier.
+                if carrier in (CARRIER_UNKNOWN, CARRIER_DPD):
+                    item = await self._dpd_lookup(number, postcode)
+                    if item is not None:
+                        carrier = CARRIER_DPD
+                if item is None and carrier in (CARRIER_UNKNOWN, CARRIER_HERMES):
+                    item = await self._hermes_lookup(number)
+                    if item is not None:
+                        carrier = CARRIER_HERMES
 
             if item is None:
                 # Nothing resolved this cycle - keep the last real data
@@ -207,8 +222,18 @@ class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]
             return await self.dpd.fetch(number, postcode)
         except DpdTrackingApiError as err:
             _LOGGER.warning("DPD lookup for %s failed: %s", number, err)
-            existing = (self.data or {}).get(number)
-            return existing if existing and existing.get("carrier") == CARRIER_DPD else None
+            return self._keep_previous(number, CARRIER_DPD)
+
+    async def _hermes_lookup(self, number: str) -> dict | None:
+        try:
+            return await self.hermes.fetch(number)
+        except HermesTrackingApiError as err:
+            _LOGGER.warning("Hermes lookup for %s failed: %s", number, err)
+            return self._keep_previous(number, CARRIER_HERMES)
+
+    def _keep_previous(self, number: str, carrier: str) -> dict | None:
+        existing = (self.data or {}).get(number)
+        return existing if existing and existing.get("carrier") == carrier else None
 
 
 class DpdAccountDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):

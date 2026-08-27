@@ -9,10 +9,10 @@
         }
       },
       "dhl": {
-        "title": "Track parcel numbers (DHL & DPD)",
-        "description": "Add one or more tracking numbers (press Enter after each). Whether a number belongs to DHL or DPD is detected automatically - this entry covers both carriers. You can also start empty and add numbers later via the options.",
+        "title": "Track parcel numbers (DHL, DPD & Hermes)",
+        "description": "Add one or more tracking numbers (press Enter after each). Whether a number belongs to DHL, DPD or Hermes is detected automatically - this entry covers all three carriers. You can also start empty and add numbers later via the options.",
         "data": {
-          "tracking_numbers": "Tracking numbers (DHL or DPD)",
+          "tracking_numbers": "Tracking numbers (DHL, DPD or Hermes)",
           "default_postcode": "Your postcode (only needed if a DPD number is protected)"
         }
       },
@@ -36,7 +36,7 @@
   "selector": {
     "provider": {
       "options": {
-        "dhl": "Tracking numbers (DHL & DPD)",
+        "dhl": "Tracking numbers (DHL, DPD & Hermes)",
         "dpd": "DPD account (all parcels automatically)"
       }
     }
@@ -44,9 +44,9 @@
   "options": {
     "step": {
       "dhl_options": {
-        "description": "Tracking numbers for DHL and DPD - this entry covers both carriers. Add or remove numbers, optionally set your postcode (only for protected DPD parcels), and adjust the update interval.",
+        "description": "Tracking numbers for DHL, DPD and Hermes - this entry covers all three carriers. Add or remove numbers, optionally set your postcode (only for protected DPD parcels), and adjust the update interval.",
         "data": {
-          "tracking_numbers": "Tracking numbers (DHL or DPD)",
+          "tracking_numbers": "Tracking numbers (DHL, DPD or Hermes)",
           "default_postcode": "Your postcode (only needed if a DPD number is protected)",
           "update_interval_minutes": "Update interval (minutes)"
         }
@@ -63,11 +63,11 @@
   "services": {
     "add_tracking_number": {
       "name": "Add tracking number",
-      "description": "Adds a tracking number to Paketverfolgung, unless it's already tracked. The carrier (DHL or DPD) is detected automatically.",
+      "description": "Adds a tracking number to Paketverfolgung, unless it's already tracked. The carrier (DHL, DPD or Hermes) is detected automatically.",
       "fields": {
         "tracking_number": {
           "name": "Tracking number",
-          "description": "The tracking number (DHL or DPD)."
+          "description": "The tracking number (DHL, DPD or Hermes)."
         }
       }
     },

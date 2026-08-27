@@ -28,6 +28,10 @@ from .const import (
     GROUP_UNKNOWN,
     USER_AGENT,
 )
+from .tracking_util import as_bool as _bool
+from .tracking_util import first as _first
+from .tracking_util import pick as _get
+from .tracking_util import text as _text
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,35 +65,6 @@ _TEXT_GROUP = (
 
 class DpdTrackingApiError(Exception):
     """Error talking to DPD's public tracking endpoint."""
-
-
-def _get(obj: Any, *keys: str) -> Any:
-    """Return obj[key] for the first key present (case-insensitive-ish)."""
-    if not isinstance(obj, dict):
-        return None
-    lowered = {k.lower(): v for k, v in obj.items()}
-    for key in keys:
-        if key in obj:
-            return obj[key]
-        if key.lower() in lowered:
-            return lowered[key.lower()]
-    return None
-
-
-def _text(value: Any) -> str:
-    """Flatten the {'content': [...]} / plain-string label shapes DPD uses."""
-    if isinstance(value, str):
-        return value.strip()
-    if isinstance(value, dict):
-        content = value.get("content") or value.get("Content")
-        if isinstance(content, list):
-            return " ".join(str(p) for p in content if p).strip()
-        if isinstance(content, str):
-            return content.strip()
-        return _text(value.get("label"))
-    if isinstance(value, list):
-        return " ".join(_text(v) for v in value if v).strip()
-    return ""
 
 
 class DpdTrackingApiClient:
@@ -268,13 +243,3 @@ class DpdTrackingApiClient:
                 group = GROUP_TRANSIT if events else GROUP_REGISTERED
 
         return current_label, group
-
-
-def _first(value: Any) -> Any:
-    if isinstance(value, list) and value:
-        return value[0]
-    return value
-
-
-def _bool(value: Any) -> bool:
-    return value is True or str(value).strip().lower() in ("true", "1", "yes")

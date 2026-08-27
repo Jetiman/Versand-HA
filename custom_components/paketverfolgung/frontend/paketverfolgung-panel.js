@@ -12,6 +12,8 @@
  * (one per shipment/parcel, identified by the `tracking_id` attribute).
  */
 
+const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes" };
+
 class PaketverfolgungPanel extends HTMLElement {
   constructor() {
     super();
@@ -70,7 +72,13 @@ class PaketverfolgungPanel extends HTMLElement {
       const a = stateObj.attributes || {};
       if (!a.tracking_id) continue;
       const url = a.tracking_url || "";
-      const carrier = (a.carrier || (url.includes("dpd") ? "dpd" : "dhl")) + "";
+      const carrier =
+        (a.carrier ||
+          (url.includes("dpd")
+            ? "dpd"
+            : url.includes("hermes")
+            ? "hermes"
+            : "dhl")) + "";
       const group = a.group || "";
       const delivered = a.delivered === true || group === "delivered";
       const events = Array.isArray(a.events) ? a.events : [];
@@ -84,7 +92,7 @@ class PaketverfolgungPanel extends HTMLElement {
         status: stateObj.state,
         icon: a.icon || "mdi:package-variant-closed",
         tracking_id: String(a.tracking_id),
-        provider: carrier === "dpd" ? "DPD" : carrier === "dhl" ? "DHL" : "?",
+        provider: PROVIDER_LABELS[carrier] || "?",
         carrier,
         group,
         direction: a.direction || null,
@@ -212,7 +220,7 @@ class PaketverfolgungPanel extends HTMLElement {
         canAdd
           ? `<form class="pv-add" autocomplete="off">
               <input name="tracking" type="text" inputmode="numeric"
-                placeholder="Sendungsnummer hinzufügen (DHL oder DPD)" />
+                placeholder="Sendungsnummer hinzufügen (DHL, DPD, Hermes)" />
               <button type="submit" ${this._addBusy ? "disabled" : ""}>
                 ${this._addBusy ? "…" : "Hinzufügen"}
               </button>
@@ -239,8 +247,9 @@ class PaketverfolgungPanel extends HTMLElement {
     const generic =
       !s.name ||
       s.name === s.tracking_id ||
-      s.name === `DHL ${s.tracking_id}` ||
-      s.name === `DPD ${s.tracking_id}`;
+      Object.values(PROVIDER_LABELS).some(
+        (p) => s.name === `${p} ${s.tracking_id}`
+      );
     const prov = s.provider === "?" ? "wird erkannt" : s.provider;
     const dim = [prov, s.changed ? fmtShort(s.changed) : ""]
       .filter(Boolean)
@@ -320,7 +329,7 @@ class PaketverfolgungPanel extends HTMLElement {
     if (s.protected) {
       note = `<div class="pv-note">Diese DPD-Sendung ist geschützt. Hinterlege deine PLZ
         in den Optionen der Integration, damit der Verlauf abgerufen werden kann.</div>`;
-    } else if (!s.events.length && s.provider === "DPD") {
+    } else if (!s.events.length && (s.provider === "DPD" || s.provider === "Hermes")) {
       note = `<div class="pv-note">Für diese Sendung liegt noch kein Verlauf vor.</div>`;
     } else if (!s.events.length && s.provider === "?") {
       note = `<div class="pv-note">Der Anbieter wird bei der nächsten Aktualisierung erkannt.</div>`;

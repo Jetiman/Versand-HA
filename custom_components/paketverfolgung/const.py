@@ -34,6 +34,7 @@ ATTR_TRACKING_NUMBER = "tracking_number"
 # restart, which is cheap).
 CARRIER_DHL = "dhl"
 CARRIER_DPD = "dpd"
+CARRIER_HERMES = "hermes"
 CARRIER_UNKNOWN = "unknown"
 
 # Custom sidebar panel (buildless web component served from ./frontend).
@@ -42,7 +43,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.7.5"
+PANEL_VERSION = "1.8.0"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is
@@ -75,6 +76,14 @@ DPD_TRACKING_PAGE_URL = "https://tracking.dpd.de/status/de_DE/parcel/{id}"
 # without a login; some parcels are postcode-protected and need `?zip=`.
 # This gives the full scan history the SOAP account API doesn't return.
 DPD_PLC_URL = "https://tracking.dpd.de/rest/plc/de_DE/{id}"
+
+# Hermes Germany's public tracking JSON endpoint (the one myhermes.de's
+# "Sendungsverfolgung" page calls). Works by parcel number, no login, no
+# postcode. Unofficial - schema undocumented.
+HERMES_PLC_URL = "https://api.my-deliveries.de/tnt/parcelservice/parceldetails/{id}"
+HERMES_TRACKING_PAGE_URL = (
+    "https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation/#{id}"
+)
 
 # Broad lifecycle group shared by both carriers - drives the icon and the
 # combined "out for delivery" count regardless of provider.
