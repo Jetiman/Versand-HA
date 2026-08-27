@@ -3,6 +3,10 @@ from datetime import timedelta
 
 DOMAIN = "paketverfolgung"
 
+# Sentinel key (alongside the entry_id keys) in hass.data[DOMAIN] marking
+# that the one shared "Heute in Zustellung" sensor has already been added.
+COMBINED_SENSOR_ADDED_KEY = "_combined_out_for_delivery_sensor_added"
+
 # DHL's public shipment-tracking search. Works fully anonymously for a
 # known tracking number (piececode) - no login required. Verified against
 # the real endpoint: https://www.dhl.de/int-verfolgen/data/search

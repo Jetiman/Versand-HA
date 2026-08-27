@@ -52,7 +52,7 @@ Pro Sendung (DHL) bzw. Paket (DPD) ein Sensor mit:
 - **Zustand:** Klartext-Status (z. B. „In Zustellung“, „Zugestellt“)
 - **Attribute:** Tracking-ID, Status/Fortschritt, Richtung, Link zur Sendungsverfolgung (bei DHL zusätzlich Zustellzeitfenster und komplette Verlaufshistorie)
 
-Zusätzlich pro Anbieter ein Sammel-Sensor **„Heute in Zustellung“**: Zustand ist die Anzahl der Sendungen, die gerade im Zustellfahrzeug sind, Attribut `shipments` enthält die Liste dieser Sendungen für eine Dashboard-Karte.
+Zusätzlich ein **anbieterübergreifender** Sammel-Sensor **„Heute in Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Gesamtzahl der Sendungen (DHL + DPD zusammen), die gerade im Zustellfahrzeug sind, Attribut `shipments` enthält die Liste dieser Sendungen (inkl. Anbieter) für eine Dashboard-Karte.
 
 ## Bekannte Einschränkungen
 
