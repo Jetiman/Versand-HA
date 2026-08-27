@@ -17,7 +17,7 @@
       },
       "dpd": {
         "title": "Mit DPD-Konto anmelden",
-        "description": "Melde dich mit deinem myDPD-Konto an. Alle Sendungen (gesendet, empfangen, Retouren) werden danach automatisch erkannt - anders als bei DHL musst du keine Sendungsnummern manuell eintragen.",
+        "description": "Melde dich mit deinem myDPD-Konto an. Alle Sendungen (gesendet, empfangen, Retouren) werden danach automatisch erkannt.",
         "data": {
           "dpd_username": "Benutzername / E-Mail",
           "dpd_password": "Passwort"

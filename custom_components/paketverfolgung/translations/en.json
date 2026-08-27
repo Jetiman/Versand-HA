@@ -17,7 +17,7 @@
       },
       "dpd": {
         "title": "Log in with your DPD account",
-        "description": "Log in with your myDPD account. All parcels (sent, received, returns) will then be detected automatically - unlike DHL, you don't need to enter tracking numbers manually.",
+        "description": "Log in with your myDPD account. All parcels (sent, received, returns) will then be detected automatically.",
         "data": {
           "dpd_username": "Username / email",
           "dpd_password": "Password"
