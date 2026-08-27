@@ -130,6 +130,7 @@ class PaketverfolgungPanel extends HTMLElement {
       result: this._addResult,
       items: shipments.map((s) => [
         s.entity_id,
+        s.name,
         s.status,
         s.group,
         s.carrier,
@@ -235,23 +236,27 @@ class PaketverfolgungPanel extends HTMLElement {
   }
 
   _rowHtml(s, pos) {
+    const generic =
+      !s.name ||
+      s.name === s.tracking_id ||
+      s.name === `DHL ${s.tracking_id}` ||
+      s.name === `DPD ${s.tracking_id}`;
+    const prov = s.provider === "?" ? "wird erkannt" : s.provider;
+    const dim = [prov, s.changed ? fmtShort(s.changed) : ""]
+      .filter(Boolean)
+      .map(esc)
+      .join(" · ");
     return `
       <button class="pv-row" data-entity="${esc(s.entity_id)}">
         <div class="pv-row-num">${pos}</div>
         <ha-icon class="pv-row-icon" icon="${esc(s.icon)}"></ha-icon>
         <div class="pv-row-main">
-          <div class="pv-row-name">${esc(s.name)}</div>
-          <div class="pv-row-sub">${esc(
-            s.provider === "?" ? "Anbieter wird erkannt" : s.provider
-          )} · ${esc(s.tracking_id)}</div>
-        </div>
-        <div class="pv-row-right">
-          <div class="pv-row-status ${s.delivered ? "done" : ""}">${esc(s.status)}</div>
-          ${
-            s.changed
-              ? `<div class="pv-row-time">${esc(fmtShort(s.changed))}</div>`
-              : ""
-          }
+          ${generic ? "" : `<div class="pv-row-name">${esc(s.name)}</div>`}
+          <div class="pv-row-id">${esc(s.tracking_id)}</div>
+          <div class="pv-row-meta">
+            <span class="pv-row-status ${s.delivered ? "done" : ""}">${esc(s.status)}</span>
+            <span class="pv-row-dim">${dim}</span>
+          </div>
         </div>
         <ha-icon class="pv-chevron" icon="mdi:chevron-right"></ha-icon>
       </button>
@@ -565,38 +570,34 @@ const STYLES = `
 
   .pv-list { display: flex; flex-direction: column; gap: 8px; }
   .pv-row {
-    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
     background: var(--card-background-color); border: none; border-radius: 12px;
     padding: 12px; cursor: pointer; color: var(--primary-text-color);
     box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.1));
   }
   .pv-row:hover { background: var(--secondary-background-color); }
   .pv-row-num {
-    flex: none; width: 18px; text-align: center; font-size: 13px;
+    flex: none; width: 18px; text-align: center; font-size: 13px; line-height: 20px;
     font-weight: 500; color: var(--secondary-text-color);
   }
-  .pv-row-icon { flex: none; color: var(--primary-color); --mdc-icon-size: 26px; }
+  .pv-row-icon { flex: none; color: var(--primary-color); --mdc-icon-size: 20px; margin-top: 1px; }
   .pv-row-main { flex: 1 1 auto; min-width: 0; }
   .pv-row-name {
-    font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-weight: 500; margin-bottom: 1px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .pv-row-sub {
-    font-size: 12px; color: var(--secondary-text-color);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .pv-row-id {
+    font-weight: 500; font-size: 14px; line-height: 1.35;
+    overflow-wrap: anywhere; word-break: break-all;
   }
-  .pv-row-right {
-    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
-    flex: none; width: 40%; max-width: 220px; min-width: 0;
+  .pv-row-meta {
+    font-size: 12px; margin-top: 3px; line-height: 1.4; overflow-wrap: anywhere;
   }
-  .pv-row-status {
-    font-size: 13px; color: var(--secondary-text-color); text-align: right;
-    overflow-wrap: anywhere;
-  }
+  .pv-row-status { color: var(--primary-text-color); }
   .pv-row-status.done { color: var(--success-color, #2e7d32); }
-  .pv-row-time {
-    font-size: 11px; color: var(--secondary-text-color); white-space: nowrap;
-  }
-  .pv-chevron { flex: none; color: var(--secondary-text-color); }
+  .pv-row-dim { color: var(--secondary-text-color); }
+  .pv-row-dim::before { content: " · "; }
+  .pv-chevron { flex: none; color: var(--secondary-text-color); margin-top: 1px; }
 
   .pv-empty { color: var(--secondary-text-color); padding: 32px 8px; text-align: center; }
 
@@ -630,7 +631,7 @@ const STYLES = `
   }
   .pv-actions button.pv-delete {
     background: transparent; color: var(--error-color, #c62828);
-    border: 1px solid var(--error-color, #c62828); margin-left: auto;
+    border: 1px solid var(--error-color, #c62828);
   }
 
   .pv-meta {
@@ -639,7 +640,7 @@ const STYLES = `
     margin-bottom: 24px; box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.1));
   }
   .pv-meta-key { font-size: 12px; color: var(--secondary-text-color); }
-  .pv-meta-val { font-size: 14px; color: var(--primary-text-color); margin-top: 2px; word-break: break-word; }
+  .pv-meta-val { font-size: 14px; color: var(--primary-text-color); margin-top: 2px; overflow-wrap: anywhere; }
 
   .pv-section-title { font-size: 16px; font-weight: 600; color: var(--primary-text-color); margin-bottom: 12px; }
 
