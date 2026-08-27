@@ -73,6 +73,11 @@ class PaketverfolgungPanel extends HTMLElement {
       const carrier = (a.carrier || (url.includes("dpd") ? "dpd" : "dhl")) + "";
       const group = a.group || "";
       const delivered = a.delivered === true || group === "delivered";
+      const events = Array.isArray(a.events) ? a.events : [];
+      // "last change" of the shipment itself: the newest carrier event if
+      // we have one, otherwise when the sensor state last changed.
+      const changed =
+        (events[0] && events[0].datum) || stateObj.last_changed || null;
       out.push({
         entity_id: stateObj.entity_id,
         name: a.friendly_name || stateObj.entity_id,
@@ -86,17 +91,19 @@ class PaketverfolgungPanel extends HTMLElement {
         delivery_from: a.delivery_window_from || null,
         delivery_to: a.delivery_window_to || null,
         tracking_url: url || null,
-        events: Array.isArray(a.events) ? a.events : [],
+        events,
         delivered,
         protected: a.protected === true,
         out_for_delivery: group === "out_for_delivery" && !delivered,
+        changed,
         last_updated: stateObj.last_updated,
         last_changed: stateObj.last_changed,
       });
     }
     out.sort((x, y) => {
-      if (x.delivered !== y.delivered) return x.delivered ? 1 : -1;
-      return (y.last_changed || "").localeCompare(x.last_changed || "");
+      const tx = x.changed ? Date.parse(x.changed) : 0;
+      const ty = y.changed ? Date.parse(y.changed) : 0;
+      return (ty || 0) - (tx || 0);
     });
     return out;
   }
@@ -125,7 +132,7 @@ class PaketverfolgungPanel extends HTMLElement {
         s.status,
         s.group,
         s.carrier,
-        s.last_updated,
+        s.changed,
         s.events.length,
       ]),
     });
@@ -212,6 +219,17 @@ class PaketverfolgungPanel extends HTMLElement {
           : ""
       }
       <div class="pv-list">${rows}</div>
+
+      <div class="pv-footer">
+        <button class="pv-settings" data-nav="/config/integrations/integration/paketverfolgung">
+          <ha-icon icon="mdi:cog-outline"></ha-icon>
+          Einstellungen (DPD-Login, PLZ, Sendungsnummern)
+        </button>
+        <div class="pv-footer-hint">
+          Öffnet die Integration – dort beim jeweiligen Eintrag auf das Zahnrad
+          für PLZ und Sendungsnummern, oder „Eintrag hinzufügen“ für den DPD-Login.
+        </div>
+      </div>
     `;
   }
 
@@ -225,7 +243,14 @@ class PaketverfolgungPanel extends HTMLElement {
             s.provider === "?" ? "Anbieter wird erkannt" : s.provider
           )} · ${esc(s.tracking_id)}</div>
         </div>
-        <div class="pv-row-status ${s.delivered ? "done" : ""}">${esc(s.status)}</div>
+        <div class="pv-row-right">
+          <div class="pv-row-status ${s.delivered ? "done" : ""}">${esc(s.status)}</div>
+          ${
+            s.changed
+              ? `<div class="pv-row-time">${esc(fmtDateTime(s.changed))}</div>`
+              : ""
+          }
+        </div>
         <ha-icon class="pv-chevron" icon="mdi:chevron-right"></ha-icon>
       </button>
     `;
@@ -335,6 +360,11 @@ class PaketverfolgungPanel extends HTMLElement {
     if (ev.target.closest("[data-back]")) {
       ev.preventDefault();
       this._navigate("/paketverfolgung");
+      return;
+    }
+    const nav = ev.target.closest("[data-nav]");
+    if (nav) {
+      this._navigate(nav.getAttribute("data-nav"));
       return;
     }
     const refresh = ev.target.closest("[data-refresh]");
@@ -514,14 +544,27 @@ const STYLES = `
   .pv-row-main { flex: 1; min-width: 0; }
   .pv-row-name { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pv-row-sub { font-size: 12px; color: var(--secondary-text-color); }
-  .pv-row-status {
-    font-size: 13px; color: var(--secondary-text-color); text-align: right;
-    max-width: 40%;
+  .pv-row-right {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+    max-width: 45%; flex: none;
   }
+  .pv-row-status { font-size: 13px; color: var(--secondary-text-color); text-align: right; }
   .pv-row-status.done { color: var(--success-color, #2e7d32); }
-  .pv-chevron { color: var(--secondary-text-color); }
+  .pv-row-time { font-size: 11px; color: var(--secondary-text-color); white-space: nowrap; }
+  .pv-chevron { color: var(--secondary-text-color); flex: none; }
 
   .pv-empty { color: var(--secondary-text-color); padding: 32px 8px; text-align: center; }
+
+  .pv-footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--divider-color); }
+  .pv-settings {
+    display: flex; align-items: center; gap: 8px; width: 100%; cursor: pointer;
+    background: var(--card-background-color); color: var(--primary-text-color);
+    border: 1px solid var(--divider-color); border-radius: 10px; padding: 12px 14px;
+    font-size: 14px; text-align: left;
+  }
+  .pv-settings:hover { background: var(--secondary-background-color); }
+  .pv-settings ha-icon { color: var(--primary-color); }
+  .pv-footer-hint { font-size: 12px; color: var(--secondary-text-color); margin-top: 8px; }
 
   .pv-back {
     display: inline-block; margin-bottom: 16px; cursor: pointer;
