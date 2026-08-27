@@ -24,3 +24,30 @@ remove_tracking_number:
       example: "00340434123456789012"
       selector:
         text:
+
+set_tracking_carrier:
+  name: Anbieter festlegen
+  description: >-
+    Ordnet eine Sendungsnummer fest einem Anbieter zu, falls die
+    automatische Erkennung daneben liegt. "auto" hebt die Zuordnung
+    wieder auf.
+  fields:
+    tracking_number:
+      name: Sendungsnummer
+      description: Die Sendungs-/Trackingnummer.
+      required: true
+      example: "H1003660752960401006"
+      selector:
+        text:
+    carrier:
+      name: Anbieter
+      description: dhl, dpd, hermes oder auto.
+      required: true
+      example: hermes
+      selector:
+        select:
+          options:
+            - dhl
+            - dpd
+            - hermes
+            - auto

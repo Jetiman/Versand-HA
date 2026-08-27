@@ -119,6 +119,7 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
         return {
             "tracking_id": self.item_id,
             "carrier": s.get("carrier"),
+            "forced_carrier": s.get("forced"),
             "group": s.get("group"),
             "removable": isinstance(
                 self.coordinator, TrackingNumbersDataUpdateCoordinator

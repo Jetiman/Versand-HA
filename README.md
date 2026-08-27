@@ -24,6 +24,8 @@ Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten
 
 Bei der nächsten Aktualisierung wird jede Nummer der Reihe nach bei DHL, DPD und Hermes nachgeschlagen. Der erkannte Anbieter wird gemerkt und danach nur noch dieser abgefragt.
 
+Liegt die Erkennung mal daneben, lässt sich der Anbieter pro Sendung fest vorgeben – auf der Detailseite in der Oberfläche über das Auswahlfeld „Anbieter", oder per Dienst `paketverfolgung.set_tracking_carrier` (`carrier: dhl` / `dpd` / `hermes` / `auto`).
+
 - **DHL:** öffentliche Sendungsverfolgungs-Suche (kein Login), inkl. komplettem Verlauf und Zustellzeitfenster.
 - **DPD:** öffentliche „Parcel Life Cycle“-Verfolgung von tracking.dpd.de, inkl. Verlauf.
 - **Hermes:** öffentliche Sendungsverfolgung von myhermes.de (api.my-deliveries.de), inkl. Verlauf.
@@ -52,7 +54,7 @@ Zusätzlich der **anbieterübergreifende** Sammel-Sensor **„Heute in Zustellun
 Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolgung**:
 
 - **Übersicht:** Kacheln (Gesamt / Unterwegs / Heute in Zustellung / Zugestellt), Eingabefeld „Sendungsnummer hinzufügen (DHL, DPD, Hermes)“ und die nummerierte Liste aller Sendungen – zuletzt geändert zuerst, mit Datum und Uhrzeit der letzten Änderung.
-- **Detailseite:** Klick auf eine Sendung → aktueller Status, Eckdaten, Link zur Anbieter-Seite, Button „Jetzt aktualisieren“ und der **komplette Sendungsverlauf** als Zeitleiste.
+- **Detailseite:** Klick auf eine Sendung → aktueller Status, Eckdaten, Link zur Anbieter-Seite, Buttons „Jetzt aktualisieren“ / „Löschen“, ein Auswahlfeld zum manuellen Festlegen des Anbieters und der **komplette Sendungsverlauf** als Zeitleiste.
 - **Einstellungen:** Button am Ende der Übersicht öffnet die Integration – dort beim jeweiligen Eintrag über das Zahnrad PLZ und Sendungsnummern eingeben, oder per „Eintrag hinzufügen“ den DPD-Login.
 
 Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie die Sensoren, nur aufbereitet.

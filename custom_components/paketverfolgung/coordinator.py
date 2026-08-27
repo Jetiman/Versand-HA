@@ -25,6 +25,8 @@ from .const import (
     CARRIER_DPD,
     CARRIER_HERMES,
     CARRIER_UNKNOWN,
+    CARRIERS,
+    CONF_CARRIER_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
@@ -112,6 +114,26 @@ def normalize_dpd_parcel(raw: dict, events: list[dict] | None) -> dict:
     }
 
 
+def _dhl_has_data(raw: dict) -> bool:
+    """True if DHL actually knows this shipment (not just an echo shell).
+
+    DHL's search echoes unknown piececodes back with an otherwise-empty
+    sendungsverlauf, which would be mistaken for a freshly-registered DHL
+    shipment and wrongly lock the number to DHL (e.g. a Hermes number).
+    """
+    details = raw.get("sendungsdetails") or {}
+    if raw.get("sendungNichtGefunden") or details.get("sendungNichtGefunden"):
+        return False
+    verlauf = details.get("sendungsverlauf") or {}
+    return bool(
+        verlauf.get("kurzStatus")
+        or verlauf.get("status")
+        or verlauf.get("events")
+        or details.get("zustellung")
+        or details.get("istZugestellt")
+    )
+
+
 def _placeholder(number: str, carrier: str) -> dict:
     """Shipment shown for a number neither carrier has data for (yet)."""
     return {
@@ -154,29 +176,49 @@ class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]
             if str(n).strip()
         ]
         postcode = (self._config(CONF_DEFAULT_POSTCODE) or "").strip() or None
+        overrides = {
+            str(k).strip(): v
+            for k, v in (self._config(CONF_CARRIER_OVERRIDES, {}) or {}).items()
+            if v in CARRIERS
+        }
         if not numbers:
             self.carriers.clear()
             return {}
 
+        # Only batch-query DHL for numbers that could still be DHL: not
+        # locked to another carrier, and not pinned to a non-DHL one.
         dhl_by_id = await self._dhl_lookup(
             [
                 n
                 for n in numbers
-                if self.carriers.get(n, CARRIER_UNKNOWN)
+                if overrides.get(n, CARRIER_DHL) == CARRIER_DHL
+                and self.carriers.get(n, CARRIER_UNKNOWN)
                 not in (CARRIER_DPD, CARRIER_HERMES)
             ]
         )
 
         result: dict[str, dict] = {}
         for number in numbers:
-            carrier = self.carriers.get(number, CARRIER_UNKNOWN)
+            forced = overrides.get(number)
+            carrier = forced or self.carriers.get(number, CARRIER_UNKNOWN)
             item: dict | None = None
 
-            if number in dhl_by_id:
-                item = normalize_dhl_shipment(dhl_by_id[number])
+            raw_dhl = dhl_by_id.get(number)
+            dhl_confirmed = raw_dhl is not None and _dhl_has_data(raw_dhl)
+
+            if forced == CARRIER_DHL:
+                item = normalize_dhl_shipment(raw_dhl) if raw_dhl is not None else None
+            elif forced == CARRIER_DPD:
+                item = await self._dpd_lookup(number, postcode)
+            elif forced == CARRIER_HERMES:
+                item = await self._hermes_lookup(number)
+            elif dhl_confirmed:
+                item = normalize_dhl_shipment(raw_dhl)
                 carrier = CARRIER_DHL
-            elif carrier != CARRIER_DHL:
-                # Try DPD then Hermes, respecting an already-detected carrier.
+            else:
+                # DHL isn't a confirmed hit - (re)detect via DPD then Hermes.
+                if carrier == CARRIER_DHL:
+                    carrier = CARRIER_UNKNOWN
                 if carrier in (CARRIER_UNKNOWN, CARRIER_DPD):
                     item = await self._dpd_lookup(number, postcode)
                     if item is not None:
@@ -193,11 +235,13 @@ class TrackingNumbersDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]
                 previous = (self.data or {}).get(number)
                 if previous and previous.get("status") != NO_DATA_STATUS:
                     item = previous
-                    carrier = previous.get("carrier", carrier)
+                    if not forced:
+                        carrier = previous.get("carrier", carrier)
                 else:
                     item = _placeholder(number, carrier)
 
             item["carrier"] = carrier
+            item["forced"] = forced
             self.carriers[number] = carrier
             result[number] = item
 

@@ -80,6 +80,20 @@
           "description": "The tracking number to remove."
         }
       }
+    },
+    "set_tracking_carrier": {
+      "name": "Set carrier",
+      "description": "Pins a tracking number to a carrier when auto-detection gets it wrong. \"auto\" clears the override.",
+      "fields": {
+        "tracking_number": {
+          "name": "Tracking number",
+          "description": "The tracking number."
+        },
+        "carrier": {
+          "name": "Carrier",
+          "description": "dhl, dpd, hermes or auto."
+        }
+      }
     }
   }
 }

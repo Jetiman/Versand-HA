@@ -27,6 +27,7 @@ class PaketverfolgungPanel extends HTMLElement {
     this._onClick = this._onClick.bind(this);
     this._onInput = this._onInput.bind(this);
     this._onSubmit = this._onSubmit.bind(this);
+    this._onChange = this._onChange.bind(this);
     this._onPopState = () => this._render();
   }
 
@@ -35,6 +36,7 @@ class PaketverfolgungPanel extends HTMLElement {
     this.addEventListener("click", this._onClick);
     this.addEventListener("input", this._onInput);
     this.addEventListener("submit", this._onSubmit);
+    this.addEventListener("change", this._onChange);
     this._render(true);
   }
 
@@ -103,6 +105,7 @@ class PaketverfolgungPanel extends HTMLElement {
         delivered,
         protected: a.protected === true,
         removable: a.removable === true,
+        forced: a.forced_carrier || null,
         out_for_delivery: group === "out_for_delivery" && !delivered,
         changed,
         last_updated: stateObj.last_updated,
@@ -142,6 +145,7 @@ class PaketverfolgungPanel extends HTMLElement {
         s.status,
         s.group,
         s.carrier,
+        s.forced,
         s.changed,
         s.events.length,
       ]),
@@ -362,6 +366,32 @@ class PaketverfolgungPanel extends HTMLElement {
         }
       </div>
 
+      ${
+        s.removable
+          ? `<label class="pv-carrier">
+              <span>Anbieter${s.forced ? " (manuell gesetzt)" : ""}:</span>
+              <select data-carrier="${esc(s.tracking_id)}">
+                ${["auto", "dhl", "dpd", "hermes"]
+                  .map((c) => {
+                    const cur = s.forced || "auto";
+                    const label =
+                      c === "auto"
+                        ? `automatisch${
+                            !s.forced && s.provider !== "?"
+                              ? " (" + s.provider + ")"
+                              : ""
+                          }`
+                        : PROVIDER_LABELS[c];
+                    return `<option value="${c}"${
+                      c === cur ? " selected" : ""
+                    }>${esc(label)}</option>`;
+                  })
+                  .join("")}
+              </select>
+            </label>`
+          : ""
+      }
+
       <div class="pv-meta">${meta}</div>
 
       <div class="pv-section-title">Sendungsverlauf</div>
@@ -413,6 +443,17 @@ class PaketverfolgungPanel extends HTMLElement {
     if (ev.target.name === "tracking") {
       this._draftTracking = ev.target.value;
       this._addResult = null;
+    }
+  }
+
+  _onChange(ev) {
+    const pick = ev.target.closest("[data-carrier]");
+    if (pick) {
+      this._hass.callService("paketverfolgung", "set_tracking_carrier", {
+        tracking_number: pick.getAttribute("data-carrier"),
+        carrier: pick.value,
+      });
+      pick.disabled = true;
     }
   }
 
@@ -641,6 +682,16 @@ const STYLES = `
   .pv-actions button.pv-delete {
     background: transparent; color: var(--error-color, #c62828);
     border: 1px solid var(--error-color, #c62828);
+  }
+
+  .pv-carrier {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 13px; color: var(--secondary-text-color); margin-bottom: 20px;
+  }
+  .pv-carrier select {
+    padding: 8px 10px; border-radius: 8px; font-size: 13px;
+    border: 1px solid var(--divider-color); background: var(--card-background-color);
+    color: var(--primary-text-color);
   }
 
   .pv-meta {

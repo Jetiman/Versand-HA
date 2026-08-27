@@ -80,6 +80,20 @@
           "description": "Die zu entfernende Sendungs-/Trackingnummer."
         }
       }
+    },
+    "set_tracking_carrier": {
+      "name": "Anbieter festlegen",
+      "description": "Ordnet eine Sendungsnummer fest einem Anbieter zu, falls die automatische Erkennung daneben liegt. \"auto\" hebt die Zuordnung wieder auf.",
+      "fields": {
+        "tracking_number": {
+          "name": "Sendungsnummer",
+          "description": "Die Sendungs-/Trackingnummer."
+        },
+        "carrier": {
+          "name": "Anbieter",
+          "description": "dhl, dpd, hermes oder auto."
+        }
+      }
     }
   }
 }

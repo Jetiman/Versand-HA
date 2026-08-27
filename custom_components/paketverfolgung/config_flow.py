@@ -11,6 +11,7 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
+    CONF_CARRIER_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
@@ -187,10 +188,20 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
     ) -> Any:
         if user_input is not None:
             numbers = _clean_tracking_numbers(user_input.get(CONF_TRACKING_NUMBERS))
+            # Preserve per-number carrier overrides, dropping any for
+            # numbers that were just removed here.
+            overrides = {
+                k: v
+                for k, v in dict(
+                    self._entry.options.get(CONF_CARRIER_OVERRIDES, {})
+                ).items()
+                if k in numbers
+            }
             return self.async_create_entry(
                 title="",
                 data={
                     CONF_TRACKING_NUMBERS: numbers,
+                    CONF_CARRIER_OVERRIDES: overrides,
                     CONF_DEFAULT_POSTCODE: (
                         user_input.get(CONF_DEFAULT_POSTCODE) or ""
                     ).strip(),

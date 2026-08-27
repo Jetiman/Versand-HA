@@ -13,8 +13,12 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, Supp
 from homeassistant.exceptions import ServiceValidationError
 
 from .const import (
+    ATTR_CARRIER,
     ATTR_TRACKING_NUMBER,
+    CARRIER_AUTO,
+    CARRIERS,
     COMBINED_SENSOR_ADDED_KEY,
+    CONF_CARRIER_OVERRIDES,
     CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
     CONF_UPDATE_INTERVAL,
@@ -29,6 +33,7 @@ from .const import (
     PROVIDER_NUMBERS,
     SERVICE_ADD_TRACKING_NUMBER,
     SERVICE_REMOVE_TRACKING_NUMBER,
+    SERVICE_SET_CARRIER,
 )
 from .coordinator import (
     DpdAccountDataUpdateCoordinator,
@@ -88,6 +93,13 @@ _ADD_TRACKING_NUMBER_SCHEMA = vol.Schema(
     {vol.Required(ATTR_TRACKING_NUMBER): vol.Coerce(str)}
 )
 
+_SET_CARRIER_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_TRACKING_NUMBER): vol.Coerce(str),
+        vol.Required(ATTR_CARRIER): vol.In([*CARRIERS, CARRIER_AUTO]),
+    }
+)
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Paketverfolgung integration."""
@@ -125,6 +137,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async def _async_remove_tracking_number(call: ServiceCall) -> ServiceResponse:
             return await _remove_tracking_number(hass, call.data[ATTR_TRACKING_NUMBER])
 
+        async def _async_set_carrier(call: ServiceCall) -> ServiceResponse:
+            return await _set_carrier(
+                hass, call.data[ATTR_TRACKING_NUMBER], call.data[ATTR_CARRIER]
+            )
+
         hass.services.async_register(
             DOMAIN,
             SERVICE_ADD_TRACKING_NUMBER,
@@ -137,6 +154,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_REMOVE_TRACKING_NUMBER,
             _async_remove_tracking_number,
             schema=_ADD_TRACKING_NUMBER_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_CARRIER,
+            _async_set_carrier,
+            schema=_SET_CARRIER_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
         )
 
@@ -204,11 +228,43 @@ async def _remove_tracking_number(
         return {"removed": False, "tracking_number": cleaned}
 
     current = [n for n in current if n != cleaned]
+    overrides = {
+        k: v
+        for k, v in dict(entry.options.get(CONF_CARRIER_OVERRIDES, {})).items()
+        if k != cleaned
+    }
     hass.config_entries.async_update_entry(
-        entry, options={**entry.options, CONF_TRACKING_NUMBERS: current}
+        entry,
+        options={
+            **entry.options,
+            CONF_TRACKING_NUMBERS: current,
+            CONF_CARRIER_OVERRIDES: overrides,
+        },
     )
     _LOGGER.info("Paketverfolgung: %s wurde entfernt", cleaned)
     return {"removed": True, "tracking_number": cleaned}
+
+
+async def _set_carrier(
+    hass: HomeAssistant, tracking_number: str, carrier: str
+) -> ServiceResponse:
+    """Pin a tracking number to a carrier (or 'auto' to clear the override)."""
+    entry = _numbers_entry(hass)
+    cleaned = tracking_number.strip()
+    if cleaned not in _current_numbers(entry):
+        raise ServiceValidationError(f"{cleaned} wird nicht verfolgt.")
+
+    overrides = dict(entry.options.get(CONF_CARRIER_OVERRIDES, {}))
+    if carrier == CARRIER_AUTO:
+        overrides.pop(cleaned, None)
+    else:
+        overrides[cleaned] = carrier
+
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_CARRIER_OVERRIDES: overrides}
+    )
+    _LOGGER.info("Paketverfolgung: %s -> Anbieter %s", cleaned, carrier)
+    return {"tracking_number": cleaned, "carrier": carrier}
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:

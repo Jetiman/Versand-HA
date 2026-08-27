@@ -20,6 +20,9 @@ USER_AGENT = (
 
 CONF_TRACKING_NUMBERS = "tracking_numbers"
 CONF_UPDATE_INTERVAL = "update_interval_minutes"
+# Optional {tracking_number: carrier} map that pins a number to a carrier
+# when auto-detection gets it wrong.
+CONF_CARRIER_OVERRIDES = "carrier_overrides"
 # Optional recipient ZIP, used as a fallback for DPD parcels whose public
 # tracking is postcode-protected (both on the tracking-number entry and
 # the DPD-account entry).
@@ -27,7 +30,9 @@ CONF_DEFAULT_POSTCODE = "default_postcode"
 
 SERVICE_ADD_TRACKING_NUMBER = "add_tracking_number"
 SERVICE_REMOVE_TRACKING_NUMBER = "remove_tracking_number"
+SERVICE_SET_CARRIER = "set_tracking_carrier"
 ATTR_TRACKING_NUMBER = "tracking_number"
+ATTR_CARRIER = "carrier"
 
 # Carrier a tracking number was detected to belong to. Kept per number in
 # the tracking-number coordinator (in memory - re-detected after a
@@ -36,6 +41,9 @@ CARRIER_DHL = "dhl"
 CARRIER_DPD = "dpd"
 CARRIER_HERMES = "hermes"
 CARRIER_UNKNOWN = "unknown"
+CARRIER_AUTO = "auto"  # override value meaning "go back to auto-detect"
+
+CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES)
 
 # Custom sidebar panel (buildless web component served from ./frontend).
 PANEL_URL_PATH = "paketverfolgung"
@@ -43,7 +51,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.8.0"
+PANEL_VERSION = "1.8.1"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is
