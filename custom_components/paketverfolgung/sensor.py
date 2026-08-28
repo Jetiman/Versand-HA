@@ -18,6 +18,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .const import (
@@ -91,10 +92,49 @@ def _cleanup_singletons(hass: HomeAssistant, owner_id: str) -> None:
             registry.async_update_entity(eid, new_entity_id=base)
 
 
+def _amazon_entity_id(item_id: str) -> str:
+    """Return the canonical Home Assistant entity id for an Amazon shipment."""
+    return f"sensor.amazon_{slugify(item_id)}"
+
+
+def _migrate_amazon_entity_ids(
+    hass: HomeAssistant,
+    entry_id: str,
+    coordinator: AmazonAccountDataUpdateCoordinator,
+) -> None:
+    """Rename Amazon shipment entities created from product titles.
+
+    Older builds let Home Assistant derive the object id from Amazon's product
+    title. Keep the registry unique id unchanged, but move such entities to the
+    stable ``sensor.amazon_<tracking-number>`` form when possible.
+    """
+    registry = er.async_get(hass)
+    for item_id in (coordinator.data or {}):
+        unique_id = f"{entry_id}_{item_id}"
+        current_entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
+        if not current_entity_id:
+            continue
+
+        desired_entity_id = _amazon_entity_id(item_id)
+        if current_entity_id == desired_entity_id:
+            continue
+
+        existing = registry.async_get(desired_entity_id)
+        if existing is None:
+            registry.async_update_entity(
+                current_entity_id,
+                new_entity_id=desired_entity_id,
+            )
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
+
+    if isinstance(coordinator, AmazonAccountDataUpdateCoordinator):
+        _migrate_amazon_entity_ids(hass, entry.entry_id, coordinator)
+
     _setup_dynamic_entities(entry, coordinator, async_add_entities)
 
     # Diagnostic read-out of the optional DHL-account auto-discovery.
@@ -153,13 +193,12 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
         self.item_id = item_id
         self._attr_unique_id = f"{entry_id}_{item_id}"
 
-        # Amazon's shipment name is usually the product title. Without a
-        # suggested object id Home Assistant therefore creates entity ids
-        # such as ``sensor.10_x_gizeh_black_...``. Keep the friendly product
-        # title as the entity name, but use the actual Amazon tracking number
-        # for a stable, predictable entity id instead.
+        # Amazon's shipment name is usually the product title. Setting entity_id
+        # before registration is Home Assistant's supported integration-level
+        # suggestion mechanism; the registry still remains authoritative and
+        # may reuse an existing entity id for the same unique id.
         if isinstance(coordinator, AmazonAccountDataUpdateCoordinator):
-            self._attr_suggested_object_id = f"amazon_{item_id}"
+            self.entity_id = _amazon_entity_id(item_id)
 
     @property
     def _shipment(self) -> dict:
