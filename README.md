@@ -44,6 +44,19 @@ Meldet sich mit deinem **myDPD-Konto** an (SOAP-API der offiziellen DPD-App „P
 
 Das Passwort wird nur lokal in Home Assistant gespeichert (wie bei jeder anderen Cloud-Integration).
 
+## DHL-Konto verbinden (optional)
+
+Beim Eintrag „Sendungsnummern“ gibt es im Zahnrad-Menü den Haken **„DHL-Konto verbinden und Sendungen automatisch erkennen“**. Ist er gesetzt, öffnet sich ein Schritt mit einem **DHL-Login-Link**:
+
+1. Link im Browser öffnen, mit dem DHL-Konto anmelden.
+2. DHL leitet danach auf eine Adresse weiter, die mit `dhllogin://` beginnt – die Seite bleibt scheinbar leer. Die komplette Adresse aus der Adresszeile kopieren (oder mit `Strg+U` im Quelltext nach `dhllogin://` suchen) und in das Feld einfügen.
+
+Danach werden bei jeder Aktualisierung die **nicht archivierten Sendungen des Kontos** automatisch mit in die Liste aufgenommen (Anbieter = DHL). Es wird **kein Passwort** gespeichert, nur das OAuth-Sitzungs-Token; es wird selbstständig erneuert.
+
+Der Diagnose-Sensor **„DHL-Konto Erkennung“** (`sensor.dhl_konto_erkennung`) zeigt das Ergebnis der letzten Abfrage (`Aus`, `N Sendung(en) erkannt` oder eine Fehlermeldung).
+
+> ℹ️ Die Login-Parameter stammen aus der DHL-App und sind inoffiziell – ändert DHL sie, muss die Anmeldung ggf. neu erfolgen oder die Funktion bricht. Deshalb standardmäßig **aus**.
+
 ## Was wird angezeigt?
 
 Pro Sendung ein Sensor mit:
@@ -69,6 +82,6 @@ Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie di
 ## Bekannte Einschränkungen
 
 - Alle Schnittstellen sind inoffiziell und können bei anbieterseitigen Änderungen brechen. Bitte in diesem Fall ein Issue öffnen.
-- DHL / Hermes: keine automatische Kontoerkennung – Sendungsnummern müssen eingetragen werden.
+- Hermes: keine automatische Kontoerkennung – Sendungsnummern müssen eingetragen werden. DHL bietet eine optionale Konto-Anmeldung (siehe oben), die aber auf einer inoffiziellen App-Schnittstelle beruht.
 - DPD: manche Sendungen sind ohne Empfänger-PLZ nicht öffentlich abrufbar; nur ein myDPD-Konto pro Eintrag. `tracking.dpd.de` ist aus manchen Server-/VPS-Netzen nicht erreichbar (siehe Hinweis oben).
 - Hermes: die genutzte Schnittstelle (`api.my-deliveries.de`) ist undokumentiert; falls sich das Antwortformat ändert, fehlt ggf. der Verlauf.
