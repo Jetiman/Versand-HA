@@ -30,6 +30,8 @@ from .const import (
     CARRIERS,
     CONF_CARRIER_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
+    CONF_DHL_AUTO_DISCOVERY,
+    CONF_DHL_SESSION,
     CONF_NAMES,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
@@ -46,6 +48,7 @@ from .const import (
     PROGRESS_STATUS,
     TRACKING_PAGE_URL,
 )
+from .dhl_account import DhlAccountClient, DhlAuthError
 from .dhl_api import DhlApiClient, DhlApiError
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError, DpdSession
 from .dpd_tracking_api import DpdTrackingApiClient, DpdTrackingApiError
@@ -195,9 +198,12 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         self.dhl = DhlApiClient(session)
         self.dpd = DpdTrackingApiClient(session)
         self.hermes = HermesTrackingApiClient(session)
+        self.dhl_account = DhlAccountClient(session)
         # number -> detected carrier; kept in memory (re-detected after a
         # restart, which just means one extra probe per number).
         self.carriers: dict[str, str] = {}
+        # last DHL-account-discovery outcome, for diagnostics
+        self.dhl_account_status: str | None = None
 
     def _config(self, key, default=None):
         return self.entry.options.get(key, self.entry.data.get(key, default))
@@ -209,6 +215,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             for n in self._config(CONF_TRACKING_NUMBERS, [])
             if str(n).strip()
         ]
+        numbers = await self._merge_dhl_account_numbers(numbers)
         postcode = (self._config(CONF_DEFAULT_POSTCODE) or "").strip() or None
         overrides = {
             str(k).strip(): v
@@ -280,6 +287,38 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         for stale in [n for n in self.carriers if n not in numbers]:
             self.carriers.pop(stale, None)
         return result
+
+    async def _merge_dhl_account_numbers(self, numbers: list[str]) -> list[str]:
+        """If DHL account discovery is on, add the account's shipment ids."""
+        if not self._config(CONF_DHL_AUTO_DISCOVERY):
+            self.dhl_account_status = None
+            return numbers
+        dhl_session = self.entry.data.get(CONF_DHL_SESSION)
+        if not dhl_session:
+            self.dhl_account_status = "Kein DHL-Login hinterlegt"
+            _LOGGER.warning("Paketverfolgung: DHL-Erkennung an, aber kein Login")
+            return numbers
+        try:
+            fresh = await self.dhl_account.ensure_fresh(dict(dhl_session))
+            if fresh != dhl_session:
+                self.hass.config_entries.async_update_entry(
+                    self.entry,
+                    data={**self.entry.data, CONF_DHL_SESSION: fresh},
+                )
+            account_ids = await self.dhl_account.fetch_shipment_ids(fresh)
+        except DhlAuthError as err:
+            self.dhl_account_status = str(err)
+            _LOGGER.warning("Paketverfolgung: DHL-Kontoabfrage fehlgeschlagen: %s", err)
+            return numbers
+
+        merged = list(numbers)
+        for shipment_id in account_ids:
+            if shipment_id not in merged:
+                merged.append(shipment_id)
+                self.carriers.setdefault(shipment_id, CARRIER_DHL)
+        self.dhl_account_status = f"{len(account_ids)} Sendung(en) erkannt"
+        _LOGGER.debug("Paketverfolgung: DHL-Konto -> %s", account_ids)
+        return merged
 
     async def _detect(
         self, number: str, postcode: str | None, known: str

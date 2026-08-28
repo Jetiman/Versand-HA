@@ -48,7 +48,15 @@
         "data": {
           "tracking_numbers": "Sendungsnummern (DHL, DPD oder Hermes)",
           "default_postcode": "Deine PLZ (nur nötig, falls eine DPD-Nummer geschützt ist)",
-          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
+          "dhl_auto_discovery": "DHL-Konto verbinden und Sendungen automatisch erkennen (Test)"
+        }
+      },
+      "dhl_login": {
+        "title": "DHL-Konto verbinden",
+        "description": "{known}1. Öffne diesen Link im Browser und melde dich mit deinem DHL-Konto an:\n\n{login_url}\n\n2. Danach leitet DHL auf eine Adresse weiter, die mit `dhllogin://` beginnt (die Seite lädt scheinbar nicht – das ist normal). Kopiere die komplette Adresse aus der Adresszeile und füge sie unten ein.",
+        "data": {
+          "dhl_redirect": "Weiterleitungs-Adresse (dhllogin://…)"
         }
       },
       "dpd_options": {
@@ -58,6 +66,9 @@
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }
       }
+    },
+    "error": {
+      "dhl_auth": "DHL-Anmeldung fehlgeschlagen. Bitte den Link erneut öffnen und die vollständige dhllogin://-Adresse einfügen."
     }
   },
   "services": {

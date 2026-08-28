@@ -95,6 +95,10 @@ async def async_setup_entry(
     coordinator = hass.data[DOMAIN][entry.entry_id]
     _setup_dynamic_entities(entry, coordinator, async_add_entities)
 
+    # Diagnostic read-out of the optional DHL-account auto-discovery.
+    if isinstance(coordinator, TrackingNumbersDataUpdateCoordinator):
+        async_add_entities([DhlAccountStatusSensor(coordinator, entry.entry_id)])
+
     # The combined summary sensors span every provider; exactly one entry
     # owns them.
     if entry.entry_id == _singleton_owner_id(hass):
@@ -187,6 +191,23 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
             "tracking_url": s.get("tracking_url"),
             "events": s.get("events", []),
         }
+
+
+class DhlAccountStatusSensor(CoordinatorEntity, SensorEntity):
+    """Last outcome of the optional DHL-account shipment auto-discovery."""
+
+    _attr_has_entity_name = True
+    _attr_name = "DHL-Konto Erkennung"
+    _attr_icon = "mdi:account-search-outline"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator, entry_id: str) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_dhl_account_status"
+
+    @property
+    def native_value(self) -> str:
+        return getattr(self.coordinator, "dhl_account_status", None) or "Aus"
 
 
 def _out_for_delivery(coordinator) -> list[dict]:

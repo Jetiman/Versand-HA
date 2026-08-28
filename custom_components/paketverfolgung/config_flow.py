@@ -13,6 +13,9 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import (
     CONF_CARRIER_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
+    CONF_DHL_AUTO_DISCOVERY,
+    CONF_DHL_REDIRECT,
+    CONF_DHL_SESSION,
     CONF_NAMES,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
@@ -25,6 +28,7 @@ from .const import (
     PROVIDER_DPD,
     PROVIDER_NUMBERS,
 )
+from .dhl_account import DhlAccountClient, DhlAuthError, build_login, extract_code
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError
 
 _LOGGER = logging.getLogger(__name__)
@@ -173,6 +177,9 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
 
     def __init__(self, entry: ConfigEntry) -> None:
         self._entry = entry
+        self._pending: dict[str, Any] = {}
+        self._verifier: str | None = None
+        self._login_url: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -199,28 +206,99 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     if k in numbers
                 }
 
-            return self.async_create_entry(
-                title="",
-                data={
-                    CONF_TRACKING_NUMBERS: numbers,
-                    CONF_CARRIER_OVERRIDES: _kept(CONF_CARRIER_OVERRIDES),
-                    CONF_NAMES: _kept(CONF_NAMES),
-                    CONF_DEFAULT_POSTCODE: (
-                        user_input.get(CONF_DEFAULT_POSTCODE) or ""
-                    ).strip(),
-                    CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
-                },
-            )
+            self._pending = {
+                CONF_TRACKING_NUMBERS: numbers,
+                CONF_CARRIER_OVERRIDES: _kept(CONF_CARRIER_OVERRIDES),
+                CONF_NAMES: _kept(CONF_NAMES),
+                CONF_DEFAULT_POSTCODE: (
+                    user_input.get(CONF_DEFAULT_POSTCODE) or ""
+                ).strip(),
+                CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
+                CONF_DHL_AUTO_DISCOVERY: bool(
+                    user_input.get(CONF_DHL_AUTO_DISCOVERY)
+                ),
+            }
+            if self._pending[CONF_DHL_AUTO_DISCOVERY]:
+                return await self.async_step_dhl_login()
+            return self.async_create_entry(title="", data=self._pending)
 
-        schema = _tracking_numbers_schema(
-            self._current(CONF_TRACKING_NUMBERS, []),
-            self._current(CONF_DEFAULT_POSTCODE),
-        ).extend(
-            _update_interval_schema(
-                self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
-            ).schema
+        schema = (
+            _tracking_numbers_schema(
+                self._current(CONF_TRACKING_NUMBERS, []),
+                self._current(CONF_DEFAULT_POSTCODE),
+            )
+            .extend(
+                _update_interval_schema(
+                    self._current(
+                        CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
+                    )
+                ).schema
+            )
+            .extend(
+                {
+                    vol.Optional(
+                        CONF_DHL_AUTO_DISCOVERY,
+                        default=bool(
+                            self._current(CONF_DHL_AUTO_DISCOVERY, False)
+                        ),
+                    ): selector.BooleanSelector(),
+                }
+            )
         )
         return self.async_show_form(step_id="dhl_options", data_schema=schema)
+
+    async def async_step_dhl_login(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Connect a DHL account (OAuth) so its shipments are auto-discovered.
+
+        Shows the DHL login URL, the user signs in and pastes back the
+        ``dhllogin://`` redirect; its ``code`` is exchanged for a token
+        pair that is stored in the config entry's ``data`` (no password).
+        """
+        errors: dict[str, str] = {}
+        has_session = bool(self._entry.data.get(CONF_DHL_SESSION))
+
+        if user_input is not None:
+            redirect = (user_input.get(CONF_DHL_REDIRECT) or "").strip()
+            if not redirect and has_session:
+                # Keep the existing login, just persist the toggled option.
+                return self.async_create_entry(title="", data=self._pending)
+            try:
+                code = extract_code(redirect)
+                client = DhlAccountClient(async_get_clientsession(self.hass))
+                session = await client.exchange_code(code, self._verifier or "")
+            except DhlAuthError as err:
+                _LOGGER.debug("DHL account login failed: %s", err)
+                errors["base"] = "dhl_auth"
+            else:
+                self.hass.config_entries.async_update_entry(
+                    self._entry,
+                    data={**self._entry.data, CONF_DHL_SESSION: session},
+                )
+                return self.async_create_entry(title="", data=self._pending)
+
+        self._verifier, self._login_url = build_login()
+        return self.async_show_form(
+            step_id="dhl_login",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_DHL_REDIRECT, default=""
+                    ): selector.TextSelector(),
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "login_url": self._login_url,
+                "known": (
+                    "Es ist bereits ein DHL-Login hinterlegt – Feld leer lassen, "
+                    "um ihn zu behalten.\n\n"
+                    if has_session
+                    else ""
+                ),
+            },
+        )
 
     async def async_step_dpd_options(
         self, user_input: dict[str, Any] | None = None

@@ -48,7 +48,15 @@
         "data": {
           "tracking_numbers": "Tracking numbers (DHL, DPD or Hermes)",
           "default_postcode": "Your postcode (only needed if a DPD number is protected)",
-          "update_interval_minutes": "Update interval (minutes)"
+          "update_interval_minutes": "Update interval (minutes)",
+          "dhl_auto_discovery": "Connect a DHL account and auto-discover its shipments (experimental)"
+        }
+      },
+      "dhl_login": {
+        "title": "Connect a DHL account",
+        "description": "{known}1. Open this link in a browser and sign in with your DHL account:\n\n{login_url}\n\n2. DHL then redirects to an address starting with `dhllogin://` (the page appears not to load - that is expected). Copy the full address from the address bar and paste it below.",
+        "data": {
+          "dhl_redirect": "Redirect address (dhllogin://…)"
         }
       },
       "dpd_options": {
@@ -58,6 +66,9 @@
           "update_interval_minutes": "Update interval (minutes)"
         }
       }
+    },
+    "error": {
+      "dhl_auth": "DHL login failed. Please open the link again and paste the full dhllogin:// address."
     }
   },
   "services": {

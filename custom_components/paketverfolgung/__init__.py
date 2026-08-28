@@ -19,6 +19,7 @@ from .const import (
     CARRIER_AUTO,
     CARRIERS,
     CONF_CARRIER_OVERRIDES,
+    CONF_DHL_SESSION,
     CONF_NAMES,
     CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
@@ -128,6 +129,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         coordinator = TrackingNumbersDataUpdateCoordinator(
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
+    coordinator._reload_snapshot = _reload_relevant(entry)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -322,7 +324,21 @@ async def _set_carrier(
     return {"tracking_number": cleaned, "carrier": carrier}
 
 
+def _reload_relevant(entry: ConfigEntry) -> str:
+    """A signature of the parts of the entry whose change warrants a
+    reload - i.e. everything except the rotating DHL OAuth token that the
+    coordinator persists to entry.data itself."""
+    data = {k: v for k, v in entry.data.items() if k != CONF_DHL_SESSION}
+    return repr(sorted(data.items())) + "|" + repr(sorted(dict(entry.options).items()))
+
+
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    now = _reload_relevant(entry)
+    if getattr(coordinator, "_reload_snapshot", None) == now:
+        return  # only the DHL token was refreshed - no reload needed
+    if coordinator is not None:
+        coordinator._reload_snapshot = now
     await hass.config_entries.async_reload(entry.entry_id)
 
 

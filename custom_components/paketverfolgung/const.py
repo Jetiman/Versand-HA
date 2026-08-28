@@ -14,6 +14,33 @@ USER_AGENT = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 )
 
+# --- Optional DHL account login (auto-discovery of the account's shipments) ---
+# The same int-verfolgen/data/search endpoint, called WITHOUT a piececode
+# but WITH `Cookie: dhli=<id_token>`, returns the shipments linked to the
+# logged-in DHL account. The login is the DHL app's OAuth/PKCE flow: the
+# user opens a login URL, signs in, DHL redirects to a `dhllogin://` URL,
+# and that URL's `code` is exchanged for tokens. Parameters lifted from
+# the iOS DHL app (package de.deutschepost.dhl) - may break if DHL rotates
+# them. This whole feature is opt-in and off by default.
+DHL_AUTH_BASE = "https://login.dhl.de/af5f9bb6-27ad-4af4-9445-008e7a5cddb8/login"
+DHL_CLIENT_ID = "83471082-5c13-4fce-8dcb-19d2a3fca413"
+DHL_REDIRECT_URI = "dhllogin://de.deutschepost.dhl/login"
+DHL_LOGIN_STATE = (
+    "eyJycyI6dHJ1ZSwicnYiOmZhbHNlLCJmaWQiOiJhcHAtbG9naW4tbWVoci1mb290ZXIiLCJoaWQi"
+    "OiJhcHAtbG9naW4tbWVoci1oZWFkZXIiLCJycCI6ZmFsc2V9"
+)
+DHL_LOGIN_CLAIMS = (
+    '{"id_token":{"email":null,"post_number":null,"twofa":null,'
+    '"service_mask":null,"deactivate_account":null,"last_login":null,'
+    '"customer_type":null,"display_name":null,'
+    '"data_confirmation_required":null}}'
+)
+APP_USER_AGENT = "DHLPaket_PROD/1367 CFNetwork/1240.0.4 Darwin/20.6.0"
+
+CONF_DHL_AUTO_DISCOVERY = "dhl_auto_discovery"
+CONF_DHL_SESSION = "dhl_session"
+CONF_DHL_REDIRECT = "dhl_redirect"
+
 CONF_TRACKING_NUMBERS = "tracking_numbers"
 CONF_UPDATE_INTERVAL = "update_interval_minutes"
 # Optional {tracking_number: carrier} map that pins a number to a carrier
