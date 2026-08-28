@@ -54,6 +54,13 @@ CONF_NAMES = "names"
 # the DPD-account entry).
 CONF_DEFAULT_POSTCODE = "default_postcode"
 
+# Amazon account login. Credentials/OTP are used only during config flow;
+# only the authenticated cookie store is persisted in the config entry.
+CONF_AMAZON_USERNAME = "amazon_username"
+CONF_AMAZON_PASSWORD = "amazon_password"
+CONF_AMAZON_OTP = "amazon_otp"
+CONF_AMAZON_COOKIES = "amazon_cookies"
+
 SERVICE_ADD_TRACKING_NUMBER = "add_tracking_number"
 SERVICE_REMOVE_TRACKING_NUMBER = "remove_tracking_number"
 SERVICE_SET_CARRIER = "set_tracking_carrier"
@@ -88,6 +95,7 @@ CONF_PROVIDER = "provider"
 PROVIDER_NUMBERS = "dhl"
 PROVIDER_DHL = PROVIDER_NUMBERS
 PROVIDER_DPD = "dpd"
+PROVIDER_AMAZON = "amazon"
 
 CONF_DPD_USERNAME = "dpd_username"
 CONF_DPD_PASSWORD = "dpd_password"
