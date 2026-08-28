@@ -1,6 +1,6 @@
 """Sensor platform for Paketverfolgung.
 
-One sensor entity per tracked shipment/parcel (from either coordinator -
+One sensor entity per tracked shipment/parcel (from any coordinator -
 they share the same normalized shape), plus a single provider-wide
 "Heute in Zustellung" summary sensor. Entities appear and disappear as
 shipments enter and leave the coordinators' data.
@@ -19,6 +19,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .const import (
     CONF_PROVIDER,
     DEFAULT_ICON,
@@ -36,6 +37,7 @@ from .coordinator import (
 _SHIPMENT_COORDINATORS = (
     TrackingNumbersDataUpdateCoordinator,
     DpdAccountDataUpdateCoordinator,
+    AmazonAccountDataUpdateCoordinator,
 )
 
 _DELIVERY_TODAY_UID = f"{DOMAIN}_out_for_delivery_today"
@@ -177,6 +179,7 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
         return {
             "tracking_id": self.item_id,
             "carrier": s.get("carrier"),
+            "delivery_carrier": s.get("delivery_carrier"),
             "forced_carrier": s.get("forced"),
             "custom_name": s.get("custom_name"),
             "group": s.get("group"),
@@ -189,6 +192,8 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
             "delivery_window_from": s.get("delivery_from"),
             "delivery_window_to": s.get("delivery_to"),
             "tracking_url": s.get("tracking_url"),
+            "order_id": s.get("order_id"),
+            "short_status": s.get("short_status"),
             "events": s.get("events", []),
         }
 
@@ -289,10 +294,6 @@ class CombinedOutForDeliveryTodaySensor(_AllCoordinatorsSensor):
     @property
     def extra_state_attributes(self) -> dict:
         shipments = self._shipments()
-        # Distinct carriers among today's deliveries, as a plain
-        # comma-joined string (e.g. "DHL" / "DPD" / "DHL, DPD") so it can be
-        # shown directly as a dashboard tile's secondary line via
-        # state_content, without a template needing to unpack `shipments`.
         carriers = sorted({s["provider"] for s in shipments if s.get("provider")})
         next_polls = [c.next_poll for c in self._coordinators() if c.next_poll]
         return {
