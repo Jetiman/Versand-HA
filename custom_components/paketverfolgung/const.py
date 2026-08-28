@@ -19,6 +19,9 @@ CONF_UPDATE_INTERVAL = "update_interval_minutes"
 # Optional {tracking_number: carrier} map that pins a number to a carrier
 # when auto-detection gets it wrong.
 CONF_CARRIER_OVERRIDES = "carrier_overrides"
+# Optional {tracking_number: name} map - a user-given label shown instead
+# of the carrier's own shipment name.
+CONF_NAMES = "names"
 # Optional recipient ZIP, used as a fallback for DPD parcels whose public
 # tracking is postcode-protected (both on the tracking-number entry and
 # the DPD-account entry).
@@ -27,8 +30,10 @@ CONF_DEFAULT_POSTCODE = "default_postcode"
 SERVICE_ADD_TRACKING_NUMBER = "add_tracking_number"
 SERVICE_REMOVE_TRACKING_NUMBER = "remove_tracking_number"
 SERVICE_SET_CARRIER = "set_tracking_carrier"
+SERVICE_SET_NAME = "set_tracking_name"
 ATTR_TRACKING_NUMBER = "tracking_number"
 ATTR_CARRIER = "carrier"
+ATTR_NAME = "name"
 
 # Carrier a tracking number was detected to belong to. Kept per number in
 # the tracking-number coordinator (in memory - re-detected after a
@@ -47,7 +52,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.9.1"
+PANEL_VERSION = "1.10.0"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is

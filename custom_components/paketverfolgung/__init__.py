@@ -14,10 +14,12 @@ from homeassistant.exceptions import ServiceValidationError
 
 from .const import (
     ATTR_CARRIER,
+    ATTR_NAME,
     ATTR_TRACKING_NUMBER,
     CARRIER_AUTO,
     CARRIERS,
     CONF_CARRIER_OVERRIDES,
+    CONF_NAMES,
     CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
     CONF_UPDATE_INTERVAL,
@@ -33,6 +35,7 @@ from .const import (
     SERVICE_ADD_TRACKING_NUMBER,
     SERVICE_REMOVE_TRACKING_NUMBER,
     SERVICE_SET_CARRIER,
+    SERVICE_SET_NAME,
 )
 from .coordinator import (
     DpdAccountDataUpdateCoordinator,
@@ -99,6 +102,13 @@ _SET_CARRIER_SCHEMA = vol.Schema(
     }
 )
 
+_SET_NAME_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_TRACKING_NUMBER): vol.Coerce(str),
+        vol.Optional(ATTR_NAME, default=""): vol.Coerce(str),
+    }
+)
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Paketverfolgung integration."""
@@ -126,9 +136,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    if provider == PROVIDER_NUMBERS and not hass.services.has_service(
-        DOMAIN, SERVICE_ADD_TRACKING_NUMBER
-    ):
+    if not hass.services.has_service(DOMAIN, SERVICE_ADD_TRACKING_NUMBER):
 
         async def _async_add_tracking_number(call: ServiceCall) -> ServiceResponse:
             return await _add_tracking_number(hass, call.data[ATTR_TRACKING_NUMBER])
@@ -139,6 +147,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async def _async_set_carrier(call: ServiceCall) -> ServiceResponse:
             return await _set_carrier(
                 hass, call.data[ATTR_TRACKING_NUMBER], call.data[ATTR_CARRIER]
+            )
+
+        async def _async_set_name(call: ServiceCall) -> ServiceResponse:
+            return await _set_name(
+                hass, call.data[ATTR_TRACKING_NUMBER], call.data.get(ATTR_NAME, "")
             )
 
         hass.services.async_register(
@@ -160,6 +173,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_SET_CARRIER,
             _async_set_carrier,
             schema=_SET_CARRIER_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_NAME,
+            _async_set_name,
+            schema=_SET_NAME_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
         )
 
@@ -227,21 +247,57 @@ async def _remove_tracking_number(
         return {"removed": False, "tracking_number": cleaned}
 
     current = [n for n in current if n != cleaned]
-    overrides = {
-        k: v
-        for k, v in dict(entry.options.get(CONF_CARRIER_OVERRIDES, {})).items()
-        if k != cleaned
-    }
+
+    def _without(key: str) -> dict:
+        return {
+            k: v
+            for k, v in dict(entry.options.get(key, {})).items()
+            if k != cleaned
+        }
+
     hass.config_entries.async_update_entry(
         entry,
         options={
             **entry.options,
             CONF_TRACKING_NUMBERS: current,
-            CONF_CARRIER_OVERRIDES: overrides,
+            CONF_CARRIER_OVERRIDES: _without(CONF_CARRIER_OVERRIDES),
+            CONF_NAMES: _without(CONF_NAMES),
         },
     )
     _LOGGER.info("Paketverfolgung: %s wurde entfernt", cleaned)
     return {"removed": True, "tracking_number": cleaned}
+
+
+def _entry_for_shipment(hass: HomeAssistant, number: str):
+    """The config entry whose coordinator currently holds this number."""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+        if coordinator is not None and number in (
+            getattr(coordinator, "data", None) or {}
+        ):
+            return entry
+    return _numbers_entry(hass)
+
+
+async def _set_name(
+    hass: HomeAssistant, tracking_number: str, name: str
+) -> ServiceResponse:
+    """Give a shipment a custom label (empty string clears it)."""
+    cleaned = tracking_number.strip()
+    display = (name or "").strip()
+    entry = _entry_for_shipment(hass, cleaned)
+    names = {
+        k: v
+        for k, v in dict(entry.options.get(CONF_NAMES, {})).items()
+        if k != cleaned
+    }
+    if display:
+        names[cleaned] = display
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_NAMES: names}
+    )
+    _LOGGER.info("Paketverfolgung: %s -> Name %r", cleaned, display)
+    return {"tracking_number": cleaned, "name": display}
 
 
 async def _set_carrier(

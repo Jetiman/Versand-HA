@@ -13,6 +13,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import (
     CONF_CARRIER_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
+    CONF_NAMES,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
     CONF_PROVIDER,
@@ -188,20 +189,22 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
     ) -> Any:
         if user_input is not None:
             numbers = _clean_tracking_numbers(user_input.get(CONF_TRACKING_NUMBERS))
-            # Preserve per-number carrier overrides, dropping any for
-            # numbers that were just removed here.
-            overrides = {
-                k: v
-                for k, v in dict(
-                    self._entry.options.get(CONF_CARRIER_OVERRIDES, {})
-                ).items()
-                if k in numbers
-            }
+
+            # Preserve per-number overrides/labels, dropping any for numbers
+            # that were just removed here.
+            def _kept(key: str) -> dict:
+                return {
+                    k: v
+                    for k, v in dict(self._entry.options.get(key, {})).items()
+                    if k in numbers
+                }
+
             return self.async_create_entry(
                 title="",
                 data={
                     CONF_TRACKING_NUMBERS: numbers,
-                    CONF_CARRIER_OVERRIDES: overrides,
+                    CONF_CARRIER_OVERRIDES: _kept(CONF_CARRIER_OVERRIDES),
+                    CONF_NAMES: _kept(CONF_NAMES),
                     CONF_DEFAULT_POSTCODE: (
                         user_input.get(CONF_DEFAULT_POSTCODE) or ""
                     ).strip(),
@@ -226,6 +229,8 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
             return self.async_create_entry(
                 title="",
                 data={
+                    # keep per-parcel labels and anything else already set
+                    **self._entry.options,
                     CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
                     CONF_DEFAULT_POSTCODE: (
                         user_input.get(CONF_DEFAULT_POSTCODE) or ""

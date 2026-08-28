@@ -94,6 +94,20 @@
           "description": "dhl, dpd, hermes oder auto."
         }
       }
+    },
+    "set_tracking_name": {
+      "name": "Name festlegen",
+      "description": "Gibt einer Sendung einen eigenen Namen (Label). Leer lassen, um den Namen wieder zu entfernen.",
+      "fields": {
+        "tracking_number": {
+          "name": "Sendungsnummer",
+          "description": "Die Sendungs-/Trackingnummer."
+        },
+        "name": {
+          "name": "Name",
+          "description": "Der anzuzeigende Name (leer = zurücksetzen)."
+        }
+      }
     }
   }
 }

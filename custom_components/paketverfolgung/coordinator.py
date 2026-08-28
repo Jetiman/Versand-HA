@@ -30,6 +30,7 @@ from .const import (
     CARRIERS,
     CONF_CARRIER_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
+    CONF_NAMES,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
     CONF_TRACKING_NUMBERS,
@@ -214,6 +215,11 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             for k, v in (self._config(CONF_CARRIER_OVERRIDES, {}) or {}).items()
             if v in CARRIERS
         }
+        names = {
+            str(k).strip(): str(v).strip()
+            for k, v in (self._config(CONF_NAMES, {}) or {}).items()
+            if str(v).strip()
+        }
         if not numbers:
             self.carriers.clear()
             return {}
@@ -264,6 +270,10 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
 
             item["carrier"] = carrier
             item["forced"] = forced
+            # Keep the carrier's own name so a cleared custom name reverts.
+            item.setdefault("carrier_name", item.get("name"))
+            item["custom_name"] = names.get(number)
+            item["name"] = names.get(number) or item["carrier_name"]
             self.carriers[number] = carrier
             result[number] = item
 
@@ -372,6 +382,11 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
             or self.entry.data.get(CONF_DEFAULT_POSTCODE)
             or ""
         ).strip() or None
+        names = {
+            str(k).strip(): str(v).strip()
+            for k, v in (self.entry.options.get(CONF_NAMES, {}) or {}).items()
+            if str(v).strip()
+        }
 
         # In-flight parcels first, then delivered ones - so a large account
         # (mostly old delivered parcels) backfills its history a few per
@@ -395,7 +410,12 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
                 if fetched:
                     events = fetched
                     self._events[parcel_id] = fetched
-            result[parcel_id] = normalize_dpd_parcel(parcel, events)
+            item = normalize_dpd_parcel(parcel, events)
+            item["forced"] = None
+            item["carrier_name"] = item["name"]
+            item["custom_name"] = names.get(parcel_id)
+            item["name"] = names.get(parcel_id) or item["carrier_name"]
+            result[parcel_id] = item
 
         for stale in [p for p in self._events if p not in result]:
             self._events.pop(stale, None)

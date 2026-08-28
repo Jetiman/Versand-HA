@@ -26,6 +26,8 @@ Bei der nächsten Aktualisierung wird jede Nummer der Reihe nach bei DHL, DPD un
 
 Liegt die Erkennung mal daneben, lässt sich der Anbieter pro Sendung fest vorgeben – auf der Detailseite in der Oberfläche über das Auswahlfeld „Anbieter", oder per Dienst `paketverfolgung.set_tracking_carrier` (`carrier: dhl` / `dpd` / `hermes` / `auto`).
 
+Jeder Sendung lässt sich ein **eigener Name** geben (Detailseite → Feld „Name", oder Dienst `paketverfolgung.set_tracking_name`) – gilt auch für Sendungen aus dem DPD-Konto. Leeres Feld = Anbieter-Name.
+
 - **DHL:** öffentliche Sendungsverfolgungs-Suche (kein Login), inkl. komplettem Verlauf und Zustellzeitfenster.
 - **DPD:** öffentliche „Parcel Life Cycle“-Verfolgung von tracking.dpd.de, inkl. Verlauf.
 - **Hermes:** öffentliche Sendungsverfolgung von myhermes.de (v2-API `api.my-deliveries.de`), inkl. Verlauf.
@@ -59,7 +61,7 @@ Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolgung**:
 
 - **Übersicht:** Kacheln (Gesamt / Unterwegs / Heute in Zustellung / Zugestellt), eine Zeile „Nächste Aktualisierung in ~X Min“ (Klick = sofort aktualisieren), Eingabefeld „Sendungsnummer hinzufügen (DHL, DPD, Hermes)“ und die nummerierte Liste aller Sendungen – zuletzt geändert zuerst, mit Datum und Uhrzeit der letzten Änderung.
-- **Detailseite:** Klick auf eine Sendung → aktueller Status, Eckdaten, Link zur Anbieter-Seite, Buttons „Jetzt aktualisieren“ / „Löschen“, ein Auswahlfeld zum manuellen Festlegen des Anbieters und der **komplette Sendungsverlauf** als Zeitleiste.
+- **Detailseite:** Klick auf eine Sendung → aktueller Status, Eckdaten, Link zur Anbieter-Seite, Buttons „Jetzt aktualisieren“ / „Löschen“, ein **Namensfeld** (eigenes Label statt des Anbieter-Namens), ein Auswahlfeld zum manuellen Festlegen des Anbieters und der **komplette Sendungsverlauf** als Zeitleiste.
 - **Einstellungen:** Button am Ende der Übersicht öffnet die Integration – dort beim jeweiligen Eintrag über das Zahnrad PLZ und Sendungsnummern eingeben, oder per „Eintrag hinzufügen“ den DPD-Login.
 
 Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie die Sensoren, nur aufbereitet.

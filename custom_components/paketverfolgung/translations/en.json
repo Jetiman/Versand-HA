@@ -94,6 +94,20 @@
           "description": "dhl, dpd, hermes or auto."
         }
       }
+    },
+    "set_tracking_name": {
+      "name": "Set name",
+      "description": "Gives a shipment a custom label. Leave empty to clear it.",
+      "fields": {
+        "tracking_number": {
+          "name": "Tracking number",
+          "description": "The tracking number."
+        },
+        "name": {
+          "name": "Name",
+          "description": "The label to show (empty = reset)."
+        }
+      }
     }
   }
 }

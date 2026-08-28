@@ -132,6 +132,7 @@ class PaketverfolgungPanel extends HTMLElement {
         protected: a.protected === true,
         removable: a.removable === true,
         forced: a.forced_carrier || null,
+        custom_name: a.custom_name || null,
         out_for_delivery: group === "out_for_delivery" && !delivered,
         changed,
         last_updated: stateObj.last_updated,
@@ -413,6 +414,13 @@ class PaketverfolgungPanel extends HTMLElement {
         }
       </div>
 
+      <label class="pv-rename">
+        <span>Name:</span>
+        <input type="text" name="rename" data-name="${esc(s.tracking_id)}"
+          value="${esc(s.custom_name || "")}" placeholder="${esc(s.name)}"
+          autocomplete="off" />
+      </label>
+
       ${
         s.removable
           ? `<label class="pv-carrier">
@@ -518,6 +526,15 @@ class PaketverfolgungPanel extends HTMLElement {
         carrier: pick.value,
       });
       pick.disabled = true;
+      return;
+    }
+    const rename = ev.target.closest("[data-name]");
+    if (rename) {
+      this._hass.callService("paketverfolgung", "set_tracking_name", {
+        tracking_number: rename.getAttribute("data-name"),
+        name: rename.value.trim(),
+      });
+      rename.disabled = true;
     }
   }
 
@@ -772,15 +789,17 @@ const STYLES = `
     border: 1px solid var(--error-color, #c62828);
   }
 
-  .pv-carrier {
+  .pv-carrier, .pv-rename {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-    font-size: 13px; color: var(--secondary-text-color); margin-bottom: 20px;
+    font-size: 13px; color: var(--secondary-text-color); margin-bottom: 12px;
   }
-  .pv-carrier select {
+  .pv-carrier { margin-bottom: 20px; }
+  .pv-carrier select, .pv-rename input {
     padding: 8px 10px; border-radius: 8px; font-size: 13px;
     border: 1px solid var(--divider-color); background: var(--card-background-color);
     color: var(--primary-text-color);
   }
+  .pv-rename input { flex: 1; min-width: 160px; }
 
   .pv-meta {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;
