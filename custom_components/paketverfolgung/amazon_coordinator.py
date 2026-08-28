@@ -1,0 +1,147 @@
+"""Amazon account coordinator for Paketverfolgung."""
+from __future__ import annotations
+
+import logging
+from datetime import datetime
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
+
+from .amazon_api import AmazonApiClient, AmazonApiError, AmazonAuthError
+from .amazon_session import export_cookie_store, load_cookie_store
+from .const import (
+    CONF_AMAZON_COOKIES,
+    CONF_NAMES,
+    DEFAULT_STATUS,
+    DOMAIN,
+    GROUP_DELIVERED,
+    GROUP_OUT_FOR_DELIVERY,
+    GROUP_REGISTERED,
+    GROUP_TRANSIT,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _group_from_status(status: str, short_status: str | None = None) -> str:
+    text = f"{short_status or ''} {status or ''}".lower()
+    if any(marker in text for marker in ("zugestellt", "delivered")):
+        return GROUP_DELIVERED
+    if any(
+        marker in text
+        for marker in (
+            "in zustellung",
+            "wird heute zugestellt",
+            "heute zugestellt",
+            "out for delivery",
+            "unterwegs zur zustellung",
+        )
+    ):
+        return GROUP_OUT_FOR_DELIVERY
+    if any(
+        marker in text
+        for marker in (
+            "versandt",
+            "unterwegs",
+            "auf dem weg",
+            "shipped",
+            "in transit",
+            "transport",
+        )
+    ):
+        return GROUP_TRANSIT
+    return GROUP_REGISTERED
+
+
+def normalize_amazon_shipment(raw: dict) -> dict:
+    """Map one Amazon tracking page result to the shared shipment shape."""
+    shipment_id = str(raw.get("tracking_id") or raw.get("id") or "").strip()
+    status = str(raw.get("status") or DEFAULT_STATUS).strip()
+    short_status = raw.get("short_status")
+    group = _group_from_status(status, short_status)
+    delivered = group == GROUP_DELIVERED
+    return {
+        "id": shipment_id,
+        "carrier": "amazon",
+        "delivery_carrier": raw.get("carrier"),
+        "name": raw.get("name") or f"Amazon {shipment_id}",
+        "status": status,
+        "group": group,
+        "direction": "incoming",
+        "delivery_from": None,
+        "delivery_to": None,
+        "tracking_url": raw.get("tracking_url"),
+        "events": [],
+        "delivered": delivered,
+        "protected": False,
+        "order_id": raw.get("order_id"),
+        "short_status": short_status,
+        "forced": None,
+    }
+
+
+class AmazonAccountDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]]):
+    """Fetch active deliveries from one authenticated Amazon.de account."""
+
+    last_poll: datetime | None = None
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN}_amazon",
+            update_interval=update_interval,
+        )
+        self.entry = entry
+
+    @property
+    def next_poll(self) -> datetime | None:
+        if self.last_poll is None or self.update_interval is None:
+            return None
+        return self.last_poll + self.update_interval
+
+    async def _async_update_data(self) -> dict[str, dict]:
+        self.last_poll = dt_util.utcnow()
+        store = self.entry.data.get(CONF_AMAZON_COOKIES)
+        client = AmazonApiClient()
+        if not load_cookie_store(client, store):
+            await client.close()
+            raise ConfigEntryAuthFailed("Amazon login required")
+
+        try:
+            shipments, _ = await client.fetch_shipments()
+            refreshed = export_cookie_store(client)
+        except AmazonAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except AmazonApiError as err:
+            raise UpdateFailed(f"Error fetching Amazon deliveries: {err}") from err
+        finally:
+            await client.close()
+
+        if refreshed != store:
+            self.hass.config_entries.async_update_entry(
+                self.entry,
+                data={**self.entry.data, CONF_AMAZON_COOKIES: refreshed},
+            )
+
+        names = {
+            str(k).strip(): str(v).strip()
+            for k, v in (self.entry.options.get(CONF_NAMES, {}) or {}).items()
+            if str(v).strip()
+        }
+        result: dict[str, dict] = {}
+        for raw in shipments:
+            item = normalize_amazon_shipment(raw)
+            shipment_id = item.get("id")
+            if not shipment_id:
+                continue
+            item["carrier_name"] = item["name"]
+            item["custom_name"] = names.get(shipment_id)
+            item["name"] = names.get(shipment_id) or item["carrier_name"]
+            result[shipment_id] = item
+
+        _LOGGER.debug("Paketverfolgung (Amazon): %d delivery item(s)", len(result))
+        return result
