@@ -309,7 +309,7 @@ class PaketverfolgungPanel extends HTMLElement {
       <button class="pv-row" data-entity="${esc(s.entity_id)}">
         <div class="pv-row-num">${pos}</div>
         <ha-icon class="pv-row-icon" icon="${esc(s.icon)}"></ha-icon>
-        <div class="pv-row-main">
+        <div class="pv-row-main${generic ? "" : " titled"}">
           ${generic ? "" : `<div class="pv-row-name">${esc(s.name)}</div>`}
           <div class="pv-row-id">${esc(s.tracking_id)}</div>
           <div class="pv-row-meta">
@@ -738,12 +738,16 @@ const STYLES = `
   .pv-row-icon { flex: none; color: var(--primary-color); --mdc-icon-size: 20px; margin-top: 1px; }
   .pv-row-main { flex: 1 1 auto; min-width: 0; }
   .pv-row-name {
-    font-weight: 500; margin-bottom: 1px;
+    font-size: 17px; font-weight: 500; margin-bottom: 1px; line-height: 1.3;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .pv-row-id {
     font-weight: 500; font-size: 14px; line-height: 1.35;
     overflow-wrap: anywhere; word-break: break-all;
+  }
+  /* When the row has a custom name, the tracking number becomes a quiet subtitle. */
+  .pv-row-main.titled .pv-row-id {
+    font-size: 12px; font-weight: 400; color: var(--secondary-text-color);
   }
   .pv-row-meta {
     font-size: 12px; margin-top: 3px; line-height: 1.4; overflow-wrap: anywhere;
