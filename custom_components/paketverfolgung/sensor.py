@@ -153,6 +153,14 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
         self.item_id = item_id
         self._attr_unique_id = f"{entry_id}_{item_id}"
 
+        # Amazon's shipment name is usually the product title. Without a
+        # suggested object id Home Assistant therefore creates entity ids
+        # such as ``sensor.10_x_gizeh_black_...``. Keep the friendly product
+        # title as the entity name, but use the actual Amazon tracking number
+        # for a stable, predictable entity id instead.
+        if isinstance(coordinator, AmazonAccountDataUpdateCoordinator):
+            self._attr_suggested_object_id = f"amazon_{item_id}"
+
     @property
     def _shipment(self) -> dict:
         return (self.coordinator.data or {}).get(self.item_id, {})
