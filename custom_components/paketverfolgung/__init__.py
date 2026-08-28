@@ -12,12 +12,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 
+from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .const import (
     ATTR_CARRIER,
     ATTR_NAME,
     ATTR_TRACKING_NUMBER,
     CARRIER_AUTO,
     CARRIERS,
+    CONF_AMAZON_COOKIES,
     CONF_CARRIER_OVERRIDES,
     CONF_DHL_SESSION,
     CONF_NAMES,
@@ -31,6 +33,7 @@ from .const import (
     PANEL_TITLE,
     PANEL_URL_PATH,
     PANEL_VERSION,
+    PROVIDER_AMAZON,
     PROVIDER_DPD,
     PROVIDER_NUMBERS,
     SERVICE_ADD_TRACKING_NUMBER,
@@ -119,6 +122,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     provider = entry.data.get(CONF_PROVIDER, PROVIDER_NUMBERS)
     if provider == PROVIDER_DPD:
         coordinator = DpdAccountDataUpdateCoordinator(
+            hass, entry, update_interval=timedelta(minutes=minutes)
+        )
+    elif provider == PROVIDER_AMAZON:
+        coordinator = AmazonAccountDataUpdateCoordinator(
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
     else:
@@ -325,10 +332,16 @@ async def _set_carrier(
 
 
 def _reload_relevant(entry: ConfigEntry) -> str:
-    """A signature of the parts of the entry whose change warrants a
-    reload - i.e. everything except the rotating DHL OAuth token that the
-    coordinator persists to entry.data itself."""
-    data = {k: v for k, v in entry.data.items() if k != CONF_DHL_SESSION}
+    """A signature of entry data whose change warrants a reload.
+
+    Rotating DHL OAuth tokens and Amazon session cookies are excluded so
+    coordinator-side session refreshes do not cause reload loops.
+    """
+    data = {
+        k: v
+        for k, v in entry.data.items()
+        if k not in (CONF_DHL_SESSION, CONF_AMAZON_COOKIES)
+    }
     return repr(sorted(data.items())) + "|" + repr(sorted(dict(entry.options).items()))
 
 
@@ -336,7 +349,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     now = _reload_relevant(entry)
     if getattr(coordinator, "_reload_snapshot", None) == now:
-        return  # only the DHL token was refreshed - no reload needed
+        return  # only rotating auth/session data changed - no reload needed
     if coordinator is not None:
         coordinator._reload_snapshot = now
     await hass.config_entries.async_reload(entry.entry_id)
