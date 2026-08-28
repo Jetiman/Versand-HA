@@ -10,7 +10,18 @@ from homeassistant.core import callback
 from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .amazon_api import (
+    AmazonApiClient,
+    AmazonAuthError,
+    AmazonCaptchaError,
+    AmazonOtpChallenge,
+)
+from .amazon_session import export_cookie_store
 from .const import (
+    CONF_AMAZON_COOKIES,
+    CONF_AMAZON_OTP,
+    CONF_AMAZON_PASSWORD,
+    CONF_AMAZON_USERNAME,
     CONF_CARRIER_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
     CONF_DHL_AUTO_DISCOVERY,
@@ -25,6 +36,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
     MIN_UPDATE_INTERVAL_MINUTES,
+    PROVIDER_AMAZON,
     PROVIDER_DPD,
     PROVIDER_NUMBERS,
 )
@@ -79,6 +91,25 @@ _DPD_LOGIN_SCHEMA = vol.Schema(
     }
 )
 
+_AMAZON_LOGIN_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_AMAZON_USERNAME): selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.EMAIL)
+        ),
+        vol.Required(CONF_AMAZON_PASSWORD): selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+        ),
+    }
+)
+
+_AMAZON_OTP_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_AMAZON_OTP): selector.TextSelector(
+            selector.TextSelectorConfig()
+        )
+    }
+)
+
 
 class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Paketverfolgung."""
@@ -91,6 +122,8 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             if user_input[CONF_PROVIDER] == PROVIDER_DPD:
                 return await self.async_step_dpd()
+            if user_input[CONF_PROVIDER] == PROVIDER_AMAZON:
+                return await self.async_step_amazon()
             return await self.async_step_dhl()
 
         return self.async_show_form(
@@ -101,7 +134,7 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_PROVIDER, default=PROVIDER_NUMBERS
                     ): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[PROVIDER_NUMBERS, PROVIDER_DPD],
+                            options=[PROVIDER_NUMBERS, PROVIDER_DPD, PROVIDER_AMAZON],
                             translation_key="provider",
                         )
                     ),
@@ -166,6 +199,84 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="dpd", data_schema=_DPD_LOGIN_SCHEMA, errors=errors
         )
 
+    async def async_step_amazon(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Authenticate an Amazon.de account without persisting credentials."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            client = AmazonApiClient()
+            try:
+                result = await client.login(
+                    user_input[CONF_AMAZON_USERNAME].strip(),
+                    user_input[CONF_AMAZON_PASSWORD],
+                )
+            except AmazonCaptchaError as err:
+                _LOGGER.debug("Amazon captcha/manual login required: %s", err)
+                errors["base"] = "amazon_captcha"
+            except AmazonAuthError as err:
+                _LOGGER.debug("Amazon login failed: %s", err)
+                errors["base"] = "amazon_auth"
+            else:
+                if result.otp is not None:
+                    self._amazon_challenge = result.otp
+                    return await self.async_step_amazon_otp()
+                await self.async_set_unique_id(PROVIDER_AMAZON)
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(
+                    title="Amazon",
+                    data={
+                        CONF_PROVIDER: PROVIDER_AMAZON,
+                        CONF_AMAZON_COOKIES: export_cookie_store(client),
+                    },
+                )
+            finally:
+                await client.close()
+
+        return self.async_show_form(
+            step_id="amazon", data_schema=_AMAZON_LOGIN_SCHEMA, errors=errors
+        )
+
+    async def async_step_amazon_otp(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Complete an Amazon MFA/SMS verification challenge."""
+        challenge: AmazonOtpChallenge | None = getattr(
+            self, "_amazon_challenge", None
+        )
+        if challenge is None:
+            return await self.async_step_amazon()
+
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            client = AmazonApiClient(challenge.cookies)
+            try:
+                await client.submit_otp(
+                    challenge, user_input[CONF_AMAZON_OTP].strip()
+                )
+            except AmazonCaptchaError as err:
+                _LOGGER.debug("Amazon captcha during OTP: %s", err)
+                errors["base"] = "amazon_captcha"
+            except AmazonAuthError as err:
+                _LOGGER.debug("Amazon OTP failed: %s", err)
+                errors["base"] = "amazon_otp"
+            else:
+                await self.async_set_unique_id(PROVIDER_AMAZON)
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(
+                    title="Amazon",
+                    data={
+                        CONF_PROVIDER: PROVIDER_AMAZON,
+                        CONF_AMAZON_COOKIES: export_cookie_store(client),
+                    },
+                )
+            finally:
+                await client.close()
+
+        return self.async_show_form(
+            step_id="amazon_otp", data_schema=_AMAZON_OTP_SCHEMA, errors=errors
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(entry: ConfigEntry) -> OptionsFlow:
@@ -184,8 +295,11 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
-        if self._entry.data.get(CONF_PROVIDER, PROVIDER_NUMBERS) == PROVIDER_DPD:
+        provider = self._entry.data.get(CONF_PROVIDER, PROVIDER_NUMBERS)
+        if provider == PROVIDER_DPD:
             return await self.async_step_dpd_options(user_input)
+        if provider == PROVIDER_AMAZON:
+            return await self.async_step_amazon_options(user_input)
         return await self.async_step_dhl_options(user_input)
 
     def _current(self, key, default=None):
@@ -327,3 +441,24 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
             }
         )
         return self.async_show_form(step_id="dpd_options", data_schema=schema)
+
+    async def async_step_amazon_options(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Amazon currently only exposes the common refresh interval option."""
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data={
+                    **self._entry.options,
+                    CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
+                },
+            )
+        return self.async_show_form(
+            step_id="amazon_options",
+            data_schema=_update_interval_schema(
+                self._current(
+                    CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
+                )
+            ),
+        )
