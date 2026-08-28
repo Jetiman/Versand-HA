@@ -23,11 +23,29 @@
           "dpd_username": "Benutzername / E-Mail",
           "dpd_password": "Passwort"
         }
+      },
+      "amazon": {
+        "title": "Mit Amazon.de-Konto anmelden",
+        "description": "Melde dich mit deinem Amazon.de-Konto an. Das Passwort wird nur für den Login verwendet und nicht gespeichert. Nach erfolgreicher Anmeldung wird ausschließlich die Sitzung in Home Assistant gespeichert.",
+        "data": {
+          "amazon_username": "E-Mail-Adresse",
+          "amazon_password": "Passwort"
+        }
+      },
+      "amazon_otp": {
+        "title": "Amazon-Bestätigungscode",
+        "description": "Amazon verlangt eine zusätzliche Bestätigung. Gib den Einmalcode aus deiner Authenticator-App, SMS oder E-Mail ein.",
+        "data": {
+          "amazon_otp": "Bestätigungscode"
+        }
       }
     },
     "error": {
       "invalid_auth": "Anmeldung fehlgeschlagen. Bitte Benutzername und Passwort prüfen.",
-      "cannot_connect": "Verbindung zu DPD fehlgeschlagen. Bitte später erneut versuchen."
+      "cannot_connect": "Verbindung zu DPD fehlgeschlagen. Bitte später erneut versuchen.",
+      "amazon_auth": "Amazon-Anmeldung fehlgeschlagen. Bitte E-Mail-Adresse und Passwort prüfen.",
+      "amazon_otp": "Der Amazon-Bestätigungscode wurde nicht akzeptiert.",
+      "amazon_captcha": "Amazon verlangt eine Captcha-/Browser-Bestätigung. Dieser Login kann derzeit nicht automatisch abgeschlossen werden."
     },
     "abort": {
       "already_configured": "Das ist bereits eingerichtet."
@@ -37,7 +55,8 @@
     "provider": {
       "options": {
         "dhl": "Sendungsnummern (DHL, DPD & Hermes)",
-        "dpd": "DPD-Konto (alle Sendungen automatisch)"
+        "dpd": "DPD-Konto (alle Sendungen automatisch)",
+        "amazon": "Amazon.de-Konto (Lieferungen automatisch)"
       }
     }
   },
@@ -63,6 +82,12 @@
         "description": "PLZ für geschützte Sendungen und Aktualisierungsintervall anpassen.",
         "data": {
           "default_postcode": "Deine PLZ (optional, für geschützte DPD-Sendungen)",
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+        }
+      },
+      "amazon_options": {
+        "description": "Aktualisierungsintervall für Amazon-Lieferungen anpassen.",
+        "data": {
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }
       }
