@@ -10,8 +10,9 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .amazon_api import AmazonApiClient, AmazonApiError, AmazonAuthError
+from .amazon_api import AmazonApiError, AmazonAuthError
 from .amazon_session import export_cookie_store, load_cookie_store
+from .amazon_tracking import AmazonTrackingApiClient
 from .const import (
     CONF_AMAZON_COOKIES,
     CONF_NAMES,
@@ -74,7 +75,7 @@ def normalize_amazon_shipment(raw: dict) -> dict:
         "delivery_from": None,
         "delivery_to": None,
         "tracking_url": raw.get("tracking_url"),
-        "events": [],
+        "events": raw.get("events") or [],
         "delivered": delivered,
         "protected": False,
         "order_id": raw.get("order_id"),
@@ -106,7 +107,7 @@ class AmazonAccountDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict]])
     async def _async_update_data(self) -> dict[str, dict]:
         self.last_poll = dt_util.utcnow()
         store = self.entry.data.get(CONF_AMAZON_COOKIES)
-        client = AmazonApiClient()
+        client = AmazonTrackingApiClient()
         if not load_cookie_store(client, store):
             await client.close()
             raise ConfigEntryAuthFailed("Amazon login required")
