@@ -1,3 +1,6 @@
+
+<p align="center"><img src="custom_components/paketverfolgung/brand/icon@2x.png" width="320" alt="Wattix"></p>
+
 # Paketverfolgung für Home Assistant
 
 Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten-Oberfläche in Home Assistant an. Zwei Wege, die sich beliebig kombinieren lassen:
