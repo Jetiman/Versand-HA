@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from aiohttp import ClientError
 from bs4 import BeautifulSoup
 
 from .amazon_api import AMAZON_ORDERS_URL, AmazonApiClient, _headers
@@ -116,7 +117,8 @@ def _event_datetime(value: Any) -> datetime | None:
 
     # 29.08.2026, 10:07 / 29.08., 10:07 / 29.08.2026
     match = re.search(
-        r"(?P<day>\d{1,2})\.(?P<month>\d{1,2})\.(?:(?P<year>\d{2,4})\.)?"
+        r"(?P<day>\d{1,2})\.(?P<month>\d{1,2})\."
+        r"(?:(?P<year>\d{2,4})\.?)?"
         r"(?:\s*(?:,|um|at)?\s*(?P<hour>\d{1,2}):(?P<minute>\d{2}))?",
         text,
         flags=re.I,
@@ -315,7 +317,9 @@ class AmazonTrackingApiClient(AmazonApiClient):
                 timeout=25,
             ) as response:
                 html = await response.text()
-        except Exception as err:  # Timeline is optional; keep current status usable.
+        except (ClientError, TimeoutError) as err:
+            # History is optional. Keep the current Amazon status usable even if
+            # the second tracking-page request fails.
             _LOGGER.debug("Amazon: could not fetch tracking history: %s", err)
             shipment["events"] = []
             return shipment
