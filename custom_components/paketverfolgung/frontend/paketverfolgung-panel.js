@@ -12,7 +12,7 @@
  * (one per shipment/parcel, identified by the `tracking_id` attribute).
  */
 
-const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes" };
+const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes", amazon: "Amazon" };
 
 class PaketverfolgungPanel extends HTMLElement {
   constructor() {
@@ -122,6 +122,7 @@ class PaketverfolgungPanel extends HTMLElement {
         tracking_id: String(a.tracking_id),
         provider: PROVIDER_LABELS[carrier] || "?",
         carrier,
+        delivery_carrier: a.delivery_carrier || null,
         group,
         direction: a.direction || null,
         delivery_from: a.delivery_window_from || null,
@@ -176,6 +177,7 @@ class PaketverfolgungPanel extends HTMLElement {
         s.status,
         s.group,
         s.carrier,
+        s.delivery_carrier,
         s.forced,
         s.changed,
         s.events.length,
@@ -331,6 +333,7 @@ class PaketverfolgungPanel extends HTMLElement {
 
     const meta = [
       ["Anbieter", s.provider === "?" ? "in Prüfung" : s.provider],
+      ["Zusteller", s.delivery_carrier],
       ["Sendungsnummer", s.tracking_id],
       ["Richtung", directionLabel(s.direction)],
       [
@@ -380,10 +383,10 @@ class PaketverfolgungPanel extends HTMLElement {
       note = `<div class="pv-note">Diese DPD-Sendung ist geschützt. Hinterlege deine PLZ
         in den Optionen der Integration, damit der Verlauf abgerufen werden kann.</div>`;
     } else if (s.provider === "?") {
-      note = `<div class="pv-note">Diese Sendung wird noch geprüft – kein Anbieter (DHL, DPD, Hermes)
+      note = `<div class="pv-note">Diese Sendung wird noch geprüft – kein Anbieter (DHL, DPD, Hermes, Amazon)
         hat bisher Daten dazu geliefert. Sie bleibt in der Liste und wird bei jeder Aktualisierung
         erneut geprüft, bis du sie löschst oder oben den Anbieter manuell festlegst.</div>`;
-    } else if (!s.events.length && (s.provider === "DPD" || s.provider === "Hermes")) {
+    } else if (!s.events.length && (s.provider === "DPD" || s.provider === "Hermes" || s.provider === "Amazon")) {
       note = `<div class="pv-note">Für diese Sendung liegt noch kein Verlauf vor.</div>`;
     }
 
@@ -603,6 +606,7 @@ function directionLabel(dir) {
     {
       send: "Gesendet",
       receive: "Empfangen",
+      incoming: "Empfangen",
       return: "Retoure",
       OUTBOUND: "Gesendet",
       INBOUND: "Empfangen",
