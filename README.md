@@ -7,6 +7,9 @@ Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten
 
 - **Sendungsnummern** – du trägst Nummern ein, der Anbieter (**DHL**, **DPD** oder **Hermes**) wird pro Nummer automatisch erkannt.
 - **DPD-Konto** – Login mit deinem myDPD-Konto, alle Sendungen werden automatisch erkannt.
+- **DHL-Konto** (optional) – Login mit deinem DHL-Konto, die Sendungen des Kontos werden automatisch mitgeführt.
+
+<p align="center"><img src="docs/panel.jpg" width="320" alt="Paketverfolgung-Oberfläche in der Home-Assistant-Seitenleiste"></p>
 
 ## Installation über HACS
 
