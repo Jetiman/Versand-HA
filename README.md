@@ -48,7 +48,6 @@ Meldet sich mit deinem **myDPD-Konto** an (SOAP-API der offiziellen DPD-App „P
 Das Passwort wird nur lokal in Home Assistant gespeichert (wie bei jeder anderen Cloud-Integration).
 
 ## DHL-Konto verbinden (optional)
- „DHL-Konto-Login – Idee & OAuth-Flow von @SniperWCW
 
 Beim Eintrag „Sendungsnummern“ gibt es im Zahnrad-Menü den Haken **„DHL-Konto verbinden und Sendungen automatisch erkennen“**. Ist er gesetzt, öffnet sich ein Schritt mit einem **DHL-Login-Link**:
 
@@ -60,6 +59,8 @@ Danach werden bei jeder Aktualisierung die **nicht archivierten Sendungen des Ko
 Der Diagnose-Sensor **„DHL-Konto Erkennung“** (`sensor.dhl_konto_erkennung`) zeigt das Ergebnis der letzten Abfrage (`Aus`, `N Sendung(en) erkannt` oder eine Fehlermeldung).
 
 > ℹ️ Die Login-Parameter stammen aus der DHL-App und sind inoffiziell – ändert DHL sie, muss die Anmeldung ggf. neu erfolgen oder die Funktion bricht. Deshalb standardmäßig **aus**.
+
+Idee und OAuth-Flow von [@SniperWCW](https://github.com/SniperWCW) ([#1](https://github.com/Jetiman/Versand-HA/pull/1)) – der PR wurde nicht 1:1 übernommen, sondern das Konzept auf aktuellem Stand neu umgesetzt.
 
 ## Was wird angezeigt?
 
