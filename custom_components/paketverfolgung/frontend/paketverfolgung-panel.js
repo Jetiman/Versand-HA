@@ -228,7 +228,6 @@ class PaketverfolgungPanel extends HTMLElement {
       ["Sendungen", total],
       ["Unterwegs", inTransit],
       ["Heute in Zustellung", outForDelivery],
-      ["Zugestellt", delivered],
     ]
       .map(
         ([label, value]) => `
@@ -710,9 +709,8 @@ const STYLES = `
   .pv-content { max-width: 980px; margin: 0 auto; padding: 16px; }
 
   .pv-stats {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
   }
-  @media (max-width: 600px) { .pv-stats { grid-template-columns: repeat(2, 1fr); } }
   .pv-stat {
     background: var(--card-background-color); border-radius: 12px; padding: 14px;
     box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.1)); text-align: center;

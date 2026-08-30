@@ -78,7 +78,7 @@ Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
 Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolgung**:
 
-- **Übersicht:** Kacheln (Gesamt / Unterwegs / Heute in Zustellung / Zugestellt), eine Zeile „Nächste Aktualisierung in ~X Min“ (Klick = sofort aktualisieren), Eingabefeld „Sendungsnummer hinzufügen (DHL, DPD, Hermes)“ und die nummerierte Liste aller Sendungen – zuletzt geändert zuerst, mit Datum und Uhrzeit der letzten Änderung.
+- **Übersicht:** Kacheln (Gesamt / Unterwegs / Heute in Zustellung), eine Zeile „Nächste Aktualisierung in ~X Min“ (Klick = sofort aktualisieren), Eingabefeld „Sendungsnummer hinzufügen (DHL, DPD, Hermes)“ und die nummerierte Liste aller Sendungen – zuletzt geändert zuerst, mit Datum und Uhrzeit der letzten Änderung.
 - **Archiv:** 24 Stunden nach der Zustellung wandert eine Sendung in den ausklappbaren Bereich „Archiv“ am Ende der Liste (Kacheln und aktive Liste bleiben so übersichtlich). Archivierte Sendungen werden nicht mehr abgefragt, bleiben aber inkl. Verlauf abrufbar. Das Sensor-Attribut `archived` zeigt den Zustand auch außerhalb der Oberfläche.
 - **Detailseite:** Klick auf eine Sendung → aktueller Status, Eckdaten, Link zur Anbieter-Seite, Buttons „Jetzt aktualisieren“ / „Löschen“, ein **Namensfeld** (eigenes Label statt des Anbieter-Namens), ein Auswahlfeld zum manuellen Festlegen des Anbieters und der **komplette Sendungsverlauf** als Zeitleiste.
 - **Einstellungen:** Button am Ende der Übersicht öffnet die Integration – dort beim jeweiligen Eintrag über das Zahnrad PLZ und Sendungsnummern eingeben, oder per „Eintrag hinzufügen“ den DPD-Login.
