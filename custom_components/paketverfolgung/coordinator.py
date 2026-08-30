@@ -13,7 +13,7 @@ shape so the sensor/panel code is carrier-agnostic:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -23,6 +23,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    ARCHIVE_AFTER_HOURS,
     CARRIER_DHL,
     CARRIER_DPD,
     CARRIER_HERMES,
@@ -173,10 +174,28 @@ def _placeholder(number: str, carrier: str) -> dict:
     }
 
 
+ARCHIVE_AFTER = timedelta(hours=ARCHIVE_AFTER_HOURS)
+
+
+def _delivery_moment(item: dict) -> datetime | None:
+    """When the parcel was delivered, from its newest (parseable) event."""
+    for event in item.get("events") or []:
+        parsed = dt_util.parse_datetime(str(event.get("datum") or ""))
+        if parsed:
+            return dt_util.as_utc(parsed)
+    return None
+
+
 class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     """Adds "when is the next poll" bookkeeping for the panel countdown."""
 
     last_poll: datetime | None = None
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # id -> first time we saw it delivered (fallback for the archive
+        # clock when the carrier gives no dated delivery event).
+        self._delivered_seen: dict[str, datetime] = {}
 
     @property
     def next_poll(self) -> datetime | None:
@@ -186,6 +205,18 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
     def _mark_polled(self) -> None:
         self.last_poll = dt_util.utcnow()
+
+    def _archived(self, item: dict) -> bool:
+        """True once a delivered shipment is older than ``ARCHIVE_AFTER``."""
+        if not item.get("delivered"):
+            self._delivered_seen.pop(item.get("id"), None)
+            return False
+        moment = _delivery_moment(item)
+        if moment is None:
+            moment = self._delivered_seen.setdefault(
+                item["id"], dt_util.utcnow()
+            )
+        return dt_util.utcnow() - moment >= ARCHIVE_AFTER
 
 
 class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
@@ -231,13 +262,26 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             self.carriers.clear()
             return {}
 
+        def _frozen(n: str) -> dict | None:
+            """A previously-archived item, unless its carrier override just
+            changed - archived shipments are no longer re-queried."""
+            prev = (self.data or {}).get(n)
+            if prev and prev.get("archived") and overrides.get(n) in (
+                None,
+                prev.get("carrier"),
+            ):
+                return prev
+            return None
+
         # Only batch-query DHL for numbers that could still be DHL: not
-        # locked to another carrier, and not pinned to a non-DHL one.
+        # locked to another carrier, not pinned to a non-DHL one, and not
+        # already archived.
         dhl_by_id = await self._dhl_lookup(
             [
                 n
                 for n in numbers
-                if overrides.get(n, CARRIER_DHL) == CARRIER_DHL
+                if _frozen(n) is None
+                and overrides.get(n, CARRIER_DHL) == CARRIER_DHL
                 and self.carriers.get(n, CARRIER_UNKNOWN)
                 not in (CARRIER_DPD, CARRIER_HERMES)
             ]
@@ -249,6 +293,18 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             known = self.carriers.get(number, CARRIER_UNKNOWN)
             carrier = forced or known
             item: dict | None = None
+
+            frozen = _frozen(number)
+            if frozen is not None:
+                item = dict(frozen)
+                item["forced"] = forced
+                item.setdefault("carrier_name", item.get("name"))
+                item["custom_name"] = names.get(number)
+                item["name"] = names.get(number) or item["carrier_name"]
+                item["archived"] = True
+                self.carriers[number] = item["carrier"]
+                result[number] = item
+                continue
 
             raw_dhl = dhl_by_id.get(number)
             dhl_confirmed = raw_dhl is not None and _dhl_has_data(raw_dhl)
@@ -281,11 +337,14 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             item.setdefault("carrier_name", item.get("name"))
             item["custom_name"] = names.get(number)
             item["name"] = names.get(number) or item["carrier_name"]
+            item["archived"] = self._archived(item)
             self.carriers[number] = carrier
             result[number] = item
 
         for stale in [n for n in self.carriers if n not in numbers]:
             self.carriers.pop(stale, None)
+        for stale in [n for n in self._delivered_seen if n not in result]:
+            self._delivered_seen.pop(stale, None)
         return result
 
     async def _merge_dhl_account_numbers(self, numbers: list[str]) -> list[str]:
@@ -454,10 +513,13 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
             item["carrier_name"] = item["name"]
             item["custom_name"] = names.get(parcel_id)
             item["name"] = names.get(parcel_id) or item["carrier_name"]
+            item["archived"] = self._archived(item)
             result[parcel_id] = item
 
         for stale in [p for p in self._events if p not in result]:
             self._events.pop(stale, None)
+        for stale in [p for p in self._delivered_seen if p not in result]:
+            self._delivered_seen.pop(stale, None)
         _LOGGER.debug("Paketverfolgung (DPD): %d parcel(s) fetched", len(result))
         return result
 

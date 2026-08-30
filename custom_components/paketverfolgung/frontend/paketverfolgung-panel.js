@@ -31,6 +31,7 @@ class PaketverfolgungPanel extends HTMLElement {
     this._onPopState = () => this._render();
     this._nextUpdate = null;
     this._tick = null;
+    this._archiveOpen = false;
   }
 
   connectedCallback() {
@@ -129,6 +130,7 @@ class PaketverfolgungPanel extends HTMLElement {
         tracking_url: url || null,
         events,
         delivered,
+        archived: a.archived === true,
         protected: a.protected === true,
         removable: a.removable === true,
         forced: a.forced_carrier || null,
@@ -170,6 +172,7 @@ class PaketverfolgungPanel extends HTMLElement {
       busy: this._addBusy,
       result: this._addResult,
       nextIso: nextIso || null,
+      archiveOpen: this._archiveOpen,
       items: shipments.map((s) => [
         s.entity_id,
         s.name,
@@ -179,6 +182,7 @@ class PaketverfolgungPanel extends HTMLElement {
         s.forced,
         s.changed,
         s.events.length,
+        s.archived,
       ]),
     });
     if (!force && sig === this._sig) return;
@@ -206,7 +210,9 @@ class PaketverfolgungPanel extends HTMLElement {
     if (input && this._draftTracking) input.value = this._draftTracking;
   }
 
-  _listHtml(shipments) {
+  _listHtml(allShipments) {
+    const shipments = allShipments.filter((s) => !s.archived);
+    const archived = allShipments.filter((s) => s.archived);
     const total = shipments.length;
     const delivered = shipments.filter((s) => s.delivered).length;
     const inReview = shipments.filter((s) => s.group === "unknown").length;
@@ -240,8 +246,19 @@ class PaketverfolgungPanel extends HTMLElement {
 
     const rows = shipments.length
       ? shipments.map((s, i) => this._rowHtml(s, i + 1)).join("")
+      : archived.length
+      ? `<div class="pv-empty">Keine aktiven Sendungen – alle sind im Archiv.</div>`
       : `<div class="pv-empty">Noch keine Sendungen. Füge unten eine Sendungsnummer hinzu
           oder richte das DPD-Konto ein.</div>`;
+
+    const archiveBlock = archived.length
+      ? `<details class="pv-archive"${this._archiveOpen ? " open" : ""}>
+          <summary data-archive-toggle>Archiv (${archived.length}) · zugestellt vor über 24 h</summary>
+          <div class="pv-list pv-archive-list">
+            ${archived.map((s, i) => this._rowHtml(s, i + 1)).join("")}
+          </div>
+        </details>`
+      : "";
 
     let resultMsg = "";
     if (this._addResult) {
@@ -279,6 +296,7 @@ class PaketverfolgungPanel extends HTMLElement {
           : ""
       }
       <div class="pv-list">${rows}</div>
+      ${archiveBlock}
 
       <div class="pv-footer">
         <button class="pv-settings" data-nav="/config/integrations/integration/paketverfolgung">
@@ -383,6 +401,9 @@ class PaketverfolgungPanel extends HTMLElement {
       note = `<div class="pv-note">Diese Sendung wird noch geprüft – kein Anbieter (DHL, DPD, Hermes)
         hat bisher Daten dazu geliefert. Sie bleibt in der Liste und wird bei jeder Aktualisierung
         erneut geprüft, bis du sie löschst oder oben den Anbieter manuell festlegst.</div>`;
+    } else if (s.archived) {
+      note = `<div class="pv-note">Archiviert – vor über 24 Stunden zugestellt. Diese Sendung
+        wird nicht mehr abgefragt, bleibt aber im Archiv abrufbar.</div>`;
     } else if (!s.events.length && (s.provider === "DPD" || s.provider === "Hermes")) {
       note = `<div class="pv-note">Für diese Sendung liegt noch kein Verlauf vor.</div>`;
     }
@@ -475,6 +496,13 @@ class PaketverfolgungPanel extends HTMLElement {
     const nav = ev.target.closest("[data-nav]");
     if (nav) {
       this._navigate(nav.getAttribute("data-nav"));
+      return;
+    }
+    if (ev.target.closest("[data-archive-toggle]")) {
+      ev.preventDefault();
+      this._archiveOpen = !this._archiveOpen;
+      this._sig = null;
+      this._render(true);
       return;
     }
     const refreshAll = ev.target.closest("[data-refresh-all]");
@@ -759,6 +787,18 @@ const STYLES = `
   .pv-chevron { flex: none; color: var(--secondary-text-color); margin-top: 1px; }
 
   .pv-empty { color: var(--secondary-text-color); padding: 32px 8px; text-align: center; }
+
+  .pv-archive { margin-top: 16px; }
+  .pv-archive > summary {
+    cursor: pointer; list-style: none; user-select: none;
+    padding: 11px 14px; font-size: 13px; color: var(--secondary-text-color);
+    background: var(--card-background-color); border: 1px solid var(--divider-color);
+    border-radius: 10px;
+  }
+  .pv-archive > summary::-webkit-details-marker { display: none; }
+  .pv-archive > summary::before { content: "▸"; margin-right: 8px; font-size: 11px; }
+  .pv-archive[open] > summary::before { content: "▾"; }
+  .pv-archive-list { margin-top: 8px; opacity: .8; }
 
   .pv-footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--divider-color); }
   .pv-settings {

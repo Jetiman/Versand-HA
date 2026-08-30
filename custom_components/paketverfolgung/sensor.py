@@ -185,6 +185,7 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
             ),
             "direction": s.get("direction"),
             "delivered": s.get("delivered"),
+            "archived": bool(s.get("archived")),
             "protected": s.get("protected"),
             "delivery_window_from": s.get("delivery_from"),
             "delivery_window_to": s.get("delivery_to"),

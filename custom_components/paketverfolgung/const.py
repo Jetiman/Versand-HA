@@ -79,7 +79,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.10.1"
+PANEL_VERSION = "1.11.1"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is
@@ -162,6 +162,10 @@ DPD_STATUS_GROUP = {
 DEFAULT_UPDATE_INTERVAL_MINUTES = 15
 MIN_UPDATE_INTERVAL_MINUTES = 5
 DEFAULT_UPDATE_INTERVAL = timedelta(minutes=DEFAULT_UPDATE_INTERVAL_MINUTES)
+
+# A delivered shipment moves into the panel's "Archiv" section this many
+# hours after it was delivered (and stops being re-queried).
+ARCHIVE_AFTER_HOURS = 24
 
 # DHL "fortschritt" progress step (0-5) -> German status text + lifecycle group
 PROGRESS_STATUS = {
