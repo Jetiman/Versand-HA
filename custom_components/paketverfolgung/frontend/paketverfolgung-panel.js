@@ -247,8 +247,8 @@ class PaketverfolgungPanel extends HTMLElement {
       ? shipments.map((s, i) => this._rowHtml(s, i + 1)).join("")
       : archived.length
       ? `<div class="pv-empty">Keine aktiven Sendungen – alle sind im Archiv.</div>`
-      : `<div class="pv-empty">Noch keine Sendungen. Füge unten eine Sendungsnummer hinzu
-          oder richte das DPD-Konto ein.</div>`;
+      : `<div class="pv-empty">Noch keine Sendungen. Füge unten eine Sendungsnummer hinzu,
+          verbinde ein DPD- oder DHL-Konto und die Sendungen erscheinen automatisch.</div>`;
 
     const archiveBlock = archived.length
       ? `<details class="pv-archive"${this._archiveOpen ? " open" : ""}>
@@ -300,11 +300,12 @@ class PaketverfolgungPanel extends HTMLElement {
       <div class="pv-footer">
         <button class="pv-settings" data-nav="/config/integrations/integration/paketverfolgung">
           <ha-icon icon="mdi:cog-outline"></ha-icon>
-          Einstellungen (DPD-Login, PLZ, Sendungsnummern)
+          Einstellungen (Sendungsnummern, PLZ, DPD- & DHL-Konto)
         </button>
         <div class="pv-footer-hint">
-          Öffnet die Integration – dort beim jeweiligen Eintrag auf das Zahnrad
-          für PLZ und Sendungsnummern, oder „Eintrag hinzufügen“ für den DPD-Login.
+          Öffnet die Integration. Beim Eintrag „Sendungsnummern“ über das Zahnrad:
+          Nummern, PLZ, Aktualisierungsintervall und die optionale DHL-Konto-Anmeldung.
+          Für das DPD-Konto „Eintrag hinzufügen“.
         </div>
       </div>
     `;
