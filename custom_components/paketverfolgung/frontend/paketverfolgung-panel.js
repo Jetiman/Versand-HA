@@ -111,10 +111,14 @@ class PaketverfolgungPanel extends HTMLElement {
       const group = a.group || "";
       const delivered = a.delivered === true || group === "delivered";
       const events = Array.isArray(a.events) ? a.events : [];
-      // "last change" of the shipment itself: the newest carrier event if
-      // we have one, otherwise when the sensor state last changed.
+      // "last change" of the shipment itself: newest carrier event if we
+      // have one; for a delivered parcel without dated events, the
+      // computed delivery moment; otherwise when the sensor last changed.
       const changed =
-        (events[0] && events[0].datum) || stateObj.last_changed || null;
+        (events[0] && events[0].datum) ||
+        a.delivered_at ||
+        stateObj.last_changed ||
+        null;
       out.push({
         entity_id: stateObj.entity_id,
         name: a.friendly_name || stateObj.entity_id,
@@ -131,6 +135,7 @@ class PaketverfolgungPanel extends HTMLElement {
         events,
         delivered,
         archived: a.archived === true,
+        delivered_at: a.delivered_at || null,
         protected: a.protected === true,
         removable: a.removable === true,
         forced: a.forced_carrier || null,

@@ -3,10 +3,11 @@
   "name": "Paketverfolgung",
   "codeowners": ["@Jetiman"],
   "config_flow": true,
+  "after_dependencies": ["recorder"],
   "dependencies": ["http", "panel_custom"],
   "documentation": "https://github.com/Jetiman/Versand-HA",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Jetiman/Versand-HA/issues",
   "requirements": [],
-  "version": "1.11.3"
+  "version": "1.11.4"
 }

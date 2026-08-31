@@ -18,7 +18,9 @@ from datetime import datetime, timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -190,12 +192,18 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     """Adds "when is the next poll" bookkeeping for the panel countdown."""
 
     last_poll: datetime | None = None
+    entry: ConfigEntry
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        # id -> first time we saw it delivered (fallback for the archive
-        # clock when the carrier gives no dated delivery event).
-        self._delivered_seen: dict[str, datetime] = {}
+        # id -> ISO timestamp we consider the delivery moment. Only used as
+        # a fallback when the carrier gives no dated delivery event (e.g.
+        # DPD account parcels on a host where tracking.dpd.de is blocked).
+        # Persisted so the "24h after delivery" archive clock survives a
+        # restart instead of resetting on every reload.
+        self._delivered_since: dict[str, str] = {}
+        self._archive_store: Store | None = None
+        self._archive_dirty = False
 
     @property
     def next_poll(self) -> datetime | None:
@@ -206,17 +214,75 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     def _mark_polled(self) -> None:
         self.last_poll = dt_util.utcnow()
 
-    def _archived(self, item: dict) -> bool:
-        """True once a delivered shipment is older than ``ARCHIVE_AFTER``."""
-        if not item.get("delivered"):
-            self._delivered_seen.pop(item.get("id"), None)
-            return False
-        moment = _delivery_moment(item)
-        if moment is None:
-            moment = self._delivered_seen.setdefault(
-                item["id"], dt_util.utcnow()
+    async def _load_archive(self) -> None:
+        if self._archive_store is None:
+            self._archive_store = Store(
+                self.hass, 1, f"{DOMAIN}.archive.{self.entry.entry_id}"
             )
-        return dt_util.utcnow() - moment >= ARCHIVE_AFTER
+            stored = await self._archive_store.async_load()
+            self._delivered_since = dict(stored) if stored else {}
+
+    async def _save_archive(self, live_ids: set[str]) -> None:
+        for stale in [i for i in self._delivered_since if i not in live_ids]:
+            del self._delivered_since[stale]
+            self._archive_dirty = True
+        if self._archive_dirty and self._archive_store is not None:
+            await self._archive_store.async_save(self._delivered_since)
+            self._archive_dirty = False
+
+    async def _apply_archive(self, item: dict) -> None:
+        """Set ``item['archived']`` and ``item['delivered_at']`` (ISO)."""
+        sid = str(item.get("id") or "")
+        if not item.get("delivered"):
+            if sid in self._delivered_since:
+                del self._delivered_since[sid]
+                self._archive_dirty = True
+            item["delivered_at"] = None
+            item["archived"] = False
+            return
+
+        moment = _delivery_moment(item)  # a dated carrier event is best
+        if moment is None:
+            iso = self._delivered_since.get(sid)
+            if iso is None:
+                moment = await self._estimate_delivery_moment(sid, item)
+                self._delivered_since[sid] = moment.isoformat()
+                self._archive_dirty = True
+            else:
+                moment = dt_util.parse_datetime(iso) or dt_util.utcnow()
+
+        item["delivered_at"] = moment.isoformat()
+        item["archived"] = dt_util.utcnow() - moment >= ARCHIVE_AFTER
+
+    async def _estimate_delivery_moment(self, sid: str, item: dict) -> datetime:
+        """Best guess at when an already-delivered parcel (no dated event)
+        was delivered: the first time the recorder saw its sensor reach the
+        current status. Falls back to now() (recorder off / out of range /
+        parcel new)."""
+        status = item.get("status")
+        entity_id = er.async_get(self.hass).async_get_entity_id(
+            "sensor", DOMAIN, f"{self.entry.entry_id}_{sid}"
+        )
+        if not entity_id or not status:
+            return dt_util.utcnow()
+        try:
+            from homeassistant.components.recorder import get_instance, history
+
+            def _first_seen() -> datetime | None:
+                start = dt_util.utcnow() - timedelta(days=10)
+                states = history.state_changes_during_period(
+                    self.hass, start, dt_util.utcnow(), entity_id,
+                    include_start_time_state=False, no_attributes=True,
+                ).get(entity_id, [])
+                for state in states:
+                    if state.state == status:
+                        return dt_util.as_utc(state.last_changed)
+                return None
+
+            found = await get_instance(self.hass).async_add_executor_job(_first_seen)
+            return found or dt_util.utcnow()
+        except Exception:  # noqa: BLE001 - recorder optional, never break a poll
+            return dt_util.utcnow()
 
 
 class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
@@ -241,6 +307,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
 
     async def _async_update_data(self) -> dict[str, dict]:
         self._mark_polled()
+        await self._load_archive()
         numbers = [
             str(n).strip()
             for n in self._config(CONF_TRACKING_NUMBERS, [])
@@ -337,14 +404,13 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             item.setdefault("carrier_name", item.get("name"))
             item["custom_name"] = names.get(number)
             item["name"] = names.get(number) or item["carrier_name"]
-            item["archived"] = self._archived(item)
+            await self._apply_archive(item)
             self.carriers[number] = carrier
             result[number] = item
 
         for stale in [n for n in self.carriers if n not in numbers]:
             self.carriers.pop(stale, None)
-        for stale in [n for n in self._delivered_seen if n not in result]:
-            self._delivered_seen.pop(stale, None)
+        await self._save_archive(set(result))
         return result
 
     async def _merge_dhl_account_numbers(self, numbers: list[str]) -> list[str]:
@@ -460,6 +526,7 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
 
     async def _async_update_data(self) -> dict[str, dict]:
         self._mark_polled()
+        await self._load_archive()
         if self._session is None:
             await self._login()
 
@@ -513,13 +580,12 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
             item["carrier_name"] = item["name"]
             item["custom_name"] = names.get(parcel_id)
             item["name"] = names.get(parcel_id) or item["carrier_name"]
-            item["archived"] = self._archived(item)
+            await self._apply_archive(item)
             result[parcel_id] = item
 
         for stale in [p for p in self._events if p not in result]:
             self._events.pop(stale, None)
-        for stale in [p for p in self._delivered_seen if p not in result]:
-            self._delivered_seen.pop(stale, None)
+        await self._save_archive(set(result))
         _LOGGER.debug("Paketverfolgung (DPD): %d parcel(s) fetched", len(result))
         return result
 
