@@ -307,12 +307,12 @@ class PaketverfolgungPanel extends HTMLElement {
       <div class="pv-footer">
         <button class="pv-settings" data-nav="/config/integrations/integration/paketverfolgung">
           <ha-icon icon="mdi:cog-outline"></ha-icon>
-          Einstellungen (Sendungsnummern, PLZ, DPD- & DHL-Konto)
+          Einstellungen (Konten & Optionen)
         </button>
         <div class="pv-footer-hint">
-          Öffnet die Integration. Beim Eintrag „Sendungsnummern“ über das Zahnrad:
-          Nummern, PLZ, Aktualisierungsintervall und die optionale DHL-Konto-Anmeldung.
-          Für das DPD-Konto „Eintrag hinzufügen“.
+          Öffnet die Integration. Beim Eintrag „Sendungsnummern“ führt das Zahnrad
+          zu allen Optionen (u. a. der DHL-Konto-Anmeldung). Ein DPD- oder
+          Amazon-Konto fügst du über „Eintrag hinzufügen“ hinzu.
         </div>
       </div>
     `;
