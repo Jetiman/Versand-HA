@@ -23,11 +23,29 @@
           "dpd_username": "Username / email",
           "dpd_password": "Password"
         }
+      },
+      "amazon": {
+        "title": "Log in with your Amazon.de account",
+        "description": "⚠️ Security note: after login the Amazon session (cookies) is stored locally in Home Assistant in plain text, including in backups. That session grants full access to your Amazon account (orders, addresses, payment methods). Only use this if you're comfortable with that. The password itself is used only for the login and is not stored.\n\nNote: Amazon often blocks logins from datacenter/VPS networks with a CAPTCHA - the automatic login then cannot complete.",
+        "data": {
+          "amazon_username": "Email address",
+          "amazon_password": "Password"
+        }
+      },
+      "amazon_otp": {
+        "title": "Amazon verification code",
+        "description": "Amazon requires an additional verification step. Enter the one-time code from your authenticator app, SMS or email.",
+        "data": {
+          "amazon_otp": "Verification code"
+        }
       }
     },
     "error": {
       "invalid_auth": "Login failed. Please check your username and password.",
-      "cannot_connect": "Could not connect to DPD. Please try again later."
+      "cannot_connect": "Could not connect to DPD. Please try again later.",
+      "amazon_auth": "Amazon login failed. Please check your email address and password.",
+      "amazon_otp": "The Amazon verification code was not accepted.",
+      "amazon_captcha": "Amazon requires a CAPTCHA/browser verification. This login cannot currently be completed automatically."
     },
     "abort": {
       "already_configured": "This is already configured."
@@ -37,7 +55,8 @@
     "provider": {
       "options": {
         "dhl": "Tracking numbers (DHL, DPD & Hermes)",
-        "dpd": "DPD account (all parcels automatically)"
+        "dpd": "DPD account (all parcels automatically)",
+        "amazon": "Amazon.de account (deliveries automatically)"
       }
     }
   },
@@ -63,6 +82,12 @@
         "description": "Set a postcode for protected parcels and adjust the update interval.",
         "data": {
           "default_postcode": "Your postcode (optional, for protected DPD parcels)",
+          "update_interval_minutes": "Update interval (minutes)"
+        }
+      },
+      "amazon_options": {
+        "description": "Adjust the update interval for Amazon deliveries.",
+        "data": {
           "update_interval_minutes": "Update interval (minutes)"
         }
       }

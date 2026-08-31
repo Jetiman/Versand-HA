@@ -8,6 +8,6 @@
   "documentation": "https://github.com/Jetiman/Versand-HA",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Jetiman/Versand-HA/issues",
-  "requirements": [],
-  "version": "1.11.5"
+  "requirements": ["beautifulsoup4==4.13.3"],
+  "version": "1.12.0"
 }

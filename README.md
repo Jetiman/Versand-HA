@@ -8,6 +8,7 @@ Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten
 - **Sendungsnummern** – du trägst Nummern ein, der Anbieter (**DHL**, **DPD** oder **Hermes**) wird pro Nummer automatisch erkannt.
 - **DPD-Konto** – Login mit deinem myDPD-Konto, alle Sendungen werden automatisch erkannt.
 - **DHL-Konto** (optional) – Login mit deinem DHL-Konto, die Sendungen des Kontos werden automatisch mitgeführt.
+- **Amazon.de-Konto** (optional) – Login mit deinem Amazon-Konto, laufende Lieferungen werden automatisch erkannt (inkl. tatsächlichem Zusteller). ⚠️ Sicherheitshinweis unten beachten.
 
 <p align="center"><img src="docs/panel.jpg" width="320" alt="Paketverfolgung-Oberfläche in der Home-Assistant-Seitenleiste"></p>
 
@@ -65,12 +66,22 @@ Der Diagnose-Sensor **„DHL-Konto Erkennung“** (`sensor.dhl_konto_erkennung`)
 
 Idee und OAuth-Flow von [@SniperWCW](https://github.com/SniperWCW) ([#1](https://github.com/Jetiman/Versand-HA/pull/1)) – der PR wurde nicht 1:1 übernommen, sondern das Konzept auf aktuellem Stand neu umgesetzt.
 
+## Amazon.de-Konto (optional)
+
+„Eintrag hinzufügen“ → **„Amazon.de-Konto“** → mit E-Mail und Passwort anmelden (bei aktivierter 2FA folgt ein Schritt für den Einmalcode). Danach werden bei jeder Aktualisierung die **aktuell verfolgbaren Lieferungen** aus deinen Amazon-Bestellungen ausgelesen – mit Status, Trackingnummer, **tatsächlichem Zusteller** (z. B. „Versendet mit DHL“) und dem Amazon-Sendungsverlauf.
+
+> ⚠️ **Sicherheitshinweis:** Es wird zwar **kein Passwort** gespeichert, aber die **Amazon-Sitzung (Cookies)** – im Klartext im Config-Entry und damit auch in Backups. Diese Sitzung erlaubt vollen Zugriff auf dein Amazon-Konto (Bestellungen, Adressen, Zahlungsmittel). Nur einrichten, wenn dir das bewusst ist.
+
+> ℹ️ Kein offizielles API – die Daten werden aus den Amazon-Seiten gelesen. Amazon blockt Logins aus Rechenzentrums-/VPS-Netzen häufig per CAPTCHA (dann klappt die Anmeldung nicht), ändert die Seiten laufend (kann die Erkennung brechen) und automatisiertes Auslesen widerspricht den Amazon-Nutzungsbedingungen.
+
+Konzept aus [#3](https://github.com/Jetiman/Versand-HA/pull/3) von [@SniperWCW](https://github.com/SniperWCW).
+
 ## Was wird angezeigt?
 
 Pro Sendung ein Sensor mit:
 
 - **Zustand:** Klartext-Status (z. B. „In Zustellung“, „Zugestellt“)
-- **Attribute:** `tracking_id`, `carrier` (`dhl`/`dpd`/`hermes`), `group` (Phase), `direction`, `delivered`, `archived` (zugestellt vor über 24 h), `delivered_at` (Zeitpunkt der Zustellung), `tracking_url`, `events` (kompletter Verlauf, neueste zuerst), bei DHL zusätzlich `delivery_window_from`/`_to`
+- **Attribute:** `tracking_id`, `carrier` (`dhl`/`dpd`/`hermes`/`amazon`), `delivery_carrier` (bei Amazon der tatsächliche Zusteller), `group` (Phase), `direction`, `delivered`, `archived` (zugestellt vor über 24 h), `delivered_at` (Zeitpunkt der Zustellung), `tracking_url`, `events` (kompletter Verlauf, neueste zuerst), bei DHL zusätzlich `delivery_window_from`/`_to`
 
 Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
@@ -94,3 +105,4 @@ Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie di
 - Hermes: keine automatische Kontoerkennung – Sendungsnummern müssen eingetragen werden. DHL bietet eine optionale Konto-Anmeldung (siehe oben), die aber auf einer inoffiziellen App-Schnittstelle beruht.
 - DPD: manche Sendungen sind ohne Empfänger-PLZ nicht öffentlich abrufbar; nur ein myDPD-Konto pro Eintrag. `tracking.dpd.de` ist aus manchen Server-/VPS-Netzen nicht erreichbar (siehe Hinweis oben).
 - Hermes: die genutzte Schnittstelle (`api.my-deliveries.de`) ist undokumentiert; falls sich das Antwortformat ändert, fehlt ggf. der Verlauf.
+- Amazon: kein API, sondern Auslesen der Bestell-/Trackingseiten. Login scheitert aus VPS-/Rechenzentrums-Netzen oft an einem CAPTCHA; die Sitzung läuft regelmäßig ab und muss dann neu eingerichtet werden; Amazon-Seitenänderungen können die Erkennung brechen. Die Amazon-Sitzungscookies liegen im Klartext im Config-Entry/Backup. Nur ein Amazon-Konto pro Installation.

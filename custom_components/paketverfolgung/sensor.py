@@ -18,7 +18,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import slugify
 
+from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .const import (
     CONF_PROVIDER,
     DEFAULT_ICON,
@@ -36,6 +38,7 @@ from .coordinator import (
 _SHIPMENT_COORDINATORS = (
     TrackingNumbersDataUpdateCoordinator,
     DpdAccountDataUpdateCoordinator,
+    AmazonAccountDataUpdateCoordinator,
 )
 
 _DELIVERY_TODAY_UID = f"{DOMAIN}_out_for_delivery_today"
@@ -89,10 +92,33 @@ def _cleanup_singletons(hass: HomeAssistant, owner_id: str) -> None:
             registry.async_update_entity(eid, new_entity_id=base)
 
 
+def _amazon_entity_id(item_id: str) -> str:
+    """Canonical entity id for an Amazon shipment (stable, not the product title)."""
+    return f"sensor.amazon_{slugify(item_id)}"
+
+
+def _migrate_amazon_entity_ids(hass: HomeAssistant, entry_id: str, coordinator) -> None:
+    """Move Amazon entities that older builds named after the product title to
+    the stable ``sensor.amazon_<tracking-number>`` form. The registry unique id
+    is left untouched."""
+    registry = er.async_get(hass)
+    for item_id in coordinator.data or {}:
+        current = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{entry_id}_{item_id}"
+        )
+        if not current:
+            continue
+        desired = _amazon_entity_id(item_id)
+        if current != desired and registry.async_get(desired) is None:
+            registry.async_update_entity(current, new_entity_id=desired)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
+    if isinstance(coordinator, AmazonAccountDataUpdateCoordinator):
+        _migrate_amazon_entity_ids(hass, entry.entry_id, coordinator)
     _setup_dynamic_entities(entry, coordinator, async_add_entities)
 
     # Diagnostic read-out of the optional DHL-account auto-discovery.
@@ -150,6 +176,11 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self.item_id = item_id
         self._attr_unique_id = f"{entry_id}_{item_id}"
+        # Amazon's shipment "name" is the product title; suggest a stable
+        # entity_id up front. The registry stays authoritative and keeps an
+        # existing id for the same unique_id.
+        if isinstance(coordinator, AmazonAccountDataUpdateCoordinator):
+            self.entity_id = _amazon_entity_id(item_id)
 
     @property
     def _shipment(self) -> dict:
@@ -177,6 +208,7 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
         return {
             "tracking_id": self.item_id,
             "carrier": s.get("carrier"),
+            "delivery_carrier": s.get("delivery_carrier"),
             "forced_carrier": s.get("forced"),
             "custom_name": s.get("custom_name"),
             "group": s.get("group"),
@@ -191,6 +223,8 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
             "delivery_window_from": s.get("delivery_from"),
             "delivery_window_to": s.get("delivery_to"),
             "tracking_url": s.get("tracking_url"),
+            "order_id": s.get("order_id"),
+            "short_status": s.get("short_status"),
             "events": s.get("events", []),
         }
 
