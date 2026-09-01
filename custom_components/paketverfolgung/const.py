@@ -54,9 +54,11 @@ CONF_NAMES = "names"
 # the DPD-account entry).
 CONF_DEFAULT_POSTCODE = "default_postcode"
 
-# When on, the coordinator posts a persistent notification (and fires a
-# `paketverfolgung_notification` event) on a new shipment or a status change.
-CONF_NOTIFICATIONS = "notifications"
+# notify target (e.g. "mobile_app_galaxy_s22") to send a message to on a
+# new shipment or a status change. Empty = notifications off. A
+# `paketverfolgung_notification` event is also fired when a target is set.
+CONF_NOTIFY_TARGET = "notify_target"
+NOTIFY_OFF = "aus"  # sentinel dropdown value meaning "no notifications"
 EVENT_NOTIFICATION = f"{DOMAIN}_notification"
 
 # Amazon.de account login. Email/password/OTP are used only during the

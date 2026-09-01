@@ -18,6 +18,7 @@ from .amazon_api import (
 )
 from .amazon_session import export_cookie_store
 from .const import (
+    NOTIFY_OFF,
     CONF_AMAZON_COOKIES,
     CONF_AMAZON_OTP,
     CONF_AMAZON_PASSWORD,
@@ -28,7 +29,7 @@ from .const import (
     CONF_DHL_REDIRECT,
     CONF_DHL_SESSION,
     CONF_NAMES,
-    CONF_NOTIFICATIONS,
+    CONF_NOTIFY_TARGET,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
     CONF_PROVIDER,
@@ -83,12 +84,38 @@ def _update_interval_schema(default: int) -> vol.Schema:
     )
 
 
-def _notifications_field(default: bool) -> dict:
+def _notify_target_field(hass, current: str | None) -> dict:
+    """A dropdown of the available notify services (e.g. mobile_app_*).
+
+    The chosen service is where a status-change / new-shipment message is
+    sent. "aus" (the default) means no notifications.
+    """
+    services = sorted((hass.services.async_services() or {}).get("notify", {}))
+    options = [
+        selector.SelectOptionDict(value=NOTIFY_OFF, label="Aus (keine Benachrichtigung)"),
+        *[
+            selector.SelectOptionDict(value=name, label=f"notify.{name}")
+            for name in services
+        ],
+    ]
     return {
         vol.Optional(
-            CONF_NOTIFICATIONS, default=bool(default)
-        ): selector.BooleanSelector()
+            CONF_NOTIFY_TARGET, default=current or NOTIFY_OFF
+        ): selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=options,
+                mode=selector.SelectSelectorMode.DROPDOWN,
+                custom_value=True,
+            )
+        )
     }
+
+
+def _clean_notify_target(value: str | None) -> str:
+    value = (value or "").strip()
+    if value in ("", NOTIFY_OFF):
+        return ""
+    return value[len("notify."):] if value.startswith("notify.") else value
 
 
 _DPD_LOGIN_SCHEMA = vol.Schema(
@@ -333,7 +360,7 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     user_input.get(CONF_DEFAULT_POSTCODE) or ""
                 ).strip(),
                 CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
-                CONF_NOTIFICATIONS: bool(user_input.get(CONF_NOTIFICATIONS)),
+                CONF_NOTIFY_TARGET: _clean_notify_target(user_input.get(CONF_NOTIFY_TARGET)),
                 CONF_DHL_AUTO_DISCOVERY: bool(
                     user_input.get(CONF_DHL_AUTO_DISCOVERY)
                 ),
@@ -354,7 +381,7 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     )
                 ).schema
             )
-            .extend(_notifications_field(self._current(CONF_NOTIFICATIONS, False)))
+            .extend(_notify_target_field(self.hass, self._current(CONF_NOTIFY_TARGET)))
             .extend(
                 {
                     vol.Optional(
@@ -434,7 +461,7 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     CONF_DEFAULT_POSTCODE: (
                         user_input.get(CONF_DEFAULT_POSTCODE) or ""
                     ).strip(),
-                    CONF_NOTIFICATIONS: bool(user_input.get(CONF_NOTIFICATIONS)),
+                    CONF_NOTIFY_TARGET: _clean_notify_target(user_input.get(CONF_NOTIFY_TARGET)),
                 },
             )
 
@@ -450,7 +477,7 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     ): selector.TextSelector(),
                 }
             )
-            .extend(_notifications_field(self._current(CONF_NOTIFICATIONS, False)))
+            .extend(_notify_target_field(self.hass, self._current(CONF_NOTIFY_TARGET)))
         )
         return self.async_show_form(step_id="dpd_options", data_schema=schema)
 
@@ -464,12 +491,12 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                 data={
                     **self._entry.options,
                     CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
-                    CONF_NOTIFICATIONS: bool(user_input.get(CONF_NOTIFICATIONS)),
+                    CONF_NOTIFY_TARGET: _clean_notify_target(user_input.get(CONF_NOTIFY_TARGET)),
                 },
             )
         return self.async_show_form(
             step_id="amazon_options",
             data_schema=_update_interval_schema(
                 self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
-            ).extend(_notifications_field(self._current(CONF_NOTIFICATIONS, False))),
+            ).extend(_notify_target_field(self.hass, self._current(CONF_NOTIFY_TARGET))),
         )

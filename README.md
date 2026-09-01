@@ -90,23 +90,13 @@ Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
 ## Benachrichtigungen
 
-In den Optionen jedes Eintrags gibt es den Haken **„Benachrichtigen bei neuer Sendung oder Statusänderung“**. Ist er gesetzt:
+In den Optionen jedes Eintrags (Zahnrad) gibt es das Feld **„Benachrichtigung senden an (Gerät/Dienst)“** – eine Auswahlliste deiner `notify.*`-Dienste (z. B. `notify.mobile_app_galaxy_s22`). Standard ist **„Aus“**.
 
-- erscheint bei einer neuen Sendung oder einer Statusänderung eine **persistente Benachrichtigung** in Home Assistant (eine pro Sendung, wird bei jeder Änderung aktualisiert; verschwindet, wenn die Sendung aus der Liste fällt),
-- **und** es wird das Event **`paketverfolgung_notification`** ausgelöst – damit lässt sich per Automation z. B. eine Push-Nachricht aufs Handy schicken:
+Ist ein Ziel gewählt, schickt die Integration bei einer **neuen Sendung** oder einer **Statusänderung** direkt eine Nachricht dorthin (Titel „Paketverfolgung – …“, Text „Name: Status“). Keine zusätzliche Automation nötig.
 
-```yaml
-triggers:
-  - trigger: event
-    event_type: paketverfolgung_notification
-actions:
-  - action: notify.mobile_app_dein_handy
-    data:
-      title: "{{ trigger.event.data.name }}"
-      message: "{{ trigger.event.data.status }}"
-```
+Zusätzlich wird das Event **`paketverfolgung_notification`** ausgelöst (Daten: `action` = `detected`/`changed`, `tracking_id`, `name`, `carrier`, `delivery_carrier`, `status`, `previous_status`, `group`, `delivered`, `tracking_url`) – falls du die Nachricht lieber selbst per Automation formatieren willst.
 
-Event-Daten: `action` (`detected` / `changed`), `tracking_id`, `name`, `carrier`, `delivery_carrier`, `status`, `previous_status`, `group`, `delivered`, `tracking_url`. Der erste Abruf nach dem Aktivieren löst nichts aus (nur Bestandsaufnahme).
+Der erste Abruf nach dem Setzen eines Ziels löst nichts aus (nur Bestandsaufnahme). Archivierte Sendungen und „In Prüfung“ benachrichtigen nicht.
 
 ## Oberfläche („Paketverfolgung“ in der Seitenleiste)
 

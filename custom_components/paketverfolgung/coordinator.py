@@ -15,7 +15,6 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
-from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -37,7 +36,8 @@ from .const import (
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_SESSION,
     CONF_NAMES,
-    CONF_NOTIFICATIONS,
+    CONF_NOTIFY_TARGET,
+    NOTIFY_OFF,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
     CONF_TRACKING_NUMBERS,
@@ -226,22 +226,23 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     def _mark_polled(self) -> None:
         self.last_poll = dt_util.utcnow()
 
-    def _notifications_on(self) -> bool:
-        return bool(
-            self.entry.options.get(
-                CONF_NOTIFICATIONS, self.entry.data.get(CONF_NOTIFICATIONS, False)
-            )
+    def _notify_target(self) -> str | None:
+        target = self.entry.options.get(
+            CONF_NOTIFY_TARGET, self.entry.data.get(CONF_NOTIFY_TARGET)
         )
+        target = (target or "").strip()
+        return None if target in ("", NOTIFY_OFF) else target
 
     def _notify_changes(self, new: dict[str, dict]) -> None:
-        """Persistent-notification + event on a new shipment or status change.
+        """Send a notification on a new shipment or a status change.
 
-        The first run after enabling only records the baseline (so you don't
-        get a burst of notifications for shipments that already existed).
+        The first run after picking a target only records the baseline, so
+        you don't get a burst for shipments that already existed.
         """
         primed = self._notify_primed
         self._notify_primed = True
-        if not self._notifications_on():
+        target = self._notify_target()
+        if not target:
             return
         old = self.data or {}
         for sid, item in new.items():
@@ -251,33 +252,28 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             status = item.get("status") or ""
             if prev is None:
                 if primed and status != NO_DATA_STATUS:
-                    self._push_notification("detected", item, None)
+                    self._push_notification(target, "detected", item, None)
             elif status != prev.get("status") or item.get("group") != prev.get(
                 "group"
             ):
-                self._push_notification("changed", item, prev.get("status"))
-
-        for sid in old:
-            if sid not in new:
-                persistent_notification.async_dismiss(
-                    self.hass, f"{DOMAIN}_{sid}"
-                )
+                self._push_notification(target, "changed", item, prev.get("status"))
 
     def _push_notification(
-        self, action: str, item: dict, previous_status: str | None
+        self, target: str, action: str, item: dict, previous_status: str | None
     ) -> None:
         name = item.get("name") or item.get("id")
         carrier = (item.get("carrier") or "").upper()
         status = item.get("status") or ""
         if action == "detected":
-            title = "Neue Sendung erkannt"
-            message = f"**{name}**" + (f" · {carrier}" if carrier else "")
+            title = "Neue Sendung"
+            message = f"{name}" + (f" ({carrier})" if carrier else "")
         elif item.get("delivered"):
-            title = "Sendung zugestellt"
-            message = f"**{name}**\n{status}"
+            title = "Zugestellt"
+            message = f"{name}: {status}"
         else:
             title = "Sendungs-Update"
-            message = f"**{name}**\n{status}"
+            message = f"{name}: {status}"
+
         self.hass.bus.async_fire(
             EVENT_NOTIFICATION,
             {
@@ -293,11 +289,14 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 "tracking_url": item.get("tracking_url"),
             },
         )
-        persistent_notification.async_create(
-            self.hass,
-            message,
-            title=f"Paketverfolgung – {title}",
-            notification_id=f"{DOMAIN}_{item.get('id')}",
+        service = target.split(".", 1)[1] if target.startswith("notify.") else target
+        self.hass.async_create_task(
+            self.hass.services.async_call(
+                "notify",
+                service,
+                {"title": f"Paketverfolgung – {title}", "message": message},
+                blocking=False,
+            )
         )
 
     async def _load_archive(self) -> None:
