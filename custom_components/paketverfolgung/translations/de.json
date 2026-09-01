@@ -68,7 +68,8 @@
           "tracking_numbers": "Sendungsnummern (DHL, DPD oder Hermes)",
           "default_postcode": "Deine PLZ (nur nötig, falls eine DPD-Nummer geschützt ist)",
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
-          "notify_target": "Benachrichtigung senden an (Gerät/Dienst) – bei neuer Sendung oder Statusänderung",
+          "notify_enabled": "Benachrichtigen bei neuer Sendung oder Statusänderung",
+          "notify_targets": "Ziele (notify.*-Dienste, z. B. mobile_app_galaxy_s22)",
           "dhl_auto_discovery": "DHL-Konto verbinden und Sendungen automatisch erkennen (Test)"
         }
       },
@@ -84,14 +85,16 @@
         "data": {
           "default_postcode": "Deine PLZ (optional, für geschützte DPD-Sendungen)",
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
-          "notify_target": "Benachrichtigung senden an (Gerät/Dienst) – bei neuer Sendung oder Statusänderung"
+          "notify_enabled": "Benachrichtigen bei neuer Sendung oder Statusänderung",
+          "notify_targets": "Ziele (notify.*-Dienste, z. B. mobile_app_galaxy_s22)"
         }
       },
       "amazon_options": {
         "description": "Aktualisierungsintervall für Amazon-Lieferungen anpassen.",
         "data": {
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
-          "notify_target": "Benachrichtigung senden an (Gerät/Dienst) – bei neuer Sendung oder Statusänderung"
+          "notify_enabled": "Benachrichtigen bei neuer Sendung oder Statusänderung",
+          "notify_targets": "Ziele (notify.*-Dienste, z. B. mobile_app_galaxy_s22)"
         }
       }
     },
@@ -145,6 +148,20 @@
         "name": {
           "name": "Name",
           "description": "Der anzuzeigende Name (leer = zurücksetzen)."
+        }
+      }
+    },
+    "set_notifications": {
+      "name": "Benachrichtigungen einstellen",
+      "description": "Schaltet die Benachrichtigungen bei neuer Sendung / Statusänderung an oder aus und legt die Ziele fest.",
+      "fields": {
+        "enabled": {
+          "name": "Aktiviert",
+          "description": "Benachrichtigungen an/aus."
+        },
+        "targets": {
+          "name": "Ziele",
+          "description": "notify.*-Dienste (z. B. mobile_app_galaxy_s22)."
         }
       }
     }

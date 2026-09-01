@@ -68,7 +68,8 @@
           "tracking_numbers": "Tracking numbers (DHL, DPD or Hermes)",
           "default_postcode": "Your postcode (only needed if a DPD number is protected)",
           "update_interval_minutes": "Update interval (minutes)",
-          "notify_target": "Send a notification to (device/service) on a new shipment or a status change",
+          "notify_enabled": "Notify on a new shipment or a status change",
+          "notify_targets": "Targets (notify.* services, e.g. mobile_app_galaxy_s22)",
           "dhl_auto_discovery": "Connect a DHL account and auto-discover its shipments (experimental)"
         }
       },
@@ -84,14 +85,16 @@
         "data": {
           "default_postcode": "Your postcode (optional, for protected DPD parcels)",
           "update_interval_minutes": "Update interval (minutes)",
-          "notify_target": "Send a notification to (device/service) on a new shipment or a status change"
+          "notify_enabled": "Notify on a new shipment or a status change",
+          "notify_targets": "Targets (notify.* services, e.g. mobile_app_galaxy_s22)"
         }
       },
       "amazon_options": {
         "description": "Adjust the update interval for Amazon deliveries.",
         "data": {
           "update_interval_minutes": "Update interval (minutes)",
-          "notify_target": "Send a notification to (device/service) on a new shipment or a status change"
+          "notify_enabled": "Notify on a new shipment or a status change",
+          "notify_targets": "Targets (notify.* services, e.g. mobile_app_galaxy_s22)"
         }
       }
     },
@@ -145,6 +148,20 @@
         "name": {
           "name": "Name",
           "description": "The label to show (empty = reset)."
+        }
+      }
+    },
+    "set_notifications": {
+      "name": "Set notifications",
+      "description": "Turns notifications on a new shipment / status change on or off and sets the targets.",
+      "fields": {
+        "enabled": {
+          "name": "Enabled",
+          "description": "Notifications on/off."
+        },
+        "targets": {
+          "name": "Targets",
+          "description": "notify.* services (e.g. mobile_app_galaxy_s22)."
         }
       }
     }

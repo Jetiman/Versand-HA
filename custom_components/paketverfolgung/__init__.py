@@ -23,6 +23,8 @@ from .const import (
     CONF_CARRIER_OVERRIDES,
     CONF_DHL_SESSION,
     CONF_NAMES,
+    CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_TARGETS,
     CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
     CONF_UPDATE_INTERVAL,
@@ -40,6 +42,7 @@ from .const import (
     SERVICE_REMOVE_TRACKING_NUMBER,
     SERVICE_SET_CARRIER,
     SERVICE_SET_NAME,
+    SERVICE_SET_NOTIFICATIONS,
 )
 from .coordinator import (
     DpdAccountDataUpdateCoordinator,
@@ -114,6 +117,22 @@ _SET_NAME_SCHEMA = vol.Schema(
 )
 
 
+def _as_str_list(value) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [value]
+    return [str(v) for v in value]
+
+
+_SET_NOTIFICATIONS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("enabled", default=True): vol.Coerce(bool),
+        vol.Optional("targets", default=list): _as_str_list,
+    }
+)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up the Paketverfolgung integration."""
     minutes = entry.options.get(
@@ -163,6 +182,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 hass, call.data[ATTR_TRACKING_NUMBER], call.data.get(ATTR_NAME, "")
             )
 
+        async def _async_set_notifications(call: ServiceCall) -> None:
+            _set_notifications(
+                hass,
+                bool(call.data.get("enabled", True)),
+                call.data.get("targets", []),
+            )
+
         hass.services.async_register(
             DOMAIN,
             SERVICE_ADD_TRACKING_NUMBER,
@@ -190,6 +216,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _async_set_name,
             schema=_SET_NAME_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_NOTIFICATIONS,
+            _async_set_notifications,
+            schema=_SET_NOTIFICATIONS_SCHEMA,
         )
 
     return True
@@ -331,16 +363,47 @@ async def _set_carrier(
     return {"tracking_number": cleaned, "carrier": carrier}
 
 
+def _set_notifications(
+    hass: HomeAssistant, enabled: bool, targets: list[str]
+) -> None:
+    """Store the notification on/off flag + target list on every entry."""
+    clean = [
+        t[len("notify."):] if t.startswith("notify.") else t
+        for t in (str(x).strip() for x in targets)
+        if t and t.strip()
+    ]
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        hass.config_entries.async_update_entry(
+            entry,
+            options={
+                **entry.options,
+                CONF_NOTIFY_ENABLED: enabled,
+                CONF_NOTIFY_TARGETS: clean,
+            },
+        )
+    for coordinator in hass.data.get(DOMAIN, {}).values():
+        if hasattr(coordinator, "async_update_listeners"):
+            coordinator.async_update_listeners()
+    _LOGGER.info(
+        "Paketverfolgung: Benachrichtigungen %s -> %s",
+        "an" if enabled else "aus",
+        clean,
+    )
+
+
 def _reload_relevant(entry: ConfigEntry) -> str:
     """A signature of the entry parts whose change warrants a reload.
 
-    The rotating DHL OAuth token and the refreshed Amazon session cookies
-    that the coordinators persist back into ``entry.data`` themselves are
-    excluded, so a session refresh doesn't trigger a reload loop.
+    Excluded: the rotating DHL OAuth token / Amazon session cookies that
+    the coordinators persist back into ``entry.data`` themselves, and the
+    notification options (read live each poll) so the panel toggle doesn't
+    reload the integration.
     """
-    rotating = (CONF_DHL_SESSION, CONF_AMAZON_COOKIES)
-    data = {k: v for k, v in entry.data.items() if k not in rotating}
-    return repr(sorted(data.items())) + "|" + repr(sorted(dict(entry.options).items()))
+    skip_data = (CONF_DHL_SESSION, CONF_AMAZON_COOKIES)
+    skip_options = (CONF_NOTIFY_ENABLED, CONF_NOTIFY_TARGETS)
+    data = {k: v for k, v in entry.data.items() if k not in skip_data}
+    options = {k: v for k, v in entry.options.items() if k not in skip_options}
+    return repr(sorted(data.items())) + "|" + repr(sorted(options.items()))
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:

@@ -36,8 +36,8 @@ from .const import (
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_SESSION,
     CONF_NAMES,
-    CONF_NOTIFY_TARGET,
-    NOTIFY_OFF,
+    CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_TARGETS,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
     CONF_TRACKING_NUMBERS,
@@ -226,24 +226,33 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     def _mark_polled(self) -> None:
         self.last_poll = dt_util.utcnow()
 
-    def _notify_target(self) -> str | None:
-        target = self.entry.options.get(
-            CONF_NOTIFY_TARGET, self.entry.data.get(CONF_NOTIFY_TARGET)
-        )
-        target = (target or "").strip()
-        return None if target in ("", NOTIFY_OFF) else target
+    def _notify_targets(self) -> list[str]:
+        opts = self.entry.options
+        if not opts.get(CONF_NOTIFY_ENABLED):
+            return []
+        raw = opts.get(CONF_NOTIFY_TARGETS) or []
+        if isinstance(raw, str):
+            raw = [raw]
+        out: list[str] = []
+        for value in raw:
+            value = str(value or "").strip()
+            if value.startswith("notify."):
+                value = value[len("notify."):]
+            if value and value not in out:
+                out.append(value)
+        return out
 
     def _notify_changes(self, new: dict[str, dict]) -> None:
         """Send a notification on a new shipment or a status change.
 
-        The first run after picking a target only records the baseline, so
-        you don't get a burst for shipments that already existed.
+        The first run after enabling only records the baseline, so you
+        don't get a burst for shipments that already existed.
         """
         primed = self._notify_primed
         self._notify_primed = True
-        target = self._notify_target()
-        if not target:
+        if not self.entry.options.get(CONF_NOTIFY_ENABLED):
             return
+        targets = self._notify_targets()
         old = self.data or {}
         for sid, item in new.items():
             if item.get("archived"):
@@ -252,14 +261,20 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             status = item.get("status") or ""
             if prev is None:
                 if primed and status != NO_DATA_STATUS:
-                    self._push_notification(target, "detected", item, None)
+                    self._push_notification(targets, "detected", item, None)
             elif status != prev.get("status") or item.get("group") != prev.get(
                 "group"
             ):
-                self._push_notification(target, "changed", item, prev.get("status"))
+                self._push_notification(
+                    targets, "changed", item, prev.get("status")
+                )
 
     def _push_notification(
-        self, target: str, action: str, item: dict, previous_status: str | None
+        self,
+        targets: list[str],
+        action: str,
+        item: dict,
+        previous_status: str | None,
     ) -> None:
         name = item.get("name") or item.get("id")
         carrier = (item.get("carrier") or "").upper()
@@ -289,15 +304,15 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 "tracking_url": item.get("tracking_url"),
             },
         )
-        service = target.split(".", 1)[1] if target.startswith("notify.") else target
-        self.hass.async_create_task(
-            self.hass.services.async_call(
-                "notify",
-                service,
-                {"title": f"Paketverfolgung – {title}", "message": message},
-                blocking=False,
+        for service in targets:
+            self.hass.async_create_task(
+                self.hass.services.async_call(
+                    "notify",
+                    service,
+                    {"title": f"Paketverfolgung – {title}", "message": message},
+                    blocking=False,
+                )
             )
-        )
 
     async def _load_archive(self) -> None:
         if self._archive_store is None:

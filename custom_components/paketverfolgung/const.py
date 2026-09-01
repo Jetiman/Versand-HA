@@ -54,12 +54,15 @@ CONF_NAMES = "names"
 # the DPD-account entry).
 CONF_DEFAULT_POSTCODE = "default_postcode"
 
-# notify target (e.g. "mobile_app_galaxy_s22") to send a message to on a
-# new shipment or a status change. Empty = notifications off. A
-# `paketverfolgung_notification` event is also fired when a target is set.
-CONF_NOTIFY_TARGET = "notify_target"
-NOTIFY_OFF = "aus"  # sentinel dropdown value meaning "no notifications"
+# Notifications: when enabled, a message is sent to each configured notify
+# target (e.g. "mobile_app_galaxy_s22") on a new shipment or a status
+# change; a `paketverfolgung_notification` event is also fired. These live
+# in the config entry options and are kept in sync across all entries by
+# the `set_notifications` service, so the panel can toggle them globally.
+CONF_NOTIFY_ENABLED = "notify_enabled"
+CONF_NOTIFY_TARGETS = "notify_targets"
 EVENT_NOTIFICATION = f"{DOMAIN}_notification"
+SERVICE_SET_NOTIFICATIONS = "set_notifications"
 
 # Amazon.de account login. Email/password/OTP are used only during the
 # config flow and never persisted - only the authenticated cookie store
@@ -95,7 +98,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.12.5"
+PANEL_VERSION = "1.13.1"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is

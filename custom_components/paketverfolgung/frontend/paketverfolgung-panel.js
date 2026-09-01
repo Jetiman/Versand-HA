@@ -32,6 +32,8 @@ class PaketverfolgungPanel extends HTMLElement {
     this._nextUpdate = null;
     this._tick = null;
     this._archiveOpen = false;
+    this._settingsOpen = false;
+    this._notifyBusy = false;
   }
 
   connectedCallback() {
@@ -165,6 +167,31 @@ class PaketverfolgungPanel extends HTMLElement {
     return path.replace(/^\/+/, "").split("/")[0] || null;
   }
 
+  _notifyConfig() {
+    const a = (this._combinedSensor() || {}).attributes || {};
+    return {
+      enabled: a.notify_enabled === true,
+      targets: Array.isArray(a.notify_targets) ? a.notify_targets : [],
+      services: Array.isArray(a.notify_services) ? a.notify_services : [],
+    };
+  }
+
+  _setNotifications(enabled, targets) {
+    this._notifyBusy = true;
+    this._sig = null;
+    this._render(true);
+    Promise.resolve(
+      this._hass.callService("paketverfolgung", "set_notifications", {
+        enabled,
+        targets,
+      })
+    ).finally(() => {
+      this._notifyBusy = false;
+      this._sig = null;
+      this._render(true);
+    });
+  }
+
   /* ---------- rendering ---------- */
 
   _render(force) {
@@ -174,12 +201,16 @@ class PaketverfolgungPanel extends HTMLElement {
     const combined = this._combinedSensor();
     const nextIso = combined && combined.attributes && combined.attributes.next_update;
     this._nextUpdate = nextIso ? new Date(nextIso) : null;
+    const nc = this._notifyConfig();
     const sig = JSON.stringify({
       entityId,
       busy: this._addBusy,
       result: this._addResult,
       nextIso: nextIso || null,
       archiveOpen: this._archiveOpen,
+      settingsOpen: this._settingsOpen,
+      notifyBusy: this._notifyBusy,
+      notify: nc,
       items: shipments.map((s) => [
         s.entity_id,
         s.name,
@@ -313,17 +344,49 @@ class PaketverfolgungPanel extends HTMLElement {
       <div class="pv-list">${rows}</div>
       ${archiveBlock}
 
-      <div class="pv-footer">
+      <details class="pv-settings-box"${this._settingsOpen ? " open" : ""}>
+        <summary data-settings-toggle>Einstellungen</summary>
+        <div class="pv-settings-body">
         <button class="pv-settings" data-nav="/config/integrations/integration/paketverfolgung">
           <ha-icon icon="mdi:cog-outline"></ha-icon>
-          Einstellungen (Konten & Optionen)
+          Integration öffnen (Konten, PLZ, Intervall …)
         </button>
+        <div class="pv-set-title">Benachrichtigungen</div>
+        <label class="pv-switch">
+          <input type="checkbox" data-notify-toggle ${nc.enabled ? "checked" : ""} ${
+      this._notifyBusy ? "disabled" : ""
+    } />
+          <span>Bei neuer Sendung oder Statusänderung benachrichtigen</span>
+        </label>
+        ${
+          nc.enabled
+            ? `<div class="pv-set-hint">Ziel(e) – wohin die Nachricht geht:</div>
+               <div class="pv-notify-targets">${
+                 [...new Set([...nc.services, ...nc.targets])].length
+                   ? [...new Set([...nc.services, ...nc.targets])]
+                       .sort()
+                       .map(
+                         (svc) =>
+                           `<label class="pv-check"><input type="checkbox" data-notify-target="${esc(
+                             svc
+                           )}" ${nc.targets.includes(svc) ? "checked" : ""} ${
+                             this._notifyBusy ? "disabled" : ""
+                           } /><span>notify.${esc(svc)}${
+                             nc.services.includes(svc) ? "" : " (nicht gefunden)"
+                           }</span></label>`
+                       )
+                       .join("")
+                   : `<div class="pv-set-hint">Keine <code>notify.*</code>-Dienste gefunden – z. B. die Home-Assistant-App auf dem Handy einrichten.</div>`
+               }</div>`
+            : ""
+        }
         <div class="pv-footer-hint">
-          Öffnet die Integration. Beim Eintrag „Sendungsnummern“ führt das Zahnrad
-          zu allen Optionen (u. a. der DHL-Konto-Anmeldung). Ein DPD- oder
-          Amazon-Konto fügst du über „Eintrag hinzufügen“ hinzu.
+          „Integration öffnen“ zeigt beim Eintrag „Sendungsnummern“ über das
+          Zahnrad alle Optionen (u. a. die DHL-Konto-Anmeldung). Ein DPD- oder
+          Amazon-Konto fügst du dort über „Eintrag hinzufügen“ hinzu.
         </div>
-      </div>
+        </div>
+      </details>
     `;
   }
 
@@ -528,6 +591,13 @@ class PaketverfolgungPanel extends HTMLElement {
       this._render(true);
       return;
     }
+    if (ev.target.closest("[data-settings-toggle]")) {
+      ev.preventDefault();
+      this._settingsOpen = !this._settingsOpen;
+      this._sig = null;
+      this._render(true);
+      return;
+    }
     const refreshAll = ev.target.closest("[data-refresh-all]");
     if (refreshAll) {
       const ids = this._shipments().map((s) => s.entity_id);
@@ -570,6 +640,20 @@ class PaketverfolgungPanel extends HTMLElement {
   }
 
   _onChange(ev) {
+    if (ev.target.matches("[data-notify-toggle]")) {
+      const nc = this._notifyConfig();
+      this._setNotifications(ev.target.checked, nc.targets);
+      return;
+    }
+    if (ev.target.matches("[data-notify-target]")) {
+      const targets = Array.from(
+        this.querySelectorAll("[data-notify-target]")
+      )
+        .filter((el) => el.checked)
+        .map((el) => el.getAttribute("data-notify-target"));
+      this._setNotifications(true, targets);
+      return;
+    }
     const pick = ev.target.closest("[data-carrier]");
     if (pick) {
       this._hass.callService("paketverfolgung", "set_tracking_carrier", {
@@ -823,16 +907,44 @@ const STYLES = `
   .pv-archive[open] > summary::before { content: "▾"; }
   .pv-archive-list { margin-top: 8px; opacity: .8; }
 
-  .pv-footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--divider-color); }
+  .pv-settings-box { margin-top: 24px; }
+  .pv-settings-box > summary {
+    cursor: pointer; list-style: none; user-select: none;
+    padding: 11px 14px; font-size: 14px; color: var(--secondary-text-color);
+    background: var(--card-background-color); border: 1px solid var(--divider-color);
+    border-radius: 10px;
+  }
+  .pv-settings-box > summary::-webkit-details-marker { display: none; }
+  .pv-settings-box > summary::before { content: "▸"; margin-right: 8px; font-size: 11px; }
+  .pv-settings-box[open] > summary::before { content: "▾"; }
+  .pv-settings-body {
+    margin-top: 10px; padding: 14px; border-radius: 10px;
+    background: var(--card-background-color); border: 1px solid var(--divider-color);
+    display: flex; flex-direction: column; gap: 12px;
+  }
   .pv-settings {
     display: flex; align-items: center; gap: 8px; width: 100%; cursor: pointer;
-    background: var(--card-background-color); color: var(--primary-text-color);
+    background: var(--secondary-background-color); color: var(--primary-text-color);
     border: 1px solid var(--divider-color); border-radius: 10px; padding: 12px 14px;
     font-size: 14px; text-align: left;
   }
-  .pv-settings:hover { background: var(--secondary-background-color); }
+  .pv-settings:hover { filter: brightness(1.1); }
   .pv-settings ha-icon { color: var(--primary-color); }
-  .pv-footer-hint { font-size: 12px; color: var(--secondary-text-color); margin-top: 8px; }
+  .pv-set-title {
+    font-size: 13px; font-weight: 600; color: var(--primary-text-color);
+    margin-top: 4px;
+  }
+  .pv-switch, .pv-check {
+    display: flex; align-items: center; gap: 10px; font-size: 14px;
+    color: var(--primary-text-color); cursor: pointer;
+  }
+  .pv-switch input, .pv-check input { width: 18px; height: 18px; flex: none; accent-color: var(--primary-color); }
+  .pv-set-hint { font-size: 12px; color: var(--secondary-text-color); }
+  .pv-set-hint code {
+    background: var(--secondary-background-color); padding: 1px 4px; border-radius: 4px;
+  }
+  .pv-notify-targets { display: flex; flex-direction: column; gap: 8px; padding-left: 4px; }
+  .pv-footer-hint { font-size: 12px; color: var(--secondary-text-color); }
 
   .pv-back {
     display: inline-block; margin-bottom: 16px; cursor: pointer;

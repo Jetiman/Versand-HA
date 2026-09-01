@@ -72,3 +72,28 @@ set_tracking_name:
       example: Kopfhörer Amazon
       selector:
         text:
+
+set_notifications:
+  name: Benachrichtigungen einstellen
+  description: >-
+    Schaltet die Benachrichtigungen bei neuer Sendung / Statusänderung an
+    oder aus und legt die Ziele fest (notify.*-Dienste). Gilt für alle
+    Einträge. Wird auch von der Oberfläche verwendet.
+  fields:
+    enabled:
+      name: Aktiviert
+      description: Benachrichtigungen an/aus.
+      required: false
+      default: true
+      selector:
+        boolean:
+    targets:
+      name: Ziele
+      description: notify.*-Dienste, an die gesendet wird (z. B. mobile_app_galaxy_s22).
+      required: false
+      example: ["mobile_app_galaxy_s22"]
+      selector:
+        select:
+          multiple: true
+          custom_value: true
+          options: []

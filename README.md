@@ -90,13 +90,13 @@ Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
 ## Benachrichtigungen
 
-In den Optionen jedes Eintrags (Zahnrad) gibt es das Feld **„Benachrichtigung senden an (Gerät/Dienst)“** – eine Auswahlliste deiner `notify.*`-Dienste (z. B. `notify.mobile_app_galaxy_s22`). Standard ist **„Aus“**.
+In der Oberfläche unten: **Einstellungen** aufklappen → Schalter **„Bei neuer Sendung oder Statusänderung benachrichtigen“** an → darunter die **Ziele** ankreuzen (deine `notify.*`-Dienste, z. B. `notify.mobile_app_galaxy_s22`). Mehrere Ziele möglich. (Alternativ in den Optionen jedes Eintrags über das Zahnrad.)
 
-Ist ein Ziel gewählt, schickt die Integration bei einer **neuen Sendung** oder einer **Statusänderung** direkt eine Nachricht dorthin (Titel „Paketverfolgung – …“, Text „Name: Status“). Keine zusätzliche Automation nötig.
+Ist es aktiv, schickt die Integration bei einer **neuen Sendung** oder einer **Statusänderung** direkt eine Nachricht an jedes Ziel (Titel „Paketverfolgung – …“, Text „Name: Status“). Keine zusätzliche Automation nötig.
 
 Zusätzlich wird das Event **`paketverfolgung_notification`** ausgelöst (Daten: `action` = `detected`/`changed`, `tracking_id`, `name`, `carrier`, `delivery_carrier`, `status`, `previous_status`, `group`, `delivered`, `tracking_url`) – falls du die Nachricht lieber selbst per Automation formatieren willst.
 
-Der erste Abruf nach dem Setzen eines Ziels löst nichts aus (nur Bestandsaufnahme). Archivierte Sendungen und „In Prüfung“ benachrichtigen nicht.
+Die Einstellung gilt **global** (für alle Einträge) und wird über den Dienst `paketverfolgung.set_notifications` gesetzt. Der erste Abruf nach dem Aktivieren löst nichts aus (nur Bestandsaufnahme). Archivierte Sendungen und „In Prüfung“ benachrichtigen nicht.
 
 ## Oberfläche („Paketverfolgung“ in der Seitenleiste)
 
@@ -105,7 +105,7 @@ Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolg
 - **Übersicht:** Kacheln (Gesamt / Unterwegs / Heute in Zustellung), eine Zeile „Nächste Aktualisierung in ~X Min“ (Klick = sofort aktualisieren), Eingabefeld „Sendungsnummer hinzufügen (DHL, DPD, Hermes)“ und die nummerierte Liste aller Sendungen – zuletzt geändert zuerst, mit Datum und Uhrzeit der letzten Änderung.
 - **Archiv:** 24 Stunden nach der Zustellung wandert eine Sendung in den ausklappbaren Bereich „Archiv“ am Ende der Liste (Kacheln und aktive Liste bleiben so übersichtlich). Archivierte Sendungen werden nicht mehr abgefragt, bleiben aber inkl. Verlauf abrufbar. Der Zustellzeitpunkt kommt aus dem Verlauf; fehlt er (z. B. DPD-Konto ohne erreichbaren Verlauf), zählt der Zeitpunkt, an dem HA die Sendung zuerst als zugestellt gesehen hat – dieser wird gespeichert und übersteht Neustarts. Das Sensor-Attribut `archived` zeigt den Zustand auch außerhalb der Oberfläche.
 - **Detailseite:** Klick auf eine Sendung → aktueller Status, Eckdaten, Link zur Anbieter-Seite, Buttons „Jetzt aktualisieren“ / „Löschen“, ein **Namensfeld** (eigenes Label statt des Anbieter-Namens), ein Auswahlfeld zum manuellen Festlegen des Anbieters und der **komplette Sendungsverlauf** als Zeitleiste.
-- **Einstellungen:** Button am Ende der Übersicht öffnet die Integration – dort beim jeweiligen Eintrag über das Zahnrad PLZ und Sendungsnummern eingeben, oder per „Eintrag hinzufügen“ den DPD-Login.
+- **Einstellungen:** ausklappbarer Bereich am Ende der Übersicht – Button „Integration öffnen“ (Konten, PLZ, Intervall) sowie direkt hier der **Benachrichtigungs-Schalter** und die **Ziel-Liste**.
 
 Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie die Sensoren, nur aufbereitet.
 

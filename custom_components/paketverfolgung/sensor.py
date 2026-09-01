@@ -22,6 +22,8 @@ from homeassistant.util import slugify
 
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .const import (
+    CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_TARGETS,
     CONF_PROVIDER,
     DEFAULT_ICON,
     DEFAULT_STATUS,
@@ -338,10 +340,18 @@ class CombinedOutForDeliveryTodaySensor(_AllCoordinatorsSensor):
         # state_content, without a template needing to unpack `shipments`.
         carriers = sorted({s["provider"] for s in shipments if s.get("provider")})
         next_polls = [c.next_poll for c in self._coordinators() if c.next_poll]
+        entries = self.hass.config_entries.async_entries(DOMAIN)
+        opts = entries[0].options if entries else {}
+        notify_services = sorted(
+            (self.hass.services.async_services() or {}).get("notify", {})
+        )
         return {
             "shipments": shipments,
             "carriers": ", ".join(carriers),
             "next_update": min(next_polls).isoformat() if next_polls else None,
+            "notify_enabled": bool(opts.get(CONF_NOTIFY_ENABLED)),
+            "notify_targets": list(opts.get(CONF_NOTIFY_TARGETS) or []),
+            "notify_services": notify_services,
         }
 
 
