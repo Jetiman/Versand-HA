@@ -68,6 +68,7 @@
           "tracking_numbers": "Tracking numbers (DHL, DPD or Hermes)",
           "default_postcode": "Your postcode (only needed if a DPD number is protected)",
           "update_interval_minutes": "Update interval (minutes)",
+          "notifications": "Notify on a new shipment or a status change",
           "dhl_auto_discovery": "Connect a DHL account and auto-discover its shipments (experimental)"
         }
       },
@@ -82,13 +83,15 @@
         "description": "Set a postcode for protected parcels and adjust the update interval.",
         "data": {
           "default_postcode": "Your postcode (optional, for protected DPD parcels)",
-          "update_interval_minutes": "Update interval (minutes)"
+          "update_interval_minutes": "Update interval (minutes)",
+          "notifications": "Notify on a new shipment or a status change"
         }
       },
       "amazon_options": {
         "description": "Adjust the update interval for Amazon deliveries.",
         "data": {
-          "update_interval_minutes": "Update interval (minutes)"
+          "update_interval_minutes": "Update interval (minutes)",
+          "notifications": "Notify on a new shipment or a status change"
         }
       }
     },

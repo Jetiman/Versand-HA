@@ -68,6 +68,7 @@
           "tracking_numbers": "Sendungsnummern (DHL, DPD oder Hermes)",
           "default_postcode": "Deine PLZ (nur nötig, falls eine DPD-Nummer geschützt ist)",
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
+          "notifications": "Benachrichtigen bei neuer Sendung oder Statusänderung",
           "dhl_auto_discovery": "DHL-Konto verbinden und Sendungen automatisch erkennen (Test)"
         }
       },
@@ -82,13 +83,15 @@
         "description": "PLZ für geschützte Sendungen und Aktualisierungsintervall anpassen.",
         "data": {
           "default_postcode": "Deine PLZ (optional, für geschützte DPD-Sendungen)",
-          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
+          "notifications": "Benachrichtigen bei neuer Sendung oder Statusänderung"
         }
       },
       "amazon_options": {
         "description": "Aktualisierungsintervall für Amazon-Lieferungen anpassen.",
         "data": {
-          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
+          "notifications": "Benachrichtigen bei neuer Sendung oder Statusänderung"
         }
       }
     },

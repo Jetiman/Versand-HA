@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
+from homeassistant.components import persistent_notification
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
@@ -36,6 +37,7 @@ from .const import (
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_SESSION,
     CONF_NAMES,
+    CONF_NOTIFICATIONS,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
     CONF_TRACKING_NUMBERS,
@@ -43,6 +45,7 @@ from .const import (
     DOMAIN,
     DPD_STATUS_GROUP,
     DPD_TRACKING_PAGE_URL,
+    EVENT_NOTIFICATION,
     GROUP_DELIVERED,
     GROUP_REGISTERED,
     GROUP_TRANSIT,
@@ -212,6 +215,7 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self._delivered_since: dict[str, str] = {}
         self._archive_store: Store | None = None
         self._archive_dirty = False
+        self._notify_primed = False
 
     @property
     def next_poll(self) -> datetime | None:
@@ -221,6 +225,80 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
     def _mark_polled(self) -> None:
         self.last_poll = dt_util.utcnow()
+
+    def _notifications_on(self) -> bool:
+        return bool(
+            self.entry.options.get(
+                CONF_NOTIFICATIONS, self.entry.data.get(CONF_NOTIFICATIONS, False)
+            )
+        )
+
+    def _notify_changes(self, new: dict[str, dict]) -> None:
+        """Persistent-notification + event on a new shipment or status change.
+
+        The first run after enabling only records the baseline (so you don't
+        get a burst of notifications for shipments that already existed).
+        """
+        primed = self._notify_primed
+        self._notify_primed = True
+        if not self._notifications_on():
+            return
+        old = self.data or {}
+        for sid, item in new.items():
+            if item.get("archived"):
+                continue
+            prev = old.get(sid)
+            status = item.get("status") or ""
+            if prev is None:
+                if primed and status != NO_DATA_STATUS:
+                    self._push_notification("detected", item, None)
+            elif status != prev.get("status") or item.get("group") != prev.get(
+                "group"
+            ):
+                self._push_notification("changed", item, prev.get("status"))
+
+        for sid in old:
+            if sid not in new:
+                persistent_notification.async_dismiss(
+                    self.hass, f"{DOMAIN}_{sid}"
+                )
+
+    def _push_notification(
+        self, action: str, item: dict, previous_status: str | None
+    ) -> None:
+        name = item.get("name") or item.get("id")
+        carrier = (item.get("carrier") or "").upper()
+        status = item.get("status") or ""
+        if action == "detected":
+            title = "Neue Sendung erkannt"
+            message = f"**{name}**" + (f" · {carrier}" if carrier else "")
+        elif item.get("delivered"):
+            title = "Sendung zugestellt"
+            message = f"**{name}**\n{status}"
+        else:
+            title = "Sendungs-Update"
+            message = f"**{name}**\n{status}"
+        self.hass.bus.async_fire(
+            EVENT_NOTIFICATION,
+            {
+                "action": action,
+                "tracking_id": item.get("id"),
+                "name": name,
+                "carrier": item.get("carrier"),
+                "delivery_carrier": item.get("delivery_carrier"),
+                "status": status,
+                "previous_status": previous_status,
+                "group": item.get("group"),
+                "delivered": bool(item.get("delivered")),
+                "tracking_url": item.get("tracking_url"),
+            },
+        )
+        persistent_notification.async_create(
+            self.hass,
+            message,
+            title=f"Paketverfolgung – {title}",
+            notification_id=f"{DOMAIN}_{item.get('id')}",
+        )
 
     async def _load_archive(self) -> None:
         if self._archive_store is None:
@@ -419,6 +497,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         for stale in [n for n in self.carriers if n not in numbers]:
             self.carriers.pop(stale, None)
         await self._save_archive(set(result))
+        self._notify_changes(result)
         return result
 
     async def _merge_dhl_account_numbers(self, numbers: list[str]) -> list[str]:
@@ -594,6 +673,7 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
         for stale in [p for p in self._events if p not in result]:
             self._events.pop(stale, None)
         await self._save_archive(set(result))
+        self._notify_changes(result)
         _LOGGER.debug("Paketverfolgung (DPD): %d parcel(s) fetched", len(result))
         return result
 

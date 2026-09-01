@@ -156,5 +156,6 @@ class AmazonAccountDataUpdateCoordinator(_BaseCoordinator):
             result[shipment_id] = item
 
         await self._save_archive(set(result))
+        self._notify_changes(result)
         _LOGGER.debug("Paketverfolgung (Amazon): %d delivery item(s)", len(result))
         return result

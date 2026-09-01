@@ -4,10 +4,10 @@
   "after_dependencies": ["recorder"],
   "codeowners": ["@Jetiman"],
   "config_flow": true,
-  "dependencies": ["http", "panel_custom"],
+  "dependencies": ["http", "panel_custom", "persistent_notification"],
   "documentation": "https://github.com/Jetiman/Versand-HA",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Jetiman/Versand-HA/issues",
   "requirements": ["beautifulsoup4==4.13.3"],
-  "version": "1.12.5"
+  "version": "1.13.0"
 }

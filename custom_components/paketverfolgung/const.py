@@ -54,6 +54,11 @@ CONF_NAMES = "names"
 # the DPD-account entry).
 CONF_DEFAULT_POSTCODE = "default_postcode"
 
+# When on, the coordinator posts a persistent notification (and fires a
+# `paketverfolgung_notification` event) on a new shipment or a status change.
+CONF_NOTIFICATIONS = "notifications"
+EVENT_NOTIFICATION = f"{DOMAIN}_notification"
+
 # Amazon.de account login. Email/password/OTP are used only during the
 # config flow and never persisted - only the authenticated cookie store
 # is kept (in entry.data). Those cookies grant full account access, so

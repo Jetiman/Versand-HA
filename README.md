@@ -88,6 +88,26 @@ Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 - **„Heute in Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Gesamtzahl der Sendungen, die gerade im Zustellfahrzeug sind; Attribut `shipments` enthält die Liste (inkl. Anbieter), `next_update` den nächsten Abfragezeitpunkt.
 - **„Nächste Aktualisierung“** (`sensor.naechste_aktualisierung`, Diagnose): Zeitstempel der nächsten Abfrage – HA zeigt das automatisch als „in X Minuten“.
 
+## Benachrichtigungen
+
+In den Optionen jedes Eintrags gibt es den Haken **„Benachrichtigen bei neuer Sendung oder Statusänderung“**. Ist er gesetzt:
+
+- erscheint bei einer neuen Sendung oder einer Statusänderung eine **persistente Benachrichtigung** in Home Assistant (eine pro Sendung, wird bei jeder Änderung aktualisiert; verschwindet, wenn die Sendung aus der Liste fällt),
+- **und** es wird das Event **`paketverfolgung_notification`** ausgelöst – damit lässt sich per Automation z. B. eine Push-Nachricht aufs Handy schicken:
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: paketverfolgung_notification
+actions:
+  - action: notify.mobile_app_dein_handy
+    data:
+      title: "{{ trigger.event.data.name }}"
+      message: "{{ trigger.event.data.status }}"
+```
+
+Event-Daten: `action` (`detected` / `changed`), `tracking_id`, `name`, `carrier`, `delivery_carrier`, `status`, `previous_status`, `group`, `delivered`, `tracking_url`. Der erste Abruf nach dem Aktivieren löst nichts aus (nur Bestandsaufnahme).
+
 ## Oberfläche („Paketverfolgung“ in der Seitenleiste)
 
 Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolgung**:

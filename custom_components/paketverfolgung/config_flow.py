@@ -28,6 +28,7 @@ from .const import (
     CONF_DHL_REDIRECT,
     CONF_DHL_SESSION,
     CONF_NAMES,
+    CONF_NOTIFICATIONS,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
     CONF_PROVIDER,
@@ -80,6 +81,14 @@ def _update_interval_schema(default: int) -> vol.Schema:
             ),
         }
     )
+
+
+def _notifications_field(default: bool) -> dict:
+    return {
+        vol.Optional(
+            CONF_NOTIFICATIONS, default=bool(default)
+        ): selector.BooleanSelector()
+    }
 
 
 _DPD_LOGIN_SCHEMA = vol.Schema(
@@ -324,6 +333,7 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     user_input.get(CONF_DEFAULT_POSTCODE) or ""
                 ).strip(),
                 CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
+                CONF_NOTIFICATIONS: bool(user_input.get(CONF_NOTIFICATIONS)),
                 CONF_DHL_AUTO_DISCOVERY: bool(
                     user_input.get(CONF_DHL_AUTO_DISCOVERY)
                 ),
@@ -344,6 +354,7 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     )
                 ).schema
             )
+            .extend(_notifications_field(self._current(CONF_NOTIFICATIONS, False)))
             .extend(
                 {
                     vol.Optional(
@@ -423,36 +434,42 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     CONF_DEFAULT_POSTCODE: (
                         user_input.get(CONF_DEFAULT_POSTCODE) or ""
                     ).strip(),
+                    CONF_NOTIFICATIONS: bool(user_input.get(CONF_NOTIFICATIONS)),
                 },
             )
 
-        schema = _update_interval_schema(
-            self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
-        ).extend(
-            {
-                vol.Optional(
-                    CONF_DEFAULT_POSTCODE,
-                    default=self._current(CONF_DEFAULT_POSTCODE) or "",
-                ): selector.TextSelector(),
-            }
+        schema = (
+            _update_interval_schema(
+                self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
+            )
+            .extend(
+                {
+                    vol.Optional(
+                        CONF_DEFAULT_POSTCODE,
+                        default=self._current(CONF_DEFAULT_POSTCODE) or "",
+                    ): selector.TextSelector(),
+                }
+            )
+            .extend(_notifications_field(self._current(CONF_NOTIFICATIONS, False)))
         )
         return self.async_show_form(step_id="dpd_options", data_schema=schema)
 
     async def async_step_amazon_options(
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
-        """Amazon only exposes the shared refresh-interval option."""
+        """Amazon exposes the refresh interval and the notification toggle."""
         if user_input is not None:
             return self.async_create_entry(
                 title="",
                 data={
                     **self._entry.options,
                     CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
+                    CONF_NOTIFICATIONS: bool(user_input.get(CONF_NOTIFICATIONS)),
                 },
             )
         return self.async_show_form(
             step_id="amazon_options",
             data_schema=_update_interval_schema(
                 self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
-            ),
+            ).extend(_notifications_field(self._current(CONF_NOTIFICATIONS, False))),
         )
