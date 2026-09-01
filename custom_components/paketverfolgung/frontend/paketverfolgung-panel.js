@@ -34,6 +34,8 @@ class PaketverfolgungPanel extends HTMLElement {
     this._archiveOpen = false;
     this._settingsOpen = false;
     this._notifyBusy = false;
+    this._notifyPickerOpen = false;
+    this._notifyFilter = "";
   }
 
   connectedCallback() {
@@ -176,6 +178,49 @@ class PaketverfolgungPanel extends HTMLElement {
     };
   }
 
+  _notifyPickerHtml(nc) {
+    const all = [...new Set([...nc.services, ...nc.targets])].sort();
+    const chosen = nc.targets.slice().sort();
+    const summary = chosen.length
+      ? chosen.map((t) => "notify." + t).join(", ")
+      : "keine ausgewählt";
+    if (!all.length) {
+      return `<div class="pv-set-hint">Keine <code>notify.*</code>-Dienste gefunden –
+        z. B. die Home-Assistant-App auf dem Handy einrichten.</div>`;
+    }
+    const rows = all
+      .map(
+        (svc) => `<label class="pv-check" data-svc="${esc(svc)}">
+          <input type="checkbox" data-notify-target="${esc(svc)}"
+            ${nc.targets.includes(svc) ? "checked" : ""}
+            ${this._notifyBusy ? "disabled" : ""} />
+          <span>notify.${esc(svc)}${
+          nc.services.includes(svc) ? "" : " (nicht gefunden)"
+        }</span>
+        </label>`
+      )
+      .join("");
+    return `
+      <details class="pv-picker"${this._notifyPickerOpen ? " open" : ""}>
+        <summary data-picker-toggle>
+          <span class="pv-picker-label">Ziele</span>
+          <span class="pv-picker-value">${esc(summary)}</span>
+        </summary>
+        <div class="pv-picker-body">
+          <input type="text" class="pv-picker-filter" data-notify-filter
+            placeholder="filtern …" value="${esc(this._notifyFilter)}" />
+          <div class="pv-notify-list">${rows}</div>
+        </div>
+      </details>`;
+  }
+
+  _applyNotifyFilter() {
+    const q = (this._notifyFilter || "").trim().toLowerCase();
+    this.querySelectorAll(".pv-notify-list [data-svc]").forEach((el) => {
+      el.hidden = q ? !el.getAttribute("data-svc").toLowerCase().includes(q) : false;
+    });
+  }
+
   _setNotifications(enabled, targets) {
     this._notifyBusy = true;
     this._sig = null;
@@ -210,6 +255,7 @@ class PaketverfolgungPanel extends HTMLElement {
       archiveOpen: this._archiveOpen,
       settingsOpen: this._settingsOpen,
       notifyBusy: this._notifyBusy,
+      notifyPickerOpen: this._notifyPickerOpen,
       notify: nc,
       items: shipments.map((s) => [
         s.entity_id,
@@ -248,6 +294,7 @@ class PaketverfolgungPanel extends HTMLElement {
     }
     const input = this.querySelector('input[name="tracking"]');
     if (input && this._draftTracking) input.value = this._draftTracking;
+    if (this._notifyFilter) this._applyNotifyFilter();
   }
 
   _listHtml(allShipments) {
@@ -359,28 +406,7 @@ class PaketverfolgungPanel extends HTMLElement {
     } />
           <span>Bei neuer Sendung oder Statusänderung benachrichtigen</span>
         </label>
-        ${
-          nc.enabled
-            ? `<div class="pv-set-hint">Ziel(e) – wohin die Nachricht geht:</div>
-               <div class="pv-notify-targets">${
-                 [...new Set([...nc.services, ...nc.targets])].length
-                   ? [...new Set([...nc.services, ...nc.targets])]
-                       .sort()
-                       .map(
-                         (svc) =>
-                           `<label class="pv-check"><input type="checkbox" data-notify-target="${esc(
-                             svc
-                           )}" ${nc.targets.includes(svc) ? "checked" : ""} ${
-                             this._notifyBusy ? "disabled" : ""
-                           } /><span>notify.${esc(svc)}${
-                             nc.services.includes(svc) ? "" : " (nicht gefunden)"
-                           }</span></label>`
-                       )
-                       .join("")
-                   : `<div class="pv-set-hint">Keine <code>notify.*</code>-Dienste gefunden – z. B. die Home-Assistant-App auf dem Handy einrichten.</div>`
-               }</div>`
-            : ""
-        }
+        ${nc.enabled ? this._notifyPickerHtml(nc) : ""}
         <div class="pv-footer-hint">
           „Integration öffnen“ zeigt beim Eintrag „Sendungsnummern“ über das
           Zahnrad alle Optionen (u. a. die DHL-Konto-Anmeldung). Ein DPD- oder
@@ -599,6 +625,13 @@ class PaketverfolgungPanel extends HTMLElement {
       this._render(true);
       return;
     }
+    if (ev.target.closest("[data-picker-toggle]")) {
+      ev.preventDefault();
+      this._notifyPickerOpen = !this._notifyPickerOpen;
+      this._sig = null;
+      this._render(true);
+      return;
+    }
     const refreshAll = ev.target.closest("[data-refresh-all]");
     if (refreshAll) {
       const ids = this._shipments().map((s) => s.entity_id);
@@ -637,6 +670,11 @@ class PaketverfolgungPanel extends HTMLElement {
     if (ev.target.name === "tracking") {
       this._draftTracking = ev.target.value;
       this._addResult = null;
+      return;
+    }
+    if (ev.target.matches("[data-notify-filter]")) {
+      this._notifyFilter = ev.target.value;
+      this._applyNotifyFilter();
     }
   }
 
@@ -904,8 +942,8 @@ const STYLES = `
     border-radius: 10px;
   }
   .pv-archive > summary::-webkit-details-marker { display: none; }
-  .pv-archive > summary::before { content: "▸"; margin-right: 8px; font-size: 11px; }
-  .pv-archive[open] > summary::before { content: "▾"; }
+  .pv-archive > summary::before { content: "▶"; margin-right: 8px; font-size: 10px; }
+  .pv-archive[open] > summary::before { content: "▼"; }
   .pv-archive-list { margin-top: 8px; opacity: .8; }
 
   .pv-settings-box { margin-top: 24px; }
@@ -916,8 +954,8 @@ const STYLES = `
     border-radius: 10px;
   }
   .pv-settings-box > summary::-webkit-details-marker { display: none; }
-  .pv-settings-box > summary::before { content: "▸"; margin-right: 8px; font-size: 11px; }
-  .pv-settings-box[open] > summary::before { content: "▾"; }
+  .pv-settings-box > summary::before { content: "▶"; margin-right: 8px; font-size: 10px; }
+  .pv-settings-box[open] > summary::before { content: "▼"; }
   .pv-settings-body {
     margin-top: 10px; padding: 14px; border-radius: 10px;
     background: var(--card-background-color); border: 1px solid var(--divider-color);
@@ -944,7 +982,37 @@ const STYLES = `
   .pv-set-hint code {
     background: var(--secondary-background-color); padding: 1px 4px; border-radius: 4px;
   }
-  .pv-notify-targets { display: flex; flex-direction: column; gap: 8px; padding-left: 4px; }
+  .pv-picker > summary {
+    cursor: pointer; list-style: none; user-select: none;
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 10px 12px; font-size: 13px;
+    background: var(--secondary-background-color);
+    border: 1px solid var(--divider-color); border-radius: 10px;
+  }
+  .pv-picker > summary::-webkit-details-marker { display: none; }
+  .pv-picker > summary::before { content: "▶"; font-size: 10px; color: var(--secondary-text-color); }
+  .pv-picker[open] > summary::before { content: "▼"; }
+  .pv-picker-label { color: var(--primary-text-color); font-weight: 500; flex: none; }
+  .pv-picker-value {
+    color: var(--secondary-text-color); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .pv-picker-body {
+    margin-top: 8px; border: 1px solid var(--divider-color); border-radius: 10px;
+    background: var(--card-background-color); overflow: hidden;
+  }
+  .pv-picker-filter {
+    width: 100%; box-sizing: border-box; border: none; outline: none;
+    padding: 10px 12px; font-size: 13px;
+    background: transparent; color: var(--primary-text-color);
+    border-bottom: 1px solid var(--divider-color);
+  }
+  .pv-notify-list {
+    display: flex; flex-direction: column;
+    max-height: 260px; overflow-y: auto; padding: 8px 12px;
+  }
+  .pv-notify-list .pv-check { padding: 6px 0; font-size: 13px; }
+  .pv-notify-list .pv-check[hidden] { display: none; }
   .pv-footer-hint { font-size: 12px; color: var(--secondary-text-color); }
 
   .pv-back {
