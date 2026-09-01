@@ -45,11 +45,15 @@ def _group_from_status(status: str, short_status: str | None = None) -> str:
         marker in text
         for marker in (
             "versandt",
+            "versendet",
             "unterwegs",
             "auf dem weg",
             "shipped",
             "in transit",
             "transport",
+            "verlassen",
+            "hat die einrichtung",
+            "einrichtung des versand",
         )
     ):
         return GROUP_TRANSIT
@@ -64,12 +68,17 @@ def normalize_amazon_shipment(raw: dict) -> dict:
     tracking_id = raw.get("tracking_id") or None
     status = str(raw.get("status") or DEFAULT_STATUS).strip()
     short_status = raw.get("short_status")
+    events = raw.get("events") or []
     group = _group_from_status(status, short_status)
-    # No carrier tracking number yet -> the parcel hasn't been handed over,
-    # so it's still just "registered" no matter what the delivery estimate
-    # ("Ankunft morgen") says.
     if not tracking_id and group != GROUP_DELIVERED:
+        # No carrier tracking number yet -> the parcel hasn't been handed
+        # over, so it's just "registered" regardless of the delivery
+        # estimate ("Ankunft morgen").
         group = GROUP_REGISTERED
+    elif tracking_id and events and group == GROUP_REGISTERED:
+        # The carrier has scanned it at least once -> it is on its way,
+        # even if the wording didn't match a known transit phrase.
+        group = GROUP_TRANSIT
     delivered = group == GROUP_DELIVERED
     return {
         "id": shipment_id,
@@ -83,7 +92,7 @@ def normalize_amazon_shipment(raw: dict) -> dict:
         "delivery_from": None,
         "delivery_to": None,
         "tracking_url": raw.get("tracking_url"),
-        "events": raw.get("events") or [],
+        "events": events,
         "delivered": delivered,
         "protected": False,
         "order_id": raw.get("order_id"),
