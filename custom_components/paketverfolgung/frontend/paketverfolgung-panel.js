@@ -251,6 +251,7 @@ class PaketverfolgungPanel extends HTMLElement {
   }
 
   _listHtml(allShipments) {
+    const nc = this._notifyConfig();
     const shipments = allShipments.filter((s) => !s.archived);
     const archived = allShipments.filter((s) => s.archived);
     const total = shipments.length;
