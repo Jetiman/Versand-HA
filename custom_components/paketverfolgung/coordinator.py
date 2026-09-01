@@ -45,6 +45,7 @@ from .const import (
     DPD_TRACKING_PAGE_URL,
     GROUP_DELIVERED,
     GROUP_REGISTERED,
+    GROUP_TRANSIT,
     GROUP_UNKNOWN,
     NO_DATA_STATUS,
     PROGRESS_GROUP,
@@ -85,13 +86,20 @@ def normalize_dhl_shipment(raw: dict) -> dict:
     ]
     events.reverse()
 
+    group = PROGRESS_GROUP.get(fortschritt, GROUP_UNKNOWN)
+    # "Elektronisch angekündigt/angemeldet" = only the label data reached DHL,
+    # the parcel is not in the network yet. DHL still reports fortschritt 1
+    # for this, which PROGRESS_GROUP maps to "transit" - override it.
+    if group == GROUP_TRANSIT and "elektronisch ang" in status.lower():
+        group = GROUP_REGISTERED
+
     shipment_id = raw["id"]
     return {
         "id": shipment_id,
         "carrier": CARRIER_DHL,
         "name": info.get("sendungsname") or f"DHL {shipment_id}",
         "status": status,
-        "group": PROGRESS_GROUP.get(fortschritt, GROUP_UNKNOWN),
+        "group": group,
         "direction": info.get("sendungsrichtung"),
         "delivery_from": zustellung.get("zustellzeitfensterVon"),
         "delivery_to": zustellung.get("zustellzeitfensterBis"),
