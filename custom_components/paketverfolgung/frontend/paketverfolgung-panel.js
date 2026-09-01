@@ -128,6 +128,7 @@ class PaketverfolgungPanel extends HTMLElement {
         provider: PROVIDER_LABELS[carrier] || "?",
         carrier,
         delivery_carrier: a.delivery_carrier || null,
+        carrier_tracking_id: a.carrier_tracking_id || null,
         group,
         direction: a.direction || null,
         delivery_from: a.delivery_window_from || null,
@@ -186,6 +187,7 @@ class PaketverfolgungPanel extends HTMLElement {
         s.group,
         s.carrier,
         s.delivery_carrier,
+        s.carrier_tracking_id,
         s.forced,
         s.changed,
         s.events.length,
@@ -357,7 +359,13 @@ class PaketverfolgungPanel extends HTMLElement {
     const meta = [
       ["Anbieter", s.provider === "?" ? "in Prüfung" : s.provider],
       ["Zusteller", s.delivery_carrier],
-      ["Sendungsnummer", s.tracking_id],
+      [s.carrier === "amazon" ? "Bestellnummer" : "Sendungsnummer", s.tracking_id],
+      [
+        "Trackingnummer",
+        s.carrier_tracking_id && s.carrier_tracking_id !== s.tracking_id
+          ? s.carrier_tracking_id
+          : null,
+      ],
       ["Richtung", directionLabel(s.direction)],
       [
         "Zustellzeitfenster",

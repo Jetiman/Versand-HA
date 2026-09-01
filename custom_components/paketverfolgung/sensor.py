@@ -93,24 +93,30 @@ def _cleanup_singletons(hass: HomeAssistant, owner_id: str) -> None:
 
 
 def _amazon_entity_id(item_id: str) -> str:
-    """Canonical entity id for an Amazon shipment (stable, not the product title)."""
+    """Canonical entity id for an Amazon shipment: sensor.amazon_<order-number>."""
     return f"sensor.amazon_{slugify(item_id)}"
 
 
 def _migrate_amazon_entity_ids(hass: HomeAssistant, entry_id: str, coordinator) -> None:
-    """Move Amazon entities that older builds named after the product title to
-    the stable ``sensor.amazon_<tracking-number>`` form. The registry unique id
-    is left untouched."""
+    """Give live Amazon entities the stable ``sensor.amazon_<order-number>``
+    id, and drop leftover registry entries from builds that keyed Amazon
+    shipments by the carrier tracking number (order numbers contain dashes,
+    tracking numbers don't)."""
     registry = er.async_get(hass)
-    for item_id in coordinator.data or {}:
-        current = registry.async_get_entity_id(
-            "sensor", DOMAIN, f"{entry_id}_{item_id}"
-        )
-        if not current:
+    live = set(coordinator.data or {})
+    prefix = f"{entry_id}_"
+    for entity in list(registry.entities.values()):
+        if entity.platform != DOMAIN or entity.domain != "sensor":
             continue
-        desired = _amazon_entity_id(item_id)
-        if current != desired and registry.async_get(desired) is None:
-            registry.async_update_entity(current, new_entity_id=desired)
+        if not entity.unique_id.startswith(prefix):
+            continue
+        item_id = entity.unique_id[len(prefix):]
+        if item_id in live:
+            desired = _amazon_entity_id(item_id)
+            if entity.entity_id != desired and registry.async_get(desired) is None:
+                registry.async_update_entity(entity.entity_id, new_entity_id=desired)
+        elif entity.entity_id.startswith("sensor.amazon_") and "-" not in item_id:
+            registry.async_remove(entity.entity_id)
 
 
 async def async_setup_entry(
@@ -207,6 +213,7 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
         s = self._shipment
         return {
             "tracking_id": self.item_id,
+            "carrier_tracking_id": s.get("tracking_id"),
             "carrier": s.get("carrier"),
             "delivery_carrier": s.get("delivery_carrier"),
             "forced_carrier": s.get("forced"),

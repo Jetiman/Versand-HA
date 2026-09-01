@@ -144,6 +144,90 @@ def _otp_challenge(
     return None
 
 
+_ORDER_ID_RE = re.compile(r"order(?:id)?=([0-9A-Za-z][0-9A-Za-z-]{4,})", re.I)
+
+# Prominent status line on an order card, tried in order.
+_CARD_STATUS_SELECTORS = (
+    ".delivery-box__primary-text",
+    ".yohtmlc-shipment-status-primaryText",
+    "[class*='shipment-status-primaryText']",
+    "[class*='deliveryMessage']",
+    ".delivery-box .a-color-success",
+    ".js-shipment-info-container .a-text-bold",
+    ".a-box-group .a-row .a-text-bold",
+)
+# Phrases that mark a real order-status line when no dedicated element is found.
+_CARD_STATUS_HINTS = (
+    "zugestellt",
+    "delivered",
+    "wird heute zugestellt",
+    "in zustellung",
+    "out for delivery",
+    "ankunft",
+    "ankommt",
+    "arriving",
+    "arrives",
+    "zustellung",
+    "versandt",
+    "versendet",
+    "shipped",
+    "unterwegs",
+    "auf dem weg",
+    "wird vorbereitet",
+    "versand vorbereitet",
+    "noch nicht versandt",
+    "not yet shipped",
+    "verspätet",
+    "delayed",
+    "bestellung aufgegeben",
+)
+
+
+def _order_id_of(card) -> str:
+    """The Amazon order number for one order card, or ""."""
+    for attr in ("data-order-id", "data-a-order-id"):
+        value = (card.get(attr) or "").strip()
+        if value:
+            return value
+    for link in card.select("a[href]"):
+        match = _ORDER_ID_RE.search(str(link.get("href") or ""))
+        if match:
+            return match.group(1)
+    return ""
+
+
+def _card_status(card) -> str:
+    """Best-effort delivery/shipping status text from one order card."""
+    for selector in _CARD_STATUS_SELECTORS:
+        tag = card.select_one(selector)
+        text = " ".join(tag.stripped_strings) if tag else ""
+        if text:
+            return " ".join(text.split())
+    card_text = " ".join(card.stripped_strings)
+    for hint in _CARD_STATUS_HINTS:
+        match = re.search(
+            r"[^.|]*\b" + re.escape(hint) + r"\b[^.|]*", card_text, flags=re.I
+        )
+        if match:
+            return " ".join(match.group(0).split())[:160]
+    return ""
+
+
+def _tracking_links_in(node) -> list[str]:
+    links: list[str] = []
+    for link in node.select("a[href]"):
+        href = str(link.get("href") or "")
+        text = link.get_text(" ", strip=True).lower()
+        if _is_tracking_href(href) or (
+            "verfolgen" in text
+            and any(w in text for w in ("lieferung", "sendung", "paket"))
+        ):
+            absolute = urljoin(AMAZON_BASE, href)
+            if absolute not in links:
+                links.append(absolute)
+    return links
+
+
 def _is_tracking_href(href: str) -> bool:
     """Return True for known Amazon package-tracking URLs."""
     lowered = href.lower()
@@ -333,7 +417,9 @@ class AmazonApiClient:
     async def fetch_shipments(
         self,
     ) -> tuple[list[dict[str, Any]], dict[str, str]]:
-        """Return currently trackable Amazon deliveries plus refreshed cookies."""
+        """Return the account's orders (pending *and* shipped) plus refreshed
+        cookies. Each item is keyed by the Amazon order number so it stays the
+        same entity from "ordered" through "delivered"."""
         try:
             async with self._session.get(
                 AMAZON_ORDERS_URL, headers=_headers(), timeout=25
@@ -347,70 +433,84 @@ class AmazonApiClient:
             order_cards = soup.select(
                 ".order-card.js-order-card, .order-card, [data-order-id], .js-order-card"
             )
-            order_links: list[tuple[str, str]] = []
-            seen_urls: set[str] = set()
-
-            for order in order_cards:
-                desc_tag = (
-                    order.select_one(".yohtmlc-product-title")
-                    or order.select_one(".a-link-normal[href*='/dp/']")
-                    or order.select_one(".a-fixed-right-grid-col .a-link-normal")
-                )
-                desc = " ".join(desc_tag.stripped_strings) if desc_tag else ""
-                for link in order.select("a[href]"):
-                    href = str(link.get("href") or "")
-                    text = link.get_text(" ", strip=True).lower()
-                    if not (
-                        _is_tracking_href(href)
-                        or "lieferung verfolgen" in text
-                        or "sendung verfolgen" in text
-                        or "paket verfolgen" in text
-                    ):
-                        continue
-                    absolute = urljoin(AMAZON_BASE, href)
-                    if absolute not in seen_urls:
-                        seen_urls.add(absolute)
-                        order_links.append((desc, absolute))
-
-            for link in soup.select("a[href]"):
-                href = str(link.get("href") or "")
-                text = link.get_text(" ", strip=True).lower()
-                if not (
-                    _is_tracking_href(href)
-                    or "lieferung verfolgen" in text
-                    or "sendung verfolgen" in text
-                    or "paket verfolgen" in text
-                ):
-                    continue
-                absolute = urljoin(AMAZON_BASE, href)
-                if absolute not in seen_urls:
-                    seen_urls.add(absolute)
-                    order_links.append(("", absolute))
-
-            if not order_links:
-                _LOGGER.warning(
-                    "Amazon: order page loaded but no tracking links were found "
-                    "(order_cards=%d, page_links=%d)",
-                    len(order_cards),
-                    len(soup.select("a[href]")),
-                )
 
             shipments: list[dict[str, Any]] = []
-            skipped_without_tracking = 0
-            for desc, url in order_links:
-                shipment = await self._fetch_tracking_page(url, desc)
-                if shipment:
+            seen_ids: set[str] = set()
+            handled_urls: set[str] = set()
+            pending = 0
+
+            for card in order_cards:
+                order_id = _order_id_of(card)
+                desc_tag = (
+                    card.select_one(".yohtmlc-product-title")
+                    or card.select_one(".a-link-normal[href*='/dp/']")
+                    or card.select_one(".a-fixed-right-grid-col .a-link-normal")
+                )
+                desc = " ".join(desc_tag.stripped_strings) if desc_tag else ""
+
+                made_any = False
+                for index, url in enumerate(_tracking_links_in(card)):
+                    handled_urls.add(url)
+                    shipment = await self._fetch_tracking_page(url, desc)
+                    if not shipment:
+                        continue
+                    base = order_id or shipment.get("order_id") or shipment.get(
+                        "tracking_id"
+                    )
+                    key = base if not made_any else f"{base}_{index + 1}"
+                    if not key or key in seen_ids:
+                        continue
+                    seen_ids.add(key)
+                    shipment["id"] = key
+                    shipment["order_id"] = order_id or shipment.get("order_id")
                     shipments.append(shipment)
-                else:
-                    skipped_without_tracking += 1
+                    made_any = True
+
+                if not made_any and order_id and order_id not in seen_ids:
+                    seen_ids.add(order_id)
+                    pending += 1
+                    shipments.append(
+                        {
+                            "id": order_id,
+                            "provider": "amazon",
+                            "order_id": order_id,
+                            "name": desc or f"Amazon {order_id}",
+                            "status": _card_status(card) or "Bestellt",
+                            "tracking_id": None,
+                            "carrier": None,
+                            "tracking_url": urljoin(
+                                AMAZON_BASE,
+                                f"/gp/css/order-details?orderID={order_id}",
+                            ),
+                            "short_status": None,
+                            "events": [],
+                        }
+                    )
+
+            # Tracking links that were not inside a recognised order card.
+            for url in _tracking_links_in(soup):
+                if url in handled_urls:
+                    continue
+                shipment = await self._fetch_tracking_page(url, "")
+                if not shipment:
+                    continue
+                key = shipment.get("order_id") or shipment.get("tracking_id")
+                if not key or key in seen_ids:
+                    continue
+                seen_ids.add(key)
+                shipment["id"] = key
+                shipments.append(shipment)
 
             _LOGGER.info(
-                "Amazon: order_cards=%d tracking_links=%d shipments=%d skipped_without_tracking=%d",
+                "Amazon: order_cards=%d shipments=%d (pending=%d)",
                 len(order_cards),
-                len(order_links),
                 len(shipments),
-                skipped_without_tracking,
+                pending,
             )
+            if not shipments and order_cards:
+                _LOGGER.warning(
+                    "Amazon: %d order card(s) but nothing extracted", len(order_cards)
+                )
             return shipments, self.export_cookies()
         except ClientError as err:
             raise AmazonApiError(

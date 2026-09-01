@@ -50,6 +50,10 @@ def _group_from_status(status: str, short_status: str | None = None) -> str:
             "shipped",
             "in transit",
             "transport",
+            "ankunft",
+            "ankommt",
+            "arriving",
+            "arrives",
         )
     ):
         return GROUP_TRANSIT
@@ -57,8 +61,11 @@ def _group_from_status(status: str, short_status: str | None = None) -> str:
 
 
 def normalize_amazon_shipment(raw: dict) -> dict:
-    """Map one Amazon tracking page result to the shared shipment shape."""
-    shipment_id = str(raw.get("tracking_id") or raw.get("id") or "").strip()
+    """Map one Amazon order/tracking result to the shared shipment shape."""
+    # ``id`` is the stable key (the Amazon order number); ``tracking_id`` is
+    # the carrier's own number and may be missing on a not-yet-shipped order.
+    shipment_id = str(raw.get("id") or raw.get("tracking_id") or "").strip()
+    tracking_id = raw.get("tracking_id") or None
     status = str(raw.get("status") or DEFAULT_STATUS).strip()
     short_status = raw.get("short_status")
     group = _group_from_status(status, short_status)
@@ -67,6 +74,7 @@ def normalize_amazon_shipment(raw: dict) -> dict:
         "id": shipment_id,
         "carrier": "amazon",
         "delivery_carrier": raw.get("carrier"),
+        "tracking_id": tracking_id,
         "name": raw.get("name") or f"Amazon {shipment_id}",
         "status": status,
         "group": group,

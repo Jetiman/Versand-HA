@@ -68,7 +68,7 @@ Idee und OAuth-Flow von [@SniperWCW](https://github.com/SniperWCW) ([#1](https:/
 
 ## Amazon.de-Konto (optional)
 
-„Eintrag hinzufügen“ → **„Amazon.de-Konto“** → mit E-Mail und Passwort anmelden (bei aktivierter 2FA folgt ein Schritt für den Einmalcode). Danach werden bei jeder Aktualisierung die **aktuell verfolgbaren Lieferungen** aus deinen Amazon-Bestellungen ausgelesen – mit Status, Trackingnummer, **tatsächlichem Zusteller** (z. B. „Versendet mit DHL“) und dem Amazon-Sendungsverlauf.
+„Eintrag hinzufügen“ → **„Amazon.de-Konto“** → mit E-Mail und Passwort anmelden (bei aktivierter 2FA folgt ein Schritt für den Einmalcode). Danach werden bei jeder Aktualisierung deine **aktuellen Amazon-Bestellungen** ausgelesen – von „bestellt“ über „versandt“ bis „zugestellt“, mit Status, Trackingnummer, **tatsächlichem Zusteller** (z. B. „Versendet mit DHL“) und dem Amazon-Sendungsverlauf. Jede Sendung wird über die **Amazon-Bestellnummer** identifiziert und bleibt so von der Bestellung bis zur Zustellung dieselbe Entität (`sensor.amazon_<bestellnummer>`).
 
 > ⚠️ **Sicherheitshinweis:** Es wird zwar **kein Passwort** gespeichert, aber die **Amazon-Sitzung (Cookies)** – im Klartext im Config-Entry und damit auch in Backups. Diese Sitzung erlaubt vollen Zugriff auf dein Amazon-Konto (Bestellungen, Adressen, Zahlungsmittel). Nur einrichten, wenn dir das bewusst ist.
 
