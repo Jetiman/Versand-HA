@@ -50,10 +50,6 @@ def _group_from_status(status: str, short_status: str | None = None) -> str:
             "shipped",
             "in transit",
             "transport",
-            "ankunft",
-            "ankommt",
-            "arriving",
-            "arrives",
         )
     ):
         return GROUP_TRANSIT
@@ -69,6 +65,11 @@ def normalize_amazon_shipment(raw: dict) -> dict:
     status = str(raw.get("status") or DEFAULT_STATUS).strip()
     short_status = raw.get("short_status")
     group = _group_from_status(status, short_status)
+    # No carrier tracking number yet -> the parcel hasn't been handed over,
+    # so it's still just "registered" no matter what the delivery estimate
+    # ("Ankunft morgen") says.
+    if not tracking_id and group != GROUP_DELIVERED:
+        group = GROUP_REGISTERED
     delivered = group == GROUP_DELIVERED
     return {
         "id": shipment_id,

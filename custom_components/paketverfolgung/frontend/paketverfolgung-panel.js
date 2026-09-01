@@ -225,7 +225,14 @@ class PaketverfolgungPanel extends HTMLElement {
     const total = shipments.length;
     const delivered = shipments.filter((s) => s.delivered).length;
     const inReview = shipments.filter((s) => s.group === "unknown").length;
-    const inTransit = total - delivered - inReview;
+    // "Unterwegs" = actually moving (in transit or out for delivery) - not
+    // just "active and not delivered", so a registered/announced label or a
+    // still-to-be-shipped Amazon order isn't counted.
+    const inTransit = shipments.filter(
+      (s) =>
+        !s.delivered &&
+        (s.group === "transit" || s.group === "out_for_delivery")
+    ).length;
     let outForDelivery = shipments.filter((s) => s.out_for_delivery && !s.delivered)
       .length;
     const combined = this._combinedSensor();
