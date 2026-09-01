@@ -90,7 +90,7 @@ Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
 ## Benachrichtigungen
 
-In der Oberfläche unten: **Einstellungen** aufklappen → Schalter **„Bei neuer Sendung oder Statusänderung benachrichtigen“** an → darunter die **Ziele** ankreuzen (deine `notify.*`-Dienste, z. B. `notify.mobile_app_galaxy_s22`). Mehrere Ziele möglich. (Alternativ in den Optionen jedes Eintrags über das Zahnrad.)
+In der Oberfläche unten: **Einstellungen** aufklappen → Schalter **„Bei neuer Sendung oder Statusänderung benachrichtigen“** an → im Feld **„Ziele“** deine `notify.*`-Dienste ankreuzen (z. B. `notify.mobile_app_galaxy_s22`). Mehrere Ziele möglich; ein Filterfeld hilft bei vielen Diensten.
 
 Ist es aktiv, schickt die Integration bei einer **neuen Sendung** oder einer **Statusänderung** direkt eine Nachricht an jedes Ziel (Titel „Paketverfolgung – …“, Text „Name: Status“). Keine zusätzliche Automation nötig.
 

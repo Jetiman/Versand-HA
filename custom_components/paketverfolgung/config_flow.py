@@ -28,8 +28,6 @@ from .const import (
     CONF_DHL_REDIRECT,
     CONF_DHL_SESSION,
     CONF_NAMES,
-    CONF_NOTIFY_ENABLED,
-    CONF_NOTIFY_TARGETS,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
     CONF_PROVIDER,
@@ -82,45 +80,6 @@ def _update_interval_schema(default: int) -> vol.Schema:
             ),
         }
     )
-
-
-def _notify_fields(hass, enabled: bool, targets: list[str]) -> dict:
-    """An on/off switch plus a multi-select of the available notify.* services."""
-    services = sorted((hass.services.async_services() or {}).get("notify", {}))
-    options = [
-        selector.SelectOptionDict(value=name, label=f"notify.{name}")
-        for name in services
-    ]
-    return {
-        vol.Optional(
-            CONF_NOTIFY_ENABLED, default=bool(enabled)
-        ): selector.BooleanSelector(),
-        vol.Optional(
-            CONF_NOTIFY_TARGETS, default=list(targets or [])
-        ): selector.SelectSelector(
-            selector.SelectSelectorConfig(
-                options=options,
-                multiple=True,
-                custom_value=True,
-                mode=selector.SelectSelectorMode.DROPDOWN,
-            )
-        ),
-    }
-
-
-def _clean_notify_targets(value) -> list[str]:
-    if not value:
-        return []
-    if isinstance(value, str):
-        value = [value]
-    out: list[str] = []
-    for item in value:
-        item = str(item or "").strip()
-        if item.startswith("notify."):
-            item = item[len("notify."):]
-        if item and item not in out:
-            out.append(item)
-    return out
 
 
 _DPD_LOGIN_SCHEMA = vol.Schema(
@@ -365,7 +324,6 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     user_input.get(CONF_DEFAULT_POSTCODE) or ""
                 ).strip(),
                 CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
-                CONF_NOTIFY_ENABLED: bool(user_input.get(CONF_NOTIFY_ENABLED)), CONF_NOTIFY_TARGETS: _clean_notify_targets(user_input.get(CONF_NOTIFY_TARGETS)),
                 CONF_DHL_AUTO_DISCOVERY: bool(
                     user_input.get(CONF_DHL_AUTO_DISCOVERY)
                 ),
@@ -386,7 +344,6 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     )
                 ).schema
             )
-            .extend(_notify_fields(self.hass, self._current(CONF_NOTIFY_ENABLED, False), self._current(CONF_NOTIFY_TARGETS, [])))
             .extend(
                 {
                     vol.Optional(
@@ -466,7 +423,6 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     CONF_DEFAULT_POSTCODE: (
                         user_input.get(CONF_DEFAULT_POSTCODE) or ""
                     ).strip(),
-                    CONF_NOTIFY_ENABLED: bool(user_input.get(CONF_NOTIFY_ENABLED)), CONF_NOTIFY_TARGETS: _clean_notify_targets(user_input.get(CONF_NOTIFY_TARGETS)),
                 },
             )
 
@@ -482,7 +438,6 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                     ): selector.TextSelector(),
                 }
             )
-            .extend(_notify_fields(self.hass, self._current(CONF_NOTIFY_ENABLED, False), self._current(CONF_NOTIFY_TARGETS, [])))
         )
         return self.async_show_form(step_id="dpd_options", data_schema=schema)
 
@@ -496,12 +451,11 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                 data={
                     **self._entry.options,
                     CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
-                    CONF_NOTIFY_ENABLED: bool(user_input.get(CONF_NOTIFY_ENABLED)), CONF_NOTIFY_TARGETS: _clean_notify_targets(user_input.get(CONF_NOTIFY_TARGETS)),
                 },
             )
         return self.async_show_form(
             step_id="amazon_options",
             data_schema=_update_interval_schema(
                 self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
-            ).extend(_notify_fields(self.hass, self._current(CONF_NOTIFY_ENABLED, False), self._current(CONF_NOTIFY_TARGETS, []))),
+            ),
         )
