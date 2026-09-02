@@ -13,6 +13,7 @@ shape so the sensor/panel code is carrier-agnostic:
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
@@ -69,6 +70,17 @@ _LOGGER = logging.getLogger(__name__)
 # Cap on DPD public-tracking calls per account poll (history enrichment),
 # so a large myDPD account doesn't fan out into dozens of HTTP requests.
 _HISTORY_FETCHES_PER_POLL = 12
+
+# A parcel's status can carry Amazon's live "N Stopps entfernt" van countdown.
+# That number changes every few minutes and must not, on its own, count as a
+# status change worth a push notification.
+_VOLATILE_STATUS_RE = re.compile(
+    r"[.,\s]*\b\d+\s*(?:Stopps?|Lieferstopps?|stops?)\b[^.]*", re.I
+)
+
+
+def _stable_status(status: str | None) -> str:
+    return _VOLATILE_STATUS_RE.sub("", status or "").strip(" .,")
 
 
 def normalize_dhl_shipment(raw: dict) -> dict:
@@ -273,9 +285,9 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             if prev is None:
                 if primed and status != NO_DATA_STATUS:
                     self._push_notification(targets, "detected", item, None)
-            elif status != prev.get("status") or item.get("group") != prev.get(
-                "group"
-            ):
+            elif _stable_status(status) != _stable_status(
+                prev.get("status")
+            ) or item.get("group") != prev.get("group"):
                 self._push_notification(
                     targets, "changed", item, prev.get("status")
                 )

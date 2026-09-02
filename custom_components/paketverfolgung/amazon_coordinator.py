@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -12,9 +13,12 @@ from .amazon_api import AmazonApiError, AmazonAuthError
 from .amazon_session import export_cookie_store, load_cookie_store
 from .amazon_tracking import AmazonTrackingApiClient
 from .const import (
+    AMAZON_STOPS_UPDATE_INTERVAL,
     CONF_AMAZON_COOKIES,
     CONF_NAMES,
+    CONF_UPDATE_INTERVAL,
     DEFAULT_STATUS,
+    DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
     GROUP_DELIVERED,
     GROUP_OUT_FOR_DELIVERY,
@@ -97,6 +101,7 @@ def normalize_amazon_shipment(raw: dict) -> dict:
         "protected": False,
         "order_id": raw.get("order_id"),
         "short_status": short_status,
+        "stops_away": raw.get("stops_away"),
         "forced": None,
     }
 
@@ -157,5 +162,23 @@ class AmazonAccountDataUpdateCoordinator(_BaseCoordinator):
 
         await self._save_archive(set(result))
         self._notify_changes(result)
+        self._tune_interval(result)
         _LOGGER.debug("Paketverfolgung (Amazon): %d delivery item(s)", len(result))
         return result
+
+    def _tune_interval(self, result: dict[str, dict]) -> None:
+        """Poll once a minute while a parcel is on the van with a live
+        "N Stopps entfernt" countdown, otherwise use the configured interval."""
+        base = timedelta(
+            minutes=self.entry.options.get(
+                CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES
+            )
+        )
+        live = any(
+            item.get("stops_away") is not None and not item.get("delivered")
+            for item in result.values()
+        )
+        wanted = min(AMAZON_STOPS_UPDATE_INTERVAL, base) if live else base
+        if self.update_interval != wanted:
+            _LOGGER.debug("Paketverfolgung (Amazon): update interval -> %s", wanted)
+            self.update_interval = wanted

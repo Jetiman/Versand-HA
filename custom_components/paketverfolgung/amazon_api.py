@@ -213,6 +213,26 @@ def _card_status(card) -> str:
     return ""
 
 
+_STOPS_AWAY_RE = re.compile(
+    r"(\d+)\s*(?:Stopps?|Lieferstopps?|stops?)\b(?:[^.]*\b(?:entfernt|away|verbleibend|remaining)\b)?",
+    re.I,
+)
+
+
+def _stops_away(callout: str | None) -> int | None:
+    """Parse Amazon's "N Stopps entfernt" / "N stops away" van countdown from
+    the map callout message. Returns None when there is no live stop count."""
+    if not callout:
+        return None
+    match = _STOPS_AWAY_RE.search(callout)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
 def _tracking_links_in(node) -> list[str]:
     links: list[str] = []
     for link in node.select("a[href]"):
@@ -592,6 +612,12 @@ class AmazonApiClient:
         if additions:
             status = ". ".join([part for part in [status, *additions] if part])
 
+        # Live "N Stopps entfernt" countdown Amazon shows once the parcel is
+        # on the delivery van. Kept as a number so the coordinator can poll
+        # faster while it's ticking down (and status-only changes to it don't
+        # fire a notification).
+        stops_away = _stops_away(map_tracking.get("calloutMessage"))
+
         tracking_tag = (
             soup.select_one(".pt-delivery-card-trackingId")
             or soup.select_one("[class*='trackingId']")
@@ -657,4 +683,5 @@ class AmazonApiClient:
             "carrier": carrier or None,
             "tracking_url": final_url,
             "short_status": short_status,
+            "stops_away": stops_away,
         }

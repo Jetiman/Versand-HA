@@ -235,6 +235,7 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
             "tracking_url": s.get("tracking_url"),
             "order_id": s.get("order_id"),
             "short_status": s.get("short_status"),
+            "stops_away": s.get("stops_away"),
             "events": s.get("events", []),
         }
 
