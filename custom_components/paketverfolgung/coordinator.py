@@ -51,6 +51,7 @@ from .const import (
     GROUP_TRANSIT,
     GROUP_UNKNOWN,
     NO_DATA_STATUS,
+    PANEL_URL_PATH,
     PROGRESS_GROUP,
     PROGRESS_STATUS,
     TRACKING_PAGE_URL,
@@ -289,6 +290,12 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             title = "Sendungs-Update"
             message = f"{name}: {status}"
 
+        registry = er.async_get(self.hass)
+        entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{self.entry.entry_id}_{item.get('id')}"
+        )
+        click_path = f"/{PANEL_URL_PATH}/{entity_id}" if entity_id else f"/{PANEL_URL_PATH}"
+
         self.hass.bus.async_fire(
             EVENT_NOTIFICATION,
             {
@@ -309,7 +316,11 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 self.hass.services.async_call(
                     "notify",
                     service,
-                    {"title": f"Paketverfolgung – {title}", "message": message},
+                    {
+                        "title": f"Paketverfolgung – {title}",
+                        "message": message,
+                        "data": {"clickAction": click_path},
+                    },
                     blocking=False,
                 )
             )
