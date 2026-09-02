@@ -64,6 +64,14 @@ CONF_NOTIFY_TARGETS = "notify_targets"
 EVENT_NOTIFICATION = f"{DOMAIN}_notification"
 SERVICE_SET_NOTIFICATIONS = "set_notifications"
 
+# Dispatcher signal fired after every coordinator refresh (success or not).
+# The cross-provider summary sensors listen on this instead of subscribing
+# to each coordinator individually - the per-coordinator approach missed
+# the DPD-account and Amazon coordinators when they finished their first
+# refresh after the summary sensors were already added (parallel entry
+# setup), leaving "Nächste Aktualisierung" stuck on the numbers coordinator.
+SIGNAL_COORDINATOR_UPDATED = f"{DOMAIN}_coordinator_updated"
+
 # Amazon.de account login. Email/password/OTP are used only during the
 # config flow and never persisted - only the authenticated cookie store
 # is kept (in entry.data). Those cookies grant full account access, so
@@ -98,7 +106,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.13.4"
+PANEL_VERSION = "1.13.5"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is

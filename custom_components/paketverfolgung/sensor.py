@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Callable
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
@@ -31,6 +31,7 @@ from .const import (
     GROUP_ICONS,
     GROUP_OUT_FOR_DELIVERY,
     PROVIDER_NUMBERS,
+    SIGNAL_COORDINATOR_UPDATED,
 )
 from .coordinator import (
     DpdAccountDataUpdateCoordinator,
@@ -274,8 +275,11 @@ def _out_for_delivery(coordinator) -> list[dict]:
 class _AllCoordinatorsSensor(SensorEntity):
     """Base for the summary sensors that span every configured provider.
 
-    Not a CoordinatorEntity - it manually subscribes to every shipment
-    coordinator present when it's added and recomputes on any of them.
+    Recomputes whenever *any* coordinator refreshes. It listens on a single
+    dispatcher signal rather than subscribing per-coordinator: the entries
+    are set up in parallel, so a coordinator can finish its first refresh
+    after these sensors are already added and would otherwise never be
+    heard from (see SIGNAL_COORDINATOR_UPDATED).
     """
 
     _attr_has_entity_name = True
@@ -283,20 +287,16 @@ class _AllCoordinatorsSensor(SensorEntity):
 
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
-        self._unsub_listeners: list[Callable[[], None]] = []
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
-        for coordinator in self.hass.data[DOMAIN].values():
-            if isinstance(coordinator, _SHIPMENT_COORDINATORS):
-                self._unsub_listeners.append(
-                    coordinator.async_add_listener(self._handle_coordinator_update)
-                )
-
-    async def async_will_remove_from_hass(self) -> None:
-        for unsub in self._unsub_listeners:
-            unsub()
-        self._unsub_listeners.clear()
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                SIGNAL_COORDINATOR_UPDATED,
+                self._handle_coordinator_update,
+            )
+        )
 
     @callback
     def _handle_coordinator_update(self) -> None:

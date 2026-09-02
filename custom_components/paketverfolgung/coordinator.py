@@ -16,10 +16,11 @@ import logging
 from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
@@ -54,6 +55,7 @@ from .const import (
     PANEL_URL_PATH,
     PROGRESS_GROUP,
     PROGRESS_STATUS,
+    SIGNAL_COORDINATOR_UPDATED,
     TRACKING_PAGE_URL,
 )
 from .dhl_account import DhlAccountClient, DhlAuthError
@@ -223,6 +225,14 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         if self.last_poll is None or self.update_interval is None:
             return None
         return self.last_poll + self.update_interval
+
+    @callback
+    def async_update_listeners(self) -> None:
+        # Also nudge the cross-provider summary sensors, which can't rely on
+        # having subscribed to this particular coordinator (see
+        # SIGNAL_COORDINATOR_UPDATED).
+        super().async_update_listeners()
+        async_dispatcher_send(self.hass, SIGNAL_COORDINATOR_UPDATED)
 
     def _mark_polled(self) -> None:
         self.last_poll = dt_util.utcnow()

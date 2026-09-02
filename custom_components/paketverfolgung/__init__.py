@@ -159,6 +159,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    # Keep the coordinator polling for the entry's whole lifetime, even when
+    # it currently has no shipment entities (a DPD/Amazon account between
+    # parcels) - a DataUpdateCoordinator stops its timer once its last
+    # listener goes away, and it still needs to poll to discover new ones.
+    entry.async_on_unload(coordinator.async_add_listener(lambda: None))
     await _async_register_panel(hass)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
