@@ -63,12 +63,14 @@
   "options": {
     "step": {
       "dhl_options": {
-        "description": "Sendungsnummern für DHL, DPD und Hermes – dieser Eintrag gilt für alle drei. Nummern hinzufügen oder entfernen, optional deine PLZ (nur für geschützte DPD-Sendungen) und das Aktualisierungsintervall anpassen.",
+        "description": "Sendungsnummern für DHL, DPD und Hermes – dieser Eintrag gilt für alle drei. Nummern hinzufügen oder entfernen, optional deine PLZ (nur für geschützte DPD-Sendungen) und das Aktualisierungsintervall anpassen. UPS (1Z…) geht optional über eine eigene UPS-Developer-App (Client ID + Secret unten).",
         "data": {
           "tracking_numbers": "Sendungsnummern (DHL, DPD oder Hermes)",
           "default_postcode": "Deine PLZ (nur nötig, falls eine DPD-Nummer geschützt ist)",
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
-          "dhl_auto_discovery": "DHL-Konto verbinden und Sendungen automatisch erkennen (Test)"
+          "dhl_auto_discovery": "DHL-Konto verbinden und Sendungen automatisch erkennen (Test)",
+          "ups_client_id": "UPS Client ID (optional, für 1Z…-Sendungen)",
+          "ups_client_secret": "UPS Client Secret"
         }
       },
       "dhl_login": {
@@ -156,6 +158,20 @@
         "targets": {
           "name": "Ziele",
           "description": "notify.*-Dienste (z. B. mobile_app_galaxy_s22)."
+        }
+      }
+    },
+    "set_tracking_direction": {
+      "name": "Richtung festlegen",
+      "description": "Legt fest, ob eine Sendung gesendet oder empfangen wird. \"auto\" hebt es wieder auf.",
+      "fields": {
+        "tracking_number": {
+          "name": "Sendungsnummer",
+          "description": "Die Sendungs-/Trackingnummer (bei Amazon die Bestellnummer)."
+        },
+        "direction": {
+          "name": "Richtung",
+          "description": "send, receive oder auto."
         }
       }
     }

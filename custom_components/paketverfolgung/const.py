@@ -107,10 +107,22 @@ DIRECTIONS = (DIRECTION_SEND, DIRECTION_RECEIVE)
 CARRIER_DHL = "dhl"
 CARRIER_DPD = "dpd"
 CARRIER_HERMES = "hermes"
+CARRIER_UPS = "ups"
 CARRIER_UNKNOWN = "unknown"
 CARRIER_AUTO = "auto"  # override value meaning "go back to auto-detect"
 
-CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES)
+CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES, CARRIER_UPS)
+
+# UPS has no anonymous tracking (the consumer site is bot-walled, the API
+# returns 401 without a token). Tracking a 1Z number therefore needs the
+# user's own free UPS developer app: Client ID + Secret -> OAuth
+# client-credentials token -> the official Track API. Opt-in, off unless
+# both are set on the Sendungsnummern entry.
+CONF_UPS_CLIENT_ID = "ups_client_id"
+CONF_UPS_CLIENT_SECRET = "ups_client_secret"
+UPS_OAUTH_URL = "https://onlinetools.ups.com/security/v1/oauth/token"
+UPS_TRACK_URL = "https://onlinetools.ups.com/api/track/v1/details/{id}"
+UPS_TRACKING_PAGE_URL = "https://www.ups.com/track?loc=de_DE&tracknum={id}"
 
 # Custom sidebar panel (buildless web component served from ./frontend).
 PANEL_URL_PATH = "paketverfolgung"
@@ -118,7 +130,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.13.7"
+PANEL_VERSION = "1.14.0"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is

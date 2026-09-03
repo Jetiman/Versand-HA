@@ -24,6 +24,8 @@ from .const import (
     CONF_AMAZON_USERNAME,
     CONF_CARRIER_OVERRIDES,
     CONF_DIRECTION_OVERRIDES,
+    CONF_UPS_CLIENT_ID,
+    CONF_UPS_CLIENT_SECRET,
     CONF_DEFAULT_POSTCODE,
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_REDIRECT,
@@ -329,6 +331,12 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                 CONF_DHL_AUTO_DISCOVERY: bool(
                     user_input.get(CONF_DHL_AUTO_DISCOVERY)
                 ),
+                CONF_UPS_CLIENT_ID: (
+                    user_input.get(CONF_UPS_CLIENT_ID) or ""
+                ).strip(),
+                CONF_UPS_CLIENT_SECRET: (
+                    user_input.get(CONF_UPS_CLIENT_SECRET) or ""
+                ).strip(),
             }
             if self._pending[CONF_DHL_AUTO_DISCOVERY]:
                 return await self.async_step_dhl_login()
@@ -354,6 +362,18 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                             self._current(CONF_DHL_AUTO_DISCOVERY, False)
                         ),
                     ): selector.BooleanSelector(),
+                    vol.Optional(
+                        CONF_UPS_CLIENT_ID,
+                        default=self._current(CONF_UPS_CLIENT_ID, "") or "",
+                    ): selector.TextSelector(),
+                    vol.Optional(
+                        CONF_UPS_CLIENT_SECRET,
+                        default=self._current(CONF_UPS_CLIENT_SECRET, "") or "",
+                    ): selector.TextSelector(
+                        selector.TextSelectorConfig(
+                            type=selector.TextSelectorType.PASSWORD
+                        )
+                    ),
                 }
             )
         )

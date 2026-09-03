@@ -63,12 +63,14 @@
   "options": {
     "step": {
       "dhl_options": {
-        "description": "Tracking numbers for DHL, DPD and Hermes - this entry covers all three carriers. Add or remove numbers, optionally set your postcode (only for protected DPD parcels), and adjust the update interval.",
+        "description": "Tracking numbers for DHL, DPD and Hermes - this entry covers all three carriers. Add or remove numbers, optionally set your postcode (only for protected DPD parcels), and adjust the update interval. UPS (1Z…) works optionally via your own UPS developer app (Client ID + Secret below).",
         "data": {
           "tracking_numbers": "Tracking numbers (DHL, DPD or Hermes)",
           "default_postcode": "Your postcode (only needed if a DPD number is protected)",
           "update_interval_minutes": "Update interval (minutes)",
-          "dhl_auto_discovery": "Connect a DHL account and auto-discover its shipments (experimental)"
+          "dhl_auto_discovery": "Connect a DHL account and auto-discover its shipments (experimental)",
+          "ups_client_id": "UPS Client ID (optional, for 1Z… shipments)",
+          "ups_client_secret": "UPS Client Secret"
         }
       },
       "dhl_login": {
@@ -156,6 +158,20 @@
         "targets": {
           "name": "Targets",
           "description": "notify.* services (e.g. mobile_app_galaxy_s22)."
+        }
+      }
+    },
+    "set_tracking_direction": {
+      "name": "Set direction",
+      "description": "Marks a shipment as sent or received. \"auto\" clears it.",
+      "fields": {
+        "tracking_number": {
+          "name": "Tracking number",
+          "description": "The tracking number (Amazon: the order number)."
+        },
+        "direction": {
+          "name": "Direction",
+          "description": "send, receive or auto."
         }
       }
     }

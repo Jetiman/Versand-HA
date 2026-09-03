@@ -12,7 +12,13 @@
  * (one per shipment/parcel, identified by the `tracking_id` attribute).
  */
 
-const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes", amazon: "Amazon" };
+const PROVIDER_LABELS = {
+  dhl: "DHL",
+  dpd: "DPD",
+  hermes: "Hermes",
+  ups: "UPS",
+  amazon: "Amazon",
+};
 
 class PaketverfolgungPanel extends HTMLElement {
   constructor() {
@@ -564,7 +570,7 @@ class PaketverfolgungPanel extends HTMLElement {
           ? `<label class="pv-carrier">
               <span>Anbieter${s.forced ? " (manuell gesetzt)" : ""}:</span>
               <select data-carrier="${esc(s.tracking_id)}">
-                ${["auto", "dhl", "dpd", "hermes"]
+                ${["auto", "dhl", "dpd", "hermes", "ups"]
                   .map((c) => {
                     const cur = s.forced || "auto";
                     const label =
