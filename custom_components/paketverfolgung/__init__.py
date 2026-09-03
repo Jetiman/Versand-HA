@@ -15,6 +15,7 @@ from homeassistant.exceptions import ServiceValidationError
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .const import (
     ATTR_CARRIER,
+    ATTR_DIRECTION,
     ATTR_NAME,
     ATTR_TRACKING_NUMBER,
     CARRIER_AUTO,
@@ -22,6 +23,7 @@ from .const import (
     CONF_AMAZON_COOKIES,
     CONF_CARRIER_OVERRIDES,
     CONF_DHL_SESSION,
+    CONF_DIRECTION_OVERRIDES,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_TARGETS,
@@ -29,6 +31,8 @@ from .const import (
     CONF_TRACKING_NUMBERS,
     CONF_UPDATE_INTERVAL,
     DEFAULT_UPDATE_INTERVAL_MINUTES,
+    DIRECTION_AUTO,
+    DIRECTIONS,
     DOMAIN,
     PANEL_ICON,
     PANEL_STATIC_URL,
@@ -41,6 +45,7 @@ from .const import (
     SERVICE_ADD_TRACKING_NUMBER,
     SERVICE_REMOVE_TRACKING_NUMBER,
     SERVICE_SET_CARRIER,
+    SERVICE_SET_DIRECTION,
     SERVICE_SET_NAME,
     SERVICE_SET_NOTIFICATIONS,
 )
@@ -116,6 +121,13 @@ _SET_NAME_SCHEMA = vol.Schema(
     }
 )
 
+_SET_DIRECTION_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_TRACKING_NUMBER): vol.Coerce(str),
+        vol.Required(ATTR_DIRECTION): vol.In([*DIRECTIONS, DIRECTION_AUTO]),
+    }
+)
+
 
 def _as_str_list(value) -> list[str]:
     if not value:
@@ -187,6 +199,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 hass, call.data[ATTR_TRACKING_NUMBER], call.data.get(ATTR_NAME, "")
             )
 
+        async def _async_set_direction(call: ServiceCall) -> ServiceResponse:
+            return await _set_direction(
+                hass, call.data[ATTR_TRACKING_NUMBER], call.data[ATTR_DIRECTION]
+            )
+
         async def _async_set_notifications(call: ServiceCall) -> None:
             _set_notifications(
                 hass,
@@ -213,6 +230,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_SET_CARRIER,
             _async_set_carrier,
             schema=_SET_CARRIER_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_DIRECTION,
+            _async_set_direction,
+            schema=_SET_DIRECTION_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
         )
         hass.services.async_register(
@@ -308,6 +332,7 @@ async def _remove_tracking_number(
             CONF_TRACKING_NUMBERS: current,
             CONF_CARRIER_OVERRIDES: _without(CONF_CARRIER_OVERRIDES),
             CONF_NAMES: _without(CONF_NAMES),
+            CONF_DIRECTION_OVERRIDES: _without(CONF_DIRECTION_OVERRIDES),
         },
     )
     _LOGGER.info("Paketverfolgung: %s wurde entfernt", cleaned)
@@ -366,6 +391,30 @@ async def _set_carrier(
     )
     _LOGGER.info("Paketverfolgung: %s -> Anbieter %s", cleaned, carrier)
     return {"tracking_number": cleaned, "carrier": carrier}
+
+
+async def _set_direction(
+    hass: HomeAssistant, tracking_number: str, direction: str
+) -> ServiceResponse:
+    """Pin a shipment's "Richtung" (or 'auto' to clear the override).
+
+    Anonymous carrier tracking can't tell whether you are the sender or the
+    recipient, so this lets a shipment you sent be labelled correctly.
+    """
+    cleaned = tracking_number.strip()
+    entry = _entry_for_shipment(hass, cleaned)
+    overrides = {
+        k: v
+        for k, v in dict(entry.options.get(CONF_DIRECTION_OVERRIDES, {})).items()
+        if k != cleaned
+    }
+    if direction != DIRECTION_AUTO:
+        overrides[cleaned] = direction
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_DIRECTION_OVERRIDES: overrides}
+    )
+    _LOGGER.info("Paketverfolgung: %s -> Richtung %s", cleaned, direction)
+    return {"tracking_number": cleaned, "direction": direction}
 
 
 def _set_notifications(

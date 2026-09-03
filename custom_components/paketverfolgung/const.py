@@ -85,9 +85,21 @@ SERVICE_ADD_TRACKING_NUMBER = "add_tracking_number"
 SERVICE_REMOVE_TRACKING_NUMBER = "remove_tracking_number"
 SERVICE_SET_CARRIER = "set_tracking_carrier"
 SERVICE_SET_NAME = "set_tracking_name"
+SERVICE_SET_DIRECTION = "set_tracking_direction"
 ATTR_TRACKING_NUMBER = "tracking_number"
 ATTR_CARRIER = "carrier"
 ATTR_NAME = "name"
+ATTR_DIRECTION = "direction"
+
+# Sender/recipient direction, shown as "Richtung" in the panel. Anonymous
+# carrier tracking (a plain number, no account) can't tell whether *you*
+# are the sender or the recipient - DHL's public tracking always reports
+# "ANKOMMEND" - so a shipment can be pinned per number/id. "auto" clears it.
+CONF_DIRECTION_OVERRIDES = "direction_overrides"
+DIRECTION_SEND = "send"
+DIRECTION_RECEIVE = "receive"
+DIRECTION_AUTO = "auto"
+DIRECTIONS = (DIRECTION_SEND, DIRECTION_RECEIVE)
 
 # Carrier a tracking number was detected to belong to. Kept per number in
 # the tracking-number coordinator (in memory - re-detected after a
@@ -106,7 +118,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.13.6"
+PANEL_VERSION = "1.13.7"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is

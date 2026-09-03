@@ -37,6 +37,7 @@ from .const import (
     CONF_DEFAULT_POSTCODE,
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_SESSION,
+    CONF_DIRECTION_OVERRIDES,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_TARGETS,
@@ -45,6 +46,7 @@ from .const import (
     CONF_TRACKING_NUMBERS,
     DEFAULT_STATUS,
     DOMAIN,
+    DIRECTIONS,
     DPD_STATUS_GROUP,
     DPD_TRACKING_PAGE_URL,
     EVENT_NOTIFICATION,
@@ -83,6 +85,12 @@ def _stable_status(status: str | None) -> str:
     return _VOLATILE_STATUS_RE.sub("", status or "").strip(" .,")
 
 
+# DHL's sendungsrichtung -> the panel's canonical direction values. Note the
+# anonymous tracking endpoint returns "ANKOMMEND" for every parcel, sender's
+# own shipments included - hence the per-shipment override.
+_DHL_DIRECTION = {"ANKOMMEND": "receive", "EINGEHEND": "receive", "AUSGEHEND": "send"}
+
+
 def normalize_dhl_shipment(raw: dict) -> dict:
     """Turn a raw DHL search result into the shared shipment shape."""
     info = raw.get("sendungsinfo", {})
@@ -118,7 +126,10 @@ def normalize_dhl_shipment(raw: dict) -> dict:
         "name": info.get("sendungsname") or f"DHL {shipment_id}",
         "status": status,
         "group": group,
-        "direction": info.get("sendungsrichtung"),
+        "direction": _DHL_DIRECTION.get(
+            str(info.get("sendungsrichtung") or "").upper(),
+            info.get("sendungsrichtung"),
+        ),
         "delivery_from": zustellung.get("zustellzeitfensterVon"),
         "delivery_to": zustellung.get("zustellzeitfensterBis"),
         "tracking_url": TRACKING_PAGE_URL.format(id=shipment_id),
@@ -245,6 +256,17 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         # SIGNAL_COORDINATOR_UPDATED).
         super().async_update_listeners()
         async_dispatcher_send(self.hass, SIGNAL_COORDINATOR_UPDATED)
+
+    def _apply_direction_overrides(self, result: dict[str, dict]) -> None:
+        """Pin "Richtung" per shipment where auto-detection can't know it
+        (a plain tracking number gives no sender/recipient context)."""
+        raw = self.entry.options.get(CONF_DIRECTION_OVERRIDES, {}) or {}
+        for sid, item in result.items():
+            forced = raw.get(str(sid))
+            forced = forced if forced in DIRECTIONS else None
+            if forced:
+                item["direction"] = forced
+            item["forced_direction"] = forced
 
     def _mark_polled(self) -> None:
         self.last_poll = dt_util.utcnow()
@@ -543,6 +565,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
 
         for stale in [n for n in self.carriers if n not in numbers]:
             self.carriers.pop(stale, None)
+        self._apply_direction_overrides(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
         return result
@@ -719,6 +742,7 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
 
         for stale in [p for p in self._events if p not in result]:
             self._events.pop(stale, None)
+        self._apply_direction_overrides(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
         _LOGGER.debug("Paketverfolgung (DPD): %d parcel(s) fetched", len(result))

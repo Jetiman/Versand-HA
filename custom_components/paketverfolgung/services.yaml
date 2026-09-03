@@ -52,6 +52,33 @@ set_tracking_carrier:
             - hermes
             - auto
 
+set_tracking_direction:
+  name: Richtung festlegen
+  description: >-
+    Legt fest, ob eine Sendung von dir gesendet oder empfangen wird
+    ("Richtung" im Panel). Nötig, weil die anonyme Sendungsverfolgung das
+    nicht wissen kann - DHL meldet immer "ankommend". "auto" hebt die
+    Zuordnung wieder auf.
+  fields:
+    tracking_number:
+      name: Sendungsnummer
+      description: Die Sendungs-/Trackingnummer (bei Amazon die Bestellnummer).
+      required: true
+      example: "357566057330"
+      selector:
+        text:
+    direction:
+      name: Richtung
+      description: send (gesendet), receive (empfangen) oder auto.
+      required: true
+      example: send
+      selector:
+        select:
+          options:
+            - send
+            - receive
+            - auto
+
 set_tracking_name:
   name: Name festlegen
   description: >-

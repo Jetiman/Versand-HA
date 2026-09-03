@@ -226,6 +226,7 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
                 self.coordinator, TrackingNumbersDataUpdateCoordinator
             ),
             "direction": s.get("direction"),
+            "forced_direction": s.get("forced_direction"),
             "delivered": s.get("delivered"),
             "archived": bool(s.get("archived")),
             "delivered_at": s.get("delivered_at"),

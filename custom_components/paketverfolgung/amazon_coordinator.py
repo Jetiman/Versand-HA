@@ -160,6 +160,7 @@ class AmazonAccountDataUpdateCoordinator(_BaseCoordinator):
             await self._apply_archive(item)
             result[shipment_id] = item
 
+        self._apply_direction_overrides(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
         self._tune_interval(result)

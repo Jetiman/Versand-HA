@@ -23,6 +23,7 @@ from .const import (
     CONF_AMAZON_PASSWORD,
     CONF_AMAZON_USERNAME,
     CONF_CARRIER_OVERRIDES,
+    CONF_DIRECTION_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_REDIRECT,
@@ -320,6 +321,7 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                 CONF_TRACKING_NUMBERS: numbers,
                 CONF_CARRIER_OVERRIDES: _kept(CONF_CARRIER_OVERRIDES),
                 CONF_NAMES: _kept(CONF_NAMES),
+                CONF_DIRECTION_OVERRIDES: _kept(CONF_DIRECTION_OVERRIDES),
                 CONF_DEFAULT_POSTCODE: (
                     user_input.get(CONF_DEFAULT_POSTCODE) or ""
                 ).strip(),

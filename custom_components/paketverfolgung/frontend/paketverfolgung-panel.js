@@ -135,6 +135,7 @@ class PaketverfolgungPanel extends HTMLElement {
         carrier_tracking_id: a.carrier_tracking_id || null,
         group,
         direction: a.direction || null,
+        forced_direction: a.forced_direction || null,
         delivery_from: a.delivery_window_from || null,
         delivery_to: a.delivery_window_to || null,
         tracking_url: url || null,
@@ -463,7 +464,6 @@ class PaketverfolgungPanel extends HTMLElement {
           ? s.carrier_tracking_id
           : null,
       ],
-      ["Richtung", directionLabel(s.direction)],
       [
         "Zustellzeitfenster",
         s.delivery_from
@@ -573,6 +573,32 @@ class PaketverfolgungPanel extends HTMLElement {
                         : PROVIDER_LABELS[c];
                     return `<option value="${c}"${
                       c === cur ? " selected" : ""
+                    }>${esc(label)}</option>`;
+                  })
+                  .join("")}
+              </select>
+            </label>`
+          : ""
+      }
+
+      ${
+        s.provider !== "?"
+          ? `<label class="pv-carrier">
+              <span>Richtung${s.forced_direction ? " (manuell gesetzt)" : ""}:</span>
+              <select data-direction="${esc(s.tracking_id)}">
+                ${["auto", "receive", "send"]
+                  .map((d) => {
+                    const cur = s.forced_direction || "auto";
+                    const label =
+                      d === "auto"
+                        ? `automatisch${
+                            !s.forced_direction && s.direction
+                              ? " (" + directionLabel(s.direction) + ")"
+                              : ""
+                          }`
+                        : directionLabel(d);
+                    return `<option value="${d}"${
+                      d === cur ? " selected" : ""
                     }>${esc(label)}</option>`;
                   })
                   .join("")}
@@ -702,6 +728,15 @@ class PaketverfolgungPanel extends HTMLElement {
       pick.disabled = true;
       return;
     }
+    const dir = ev.target.closest("[data-direction]");
+    if (dir) {
+      this._hass.callService("paketverfolgung", "set_tracking_direction", {
+        tracking_number: dir.getAttribute("data-direction"),
+        direction: dir.value,
+      });
+      dir.disabled = true;
+      return;
+    }
     const rename = ev.target.closest("[data-name]");
     if (rename) {
       this._hass.callService("paketverfolgung", "set_tracking_name", {
@@ -781,6 +816,9 @@ function directionLabel(dir) {
       return: "Retoure",
       OUTBOUND: "Gesendet",
       INBOUND: "Empfangen",
+      ANKOMMEND: "Empfangen",
+      EINGEHEND: "Empfangen",
+      AUSGEHEND: "Gesendet",
     }[dir] || dir
   );
 }
