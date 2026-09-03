@@ -12,11 +12,13 @@ Needs the free "UPS My Choice" service active on the ups.com account.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
+import aiohttp
 from aiohttp import ClientError, ClientSession
 
 from .const import (
@@ -181,20 +183,42 @@ class UpsAccountClient:
                 headers={
                     "Accept": "application/json",
                     "Content-Type": "application/json",
+                    "User-Agent": (
+                        "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) Chrome/122.0 Mobile Safari/537.36"
+                    ),
                     **(headers or {}),
                 },
-                timeout=25,
+                allow_redirects=False,
+                timeout=aiohttp.ClientTimeout(total=25),
             ) as resp:
                 body = await resp.text()
+                if resp.status in (301, 302, 303, 307, 308):
+                    # UPS/Akamai bounces non-browser clients to an error page.
+                    raise UpsApiError(
+                        "UPS redirected the request away (bot protection) - the "
+                        f"UPS endpoint is not reachable from here (HTTP {resp.status})"
+                    )
                 if resp.status in (401, 403):
                     raise UpsAuthError(f"UPS returned HTTP {resp.status}")
                 if resp.status >= 400:
-                    raise UpsApiError(f"UPS returned HTTP {resp.status}: {body[:200]}")
+                    raise UpsApiError(
+                        f"UPS returned HTTP {resp.status}: {body[:200]}"
+                    )
                 try:
-                    return await resp.json(content_type=None)
+                    data = await resp.json(content_type=None)
                 except ValueError as err:
-                    raise UpsApiError(f"UPS returned no JSON: {err}") from err
-        except ClientError as err:
+                    raise UpsApiError(
+                        f"UPS returned no JSON (body: {body[:150]!r})"
+                    ) from err
+                if not isinstance(data, dict):
+                    raise UpsApiError(
+                        f"UPS returned unexpected JSON: {repr(data)[:150]}"
+                    )
+                return data
+        except UpsApiError:
+            raise
+        except (ClientError, asyncio.TimeoutError, OSError) as err:
             raise UpsApiError(f"Network error talking to UPS: {err}") from err
 
     async def _login(self, username: str, password: str) -> str:

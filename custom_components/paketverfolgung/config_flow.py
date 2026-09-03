@@ -308,10 +308,13 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 await client.login(username, password)
             except UpsAuthError as err:
-                _LOGGER.debug("UPS login failed: %s", err)
+                _LOGGER.warning("UPS login failed: %s", err)
                 errors["base"] = "invalid_auth"
             except UpsApiError as err:
-                _LOGGER.debug("UPS login error: %s", err)
+                _LOGGER.warning("UPS login error: %s", err)
+                errors["base"] = "cannot_connect"
+            except Exception:  # noqa: BLE001 - surface anything else as a clean error
+                _LOGGER.exception("Unexpected error during UPS login")
                 errors["base"] = "cannot_connect"
             else:
                 await self.async_set_unique_id(f"{PROVIDER_UPS}_{username.lower()}")
