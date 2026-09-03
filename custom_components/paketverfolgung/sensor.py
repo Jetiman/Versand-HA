@@ -31,6 +31,8 @@ from .const import (
     DOMAIN,
     GROUP_ICONS,
     GROUP_OUT_FOR_DELIVERY,
+    INTEGRATION_COMMIT,
+    INTEGRATION_VERSION,
     PROVIDER_NUMBERS,
     SIGNAL_COORDINATOR_UPDATED,
 )
@@ -358,6 +360,8 @@ class CombinedOutForDeliveryTodaySensor(_AllCoordinatorsSensor):
             "notify_out_for_delivery_only": bool(
                 opts.get(CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY)
             ),
+            "integration_version": INTEGRATION_VERSION,
+            "integration_commit": INTEGRATION_COMMIT,
         }
 
 

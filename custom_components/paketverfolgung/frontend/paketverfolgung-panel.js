@@ -170,6 +170,15 @@ class PaketverfolgungPanel extends HTMLElement {
     return path.replace(/^\/+/, "").split("/")[0] || null;
   }
 
+  _buildInfo() {
+    const a = (this._combinedSensor() || {}).attributes || {};
+    const ver = a.integration_version || "";
+    const commit = a.integration_commit || "";
+    if (!ver) return "";
+    const tail = commit && commit !== "0000000" ? " · " + commit : "";
+    return `<div class="pv-version">Paketverfolgung ${esc(ver + tail)}</div>`;
+  }
+
   _notifyConfig() {
     const a = (this._combinedSensor() || {}).attributes || {};
     return {
@@ -260,6 +269,7 @@ class PaketverfolgungPanel extends HTMLElement {
       notifyBusy: this._notifyBusy,
       notifyPickerOpen: this._notifyPickerOpen,
       notify: nc,
+      build: this._buildInfo(),
       items: shipments.map((s) => [
         s.entity_id,
         s.name,
@@ -425,6 +435,7 @@ class PaketverfolgungPanel extends HTMLElement {
           Zahnrad alle Optionen (u. a. die DHL-Konto-Anmeldung). Ein DPD- oder
           Amazon-Konto fügst du dort über „Eintrag hinzufügen“ hinzu.
         </div>
+        ${this._buildInfo()}
         </div>
       </details>
     `;
@@ -1040,6 +1051,10 @@ const STYLES = `
   .pv-switch input, .pv-check input { width: 18px; height: 18px; flex: none; accent-color: var(--primary-color); }
   .pv-switch-sub { margin: -4px 0 0 28px; font-size: 13px; color: var(--secondary-text-color); }
   .pv-switch-sub em { font-style: normal; opacity: 0.7; }
+  .pv-version {
+    margin-top: 10px; text-align: right; font-size: 11px;
+    color: var(--secondary-text-color); opacity: 0.6; font-variant-numeric: tabular-nums;
+  }
   .pv-set-hint { font-size: 12px; color: var(--secondary-text-color); }
   .pv-set-hint code {
     background: var(--secondary-background-color); padding: 1px 4px; border-radius: 4px;
