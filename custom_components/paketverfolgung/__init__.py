@@ -26,6 +26,7 @@ from .const import (
     CONF_DIRECTION_OVERRIDES,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
     CONF_NOTIFY_TARGETS,
     CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
@@ -141,6 +142,7 @@ _SET_NOTIFICATIONS_SCHEMA = vol.Schema(
     {
         vol.Optional("enabled", default=True): vol.Coerce(bool),
         vol.Optional("targets", default=list): _as_str_list,
+        vol.Optional("out_for_delivery_only", default=False): vol.Coerce(bool),
     }
 )
 
@@ -209,6 +211,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 hass,
                 bool(call.data.get("enabled", True)),
                 call.data.get("targets", []),
+                bool(call.data.get("out_for_delivery_only", False)),
             )
 
         hass.services.async_register(
@@ -418,7 +421,10 @@ async def _set_direction(
 
 
 def _set_notifications(
-    hass: HomeAssistant, enabled: bool, targets: list[str]
+    hass: HomeAssistant,
+    enabled: bool,
+    targets: list[str],
+    out_for_delivery_only: bool = False,
 ) -> None:
     """Store the notification on/off flag + target list on every entry."""
     clean = [
@@ -433,6 +439,7 @@ def _set_notifications(
                 **entry.options,
                 CONF_NOTIFY_ENABLED: enabled,
                 CONF_NOTIFY_TARGETS: clean,
+                CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY: out_for_delivery_only,
             },
         )
     for coordinator in hass.data.get(DOMAIN, {}).values():
@@ -454,7 +461,11 @@ def _reload_relevant(entry: ConfigEntry) -> str:
     reload the integration.
     """
     skip_data = (CONF_DHL_SESSION, CONF_AMAZON_COOKIES)
-    skip_options = (CONF_NOTIFY_ENABLED, CONF_NOTIFY_TARGETS)
+    skip_options = (
+        CONF_NOTIFY_ENABLED,
+        CONF_NOTIFY_TARGETS,
+        CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
+    )
     data = {k: v for k, v in entry.data.items() if k not in skip_data}
     options = {k: v for k, v in entry.options.items() if k not in skip_options}
     return repr(sorted(data.items())) + "|" + repr(sorted(options.items()))

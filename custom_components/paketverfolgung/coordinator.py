@@ -40,6 +40,7 @@ from .const import (
     CONF_DIRECTION_OVERRIDES,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
     CONF_NOTIFY_TARGETS,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
@@ -51,6 +52,7 @@ from .const import (
     DPD_TRACKING_PAGE_URL,
     EVENT_NOTIFICATION,
     GROUP_DELIVERED,
+    GROUP_OUT_FOR_DELIVERY,
     GROUP_REGISTERED,
     GROUP_TRANSIT,
     GROUP_UNKNOWN,
@@ -295,8 +297,14 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         """
         primed = self._notify_primed
         self._notify_primed = True
-        if not self.entry.options.get(CONF_NOTIFY_ENABLED):
+        opts = self.entry.options
+        if not opts.get(CONF_NOTIFY_ENABLED):
             return
+        # "Only on out-for-delivery" mode: skip the new-shipment and every
+        # intermediate-scan message; notify only when a shipment *enters*
+        # the out-for-delivery (or delivered) phase.
+        ofd_only = bool(opts.get(CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY))
+        ofd_groups = (GROUP_OUT_FOR_DELIVERY, GROUP_DELIVERED)
         targets = self._notify_targets()
         old = self.data or {}
         for sid, item in new.items():
@@ -304,15 +312,26 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 continue
             prev = old.get(sid)
             status = item.get("status") or ""
+            group = item.get("group")
             if prev is None:
-                if primed and status != NO_DATA_STATUS:
-                    self._push_notification(targets, "detected", item, None)
-            elif _stable_status(status) != _stable_status(
+                if not (primed and status != NO_DATA_STATUS):
+                    continue
+                if ofd_only and group not in ofd_groups:
+                    continue
+                self._push_notification(targets, "detected", item, None)
+                continue
+            changed = _stable_status(status) != _stable_status(
                 prev.get("status")
-            ) or item.get("group") != prev.get("group"):
-                self._push_notification(
-                    targets, "changed", item, prev.get("status")
-                )
+            ) or group != prev.get("group")
+            if not changed:
+                continue
+            if ofd_only and (
+                group == prev.get("group") or group not in ofd_groups
+            ):
+                continue
+            self._push_notification(
+                targets, "changed", item, prev.get("status")
+            )
 
     def _push_notification(
         self,

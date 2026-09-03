@@ -176,6 +176,7 @@ class PaketverfolgungPanel extends HTMLElement {
       enabled: a.notify_enabled === true,
       targets: Array.isArray(a.notify_targets) ? a.notify_targets : [],
       services: Array.isArray(a.notify_services) ? a.notify_services : [],
+      ofdOnly: a.notify_out_for_delivery_only === true,
     };
   }
 
@@ -222,7 +223,7 @@ class PaketverfolgungPanel extends HTMLElement {
     });
   }
 
-  _setNotifications(enabled, targets) {
+  _setNotifications(enabled, targets, ofdOnly) {
     this._notifyBusy = true;
     this._sig = null;
     this._render(true);
@@ -230,6 +231,7 @@ class PaketverfolgungPanel extends HTMLElement {
       this._hass.callService("paketverfolgung", "set_notifications", {
         enabled,
         targets,
+        out_for_delivery_only: ofdOnly === true,
       })
     ).finally(() => {
       this._notifyBusy = false;
@@ -407,6 +409,16 @@ class PaketverfolgungPanel extends HTMLElement {
     } />
           <span>Bei neuer Sendung oder Statusänderung benachrichtigen</span>
         </label>
+        ${
+          nc.enabled
+            ? `<label class="pv-switch pv-switch-sub">
+                 <input type="checkbox" data-notify-ofd ${
+                   nc.ofdOnly ? "checked" : ""
+                 } ${this._notifyBusy ? "disabled" : ""} />
+                 <span>Nur wenn eine Sendung in Zustellung geht <em>(Preview)</em></span>
+               </label>`
+            : ""
+        }
         ${nc.enabled ? this._notifyPickerHtml(nc) : ""}
         <div class="pv-footer-hint">
           „Integration öffnen“ zeigt beim Eintrag „Sendungsnummern“ über das
@@ -711,16 +723,22 @@ class PaketverfolgungPanel extends HTMLElement {
   _onChange(ev) {
     if (ev.target.matches("[data-notify-toggle]")) {
       const nc = this._notifyConfig();
-      this._setNotifications(ev.target.checked, nc.targets);
+      this._setNotifications(ev.target.checked, nc.targets, nc.ofdOnly);
+      return;
+    }
+    if (ev.target.matches("[data-notify-ofd]")) {
+      const nc = this._notifyConfig();
+      this._setNotifications(true, nc.targets, ev.target.checked);
       return;
     }
     if (ev.target.matches("[data-notify-target]")) {
+      const nc = this._notifyConfig();
       const targets = Array.from(
         this.querySelectorAll("[data-notify-target]")
       )
         .filter((el) => el.checked)
         .map((el) => el.getAttribute("data-notify-target"));
-      this._setNotifications(true, targets);
+      this._setNotifications(true, targets, nc.ofdOnly);
       return;
     }
     const pick = ev.target.closest("[data-carrier]");
@@ -1020,6 +1038,8 @@ const STYLES = `
     color: var(--primary-text-color); cursor: pointer;
   }
   .pv-switch input, .pv-check input { width: 18px; height: 18px; flex: none; accent-color: var(--primary-color); }
+  .pv-switch-sub { margin: -4px 0 0 28px; font-size: 13px; color: var(--secondary-text-color); }
+  .pv-switch-sub em { font-style: normal; opacity: 0.7; }
   .pv-set-hint { font-size: 12px; color: var(--secondary-text-color); }
   .pv-set-hint code {
     background: var(--secondary-background-color); padding: 1px 4px; border-radius: 4px;

@@ -124,3 +124,12 @@ set_notifications:
           multiple: true
           custom_value: true
           options: []
+    out_for_delivery_only:
+      name: Nur bei „In Zustellung"
+      description: >-
+        Wenn an, wird nur benachrichtigt, sobald eine Sendung in Zustellung
+        geht oder zugestellt wird – keine Meldung bei Zwischenschritten.
+      required: false
+      default: false
+      selector:
+        boolean:

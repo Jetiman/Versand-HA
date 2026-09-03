@@ -156,6 +156,10 @@
         "targets": {
           "name": "Targets",
           "description": "notify.* services (e.g. mobile_app_galaxy_s22)."
+        },
+        "out_for_delivery_only": {
+          "name": "Only when out for delivery",
+          "description": "When on, notify only once a shipment goes out for delivery or is delivered – no message for intermediate scans."
         }
       }
     },

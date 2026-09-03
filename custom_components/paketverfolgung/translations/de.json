@@ -156,6 +156,10 @@
         "targets": {
           "name": "Ziele",
           "description": "notify.*-Dienste (z. B. mobile_app_galaxy_s22)."
+        },
+        "out_for_delivery_only": {
+          "name": "Nur bei „In Zustellung“",
+          "description": "Wenn an, wird nur benachrichtigt, sobald eine Sendung in Zustellung geht oder zugestellt wird – keine Meldung bei Zwischenschritten."
         }
       }
     },

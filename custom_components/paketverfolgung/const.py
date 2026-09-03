@@ -61,6 +61,9 @@ CONF_DEFAULT_POSTCODE = "default_postcode"
 # the `set_notifications` service, so the panel can toggle them globally.
 CONF_NOTIFY_ENABLED = "notify_enabled"
 CONF_NOTIFY_TARGETS = "notify_targets"
+# When set, only notify once a shipment reaches "out for delivery" (or
+# "delivered") - no message for every intermediate scan.
+CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY = "notify_out_for_delivery_only"
 EVENT_NOTIFICATION = f"{DOMAIN}_notification"
 SERVICE_SET_NOTIFICATIONS = "set_notifications"
 
@@ -118,7 +121,7 @@ PANEL_STATIC_URL = "/paketverfolgung_static"
 PANEL_TITLE = "Paketverfolgung"
 PANEL_ICON = "mdi:package-variant-closed"
 # Bump on every panel .js change to bust the browser cache.
-PANEL_VERSION = "1.13.7"
+PANEL_VERSION = "1.14.0"
 
 CONF_PROVIDER = "provider"
 # Historic value "dhl" kept for config-entry stability: this provider is
