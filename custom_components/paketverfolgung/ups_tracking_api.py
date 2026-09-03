@@ -119,7 +119,6 @@ class UpsTrackingApiClient:
         auth = BasicAuth(self._client_id, self._client_secret)
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
-            "x-merchant-id": self._client_id,
             "accept": "application/json",
         }
         try:
