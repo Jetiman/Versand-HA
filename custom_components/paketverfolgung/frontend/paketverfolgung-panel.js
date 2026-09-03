@@ -466,7 +466,11 @@ class PaketverfolgungPanel extends HTMLElement {
       ],
       [
         "Zustellzeitfenster",
-        s.delivery_from
+        // DHL sometimes gives only a date (no time) - that renders as
+        // "02:00 – 02:00"; skip a window with no real span.
+        s.delivery_from &&
+        s.delivery_to &&
+        fmtTime(s.delivery_from) !== fmtTime(s.delivery_to)
           ? `${fmtTime(s.delivery_from)} – ${fmtTime(s.delivery_to)}`
           : null,
       ],
