@@ -570,7 +570,7 @@ class PaketverfolgungPanel extends HTMLElement {
           ? `<label class="pv-carrier">
               <span>Anbieter${s.forced ? " (manuell gesetzt)" : ""}:</span>
               <select data-carrier="${esc(s.tracking_id)}">
-                ${["auto", "dhl", "dpd", "hermes", "ups"]
+                ${["auto", "dhl", "dpd", "hermes"]
                   .map((c) => {
                     const cur = s.forced || "auto";
                     const label =

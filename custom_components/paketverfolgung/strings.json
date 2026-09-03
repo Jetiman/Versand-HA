@@ -38,6 +38,14 @@
         "data": {
           "amazon_otp": "Bestätigungscode"
         }
+      },
+      "ups": {
+        "title": "Mit UPS-Konto anmelden",
+        "description": "Melde dich mit deinem ups.com-Konto an (E-Mail + Passwort). Es muss „UPS My Choice“ aktiviert sein. Alle eingehenden Sendungen an deine Adresse werden danach automatisch erkannt – ohne Sendungsnummern.",
+        "data": {
+          "ups_username": "E-Mail (ups.com-Konto)",
+          "ups_password": "Passwort"
+        }
       }
     },
     "error": {
@@ -56,21 +64,20 @@
       "options": {
         "dhl": "Sendungsnummern (DHL, DPD & Hermes)",
         "dpd": "DPD-Konto (alle Sendungen automatisch)",
-        "amazon": "Amazon.de-Konto (Lieferungen automatisch)"
+        "amazon": "Amazon.de-Konto (Lieferungen automatisch)",
+        "ups": "UPS-Konto (My Choice, alle Sendungen automatisch)"
       }
     }
   },
   "options": {
     "step": {
       "dhl_options": {
-        "description": "Sendungsnummern für DHL, DPD und Hermes – dieser Eintrag gilt für alle drei. Nummern hinzufügen oder entfernen, optional deine PLZ (nur für geschützte DPD-Sendungen) und das Aktualisierungsintervall anpassen. UPS (1Z…) geht optional über eine eigene UPS-Developer-App (Client ID + Secret unten).",
+        "description": "Sendungsnummern für DHL, DPD und Hermes – dieser Eintrag gilt für alle drei. Nummern hinzufügen oder entfernen, optional deine PLZ (nur für geschützte DPD-Sendungen) und das Aktualisierungsintervall anpassen.",
         "data": {
           "tracking_numbers": "Sendungsnummern (DHL, DPD oder Hermes)",
           "default_postcode": "Deine PLZ (nur nötig, falls eine DPD-Nummer geschützt ist)",
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
-          "dhl_auto_discovery": "DHL-Konto verbinden und Sendungen automatisch erkennen (Test)",
-          "ups_client_id": "UPS Client ID (optional, für 1Z…-Sendungen)",
-          "ups_client_secret": "UPS Client Secret"
+          "dhl_auto_discovery": "DHL-Konto verbinden und Sendungen automatisch erkennen (Test)"
         }
       },
       "dhl_login": {
@@ -89,6 +96,12 @@
       },
       "amazon_options": {
         "description": "Aktualisierungsintervall für Amazon-Lieferungen anpassen.",
+        "data": {
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+        }
+      },
+      "ups_options": {
+        "description": "Aktualisierungsintervall für UPS-Sendungen anpassen.",
         "data": {
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }

@@ -107,21 +107,29 @@ DIRECTIONS = (DIRECTION_SEND, DIRECTION_RECEIVE)
 CARRIER_DHL = "dhl"
 CARRIER_DPD = "dpd"
 CARRIER_HERMES = "hermes"
+# "ups" is a valid carrier value on a shipment (from the UPS-My-Choice
+# account coordinator) but not an auto-detect / manual-override target for
+# the tracking-number list - UPS can't be tracked by number anonymously.
 CARRIER_UPS = "ups"
 CARRIER_UNKNOWN = "unknown"
 CARRIER_AUTO = "auto"  # override value meaning "go back to auto-detect"
 
-CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES, CARRIER_UPS)
+CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES)
 
-# UPS has no anonymous tracking (the consumer site is bot-walled, the API
-# returns 401 without a token). Tracking a 1Z number therefore needs the
-# user's own free UPS developer app: Client ID + Secret -> OAuth
-# client-credentials token -> the official Track API. Opt-in, off unless
-# both are set on the Sendungsnummern entry.
-CONF_UPS_CLIENT_ID = "ups_client_id"
-CONF_UPS_CLIENT_SECRET = "ups_client_secret"
-UPS_OAUTH_URL = "https://onlinetools.ups.com/security/v1/oauth/token"
-UPS_TRACK_URL = "https://onlinetools.ups.com/api/track/v1/details/{id}"
+# UPS has no anonymous tracking (the consumer site is Akamai-bot-walled,
+# the official Track API needs a paid developer app + account number). So
+# this uses UPS My Choice the way the UPS mobile app does: log in with the
+# ups.com account, pull the "shipments to my address" list. The
+# AccessLicenseNumber is a public constant from the app (via the
+# ioBroker.parcel adapter). Opt-in; a separate "UPS-Konto" config entry.
+CONF_UPS_USERNAME = "ups_username"
+CONF_UPS_PASSWORD = "ups_password"
+UPS_ACCESS_LICENSE = "3DE112BAD1F163E0"
+UPS_LOGIN_URL = "https://onlinetools.ups.com/rest/Login"
+UPS_MCENROLLMENT_URL = "https://onlinetools.ups.com/rest/MCEnrollment"
+UPS_MYCHOICE_URL = (
+    "https://onlinetools.ups.com/mychoice/v1/shipments/details/AddressToken?loc=de_DE"
+)
 UPS_TRACKING_PAGE_URL = "https://www.ups.com/track?loc=de_DE&tracknum={id}"
 
 # Custom sidebar panel (buildless web component served from ./frontend).
@@ -140,6 +148,7 @@ PROVIDER_NUMBERS = "dhl"
 PROVIDER_DHL = PROVIDER_NUMBERS
 PROVIDER_DPD = "dpd"
 PROVIDER_AMAZON = "amazon"
+PROVIDER_UPS = "ups"
 
 CONF_DPD_USERNAME = "dpd_username"
 CONF_DPD_PASSWORD = "dpd_password"

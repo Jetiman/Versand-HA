@@ -25,6 +25,8 @@ from .const import (
     CONF_DHL_SESSION,
     CONF_DIRECTION_OVERRIDES,
     CONF_NAMES,
+    CONF_UPS_PASSWORD,
+    CONF_UPS_USERNAME,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_TARGETS,
     CONF_PROVIDER,
@@ -41,6 +43,7 @@ from .const import (
     PANEL_VERSION,
     PROVIDER_AMAZON,
     PROVIDER_DPD,
+    PROVIDER_UPS,
     PROVIDER_NUMBERS,
     SERVICE_ADD_TRACKING_NUMBER,
     SERVICE_REMOVE_TRACKING_NUMBER,
@@ -52,6 +55,7 @@ from .const import (
 from .coordinator import (
     DpdAccountDataUpdateCoordinator,
     TrackingNumbersDataUpdateCoordinator,
+    UpsAccountDataUpdateCoordinator,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -157,6 +161,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     elif provider == PROVIDER_AMAZON:
         coordinator = AmazonAccountDataUpdateCoordinator(
+            hass, entry, update_interval=timedelta(minutes=minutes)
+        )
+    elif provider == PROVIDER_UPS:
+        coordinator = UpsAccountDataUpdateCoordinator(
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
     else:

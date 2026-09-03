@@ -41,7 +41,7 @@ set_tracking_carrier:
         text:
     carrier:
       name: Anbieter
-      description: dhl, dpd, hermes, ups oder auto.
+      description: dhl, dpd, hermes oder auto.
       required: true
       example: hermes
       selector:
@@ -50,7 +50,6 @@ set_tracking_carrier:
             - dhl
             - dpd
             - hermes
-            - ups
             - auto
 
 set_tracking_direction:

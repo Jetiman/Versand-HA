@@ -32,7 +32,6 @@ from .const import (
     CARRIER_DPD,
     CARRIER_HERMES,
     CARRIER_UNKNOWN,
-    CARRIER_UPS,
     CARRIERS,
     CONF_CARRIER_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
@@ -40,12 +39,12 @@ from .const import (
     CONF_DHL_SESSION,
     CONF_DIRECTION_OVERRIDES,
     CONF_NAMES,
-    CONF_UPS_CLIENT_ID,
-    CONF_UPS_CLIENT_SECRET,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_TARGETS,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
+    CONF_UPS_PASSWORD,
+    CONF_UPS_USERNAME,
     CONF_TRACKING_NUMBERS,
     DEFAULT_STATUS,
     DOMAIN,
@@ -69,7 +68,7 @@ from .dhl_api import DhlApiClient, DhlApiError
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError, DpdSession
 from .dpd_tracking_api import DpdTrackingApiClient, DpdTrackingApiError
 from .hermes_tracking_api import HermesTrackingApiClient, HermesTrackingApiError
-from .ups_tracking_api import UpsAuthError, UpsTrackingApiClient, UpsTrackingApiError
+from .ups_api import UpsAccountClient, UpsApiError, UpsAuthError, UpsSession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -93,12 +92,6 @@ def _stable_status(status: str | None) -> str:
 # anonymous tracking endpoint returns "ANKOMMEND" for every parcel, sender's
 # own shipments included - hence the per-shipment override.
 _DHL_DIRECTION = {"ANKOMMEND": "receive", "EINGEHEND": "receive", "AUSGEHEND": "send"}
-
-
-def _looks_like_ups(number: str) -> bool:
-    """UPS parcel numbers are '1Z' + 16 chars. Unambiguous enough to skip
-    the DHL batch and go straight to UPS."""
-    return str(number or "").upper().replace(" ", "").startswith("1Z")
 
 
 def normalize_dhl_shipment(raw: dict) -> dict:
@@ -460,13 +453,6 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         self.dhl = DhlApiClient(session)
         self.dpd = DpdTrackingApiClient(session)
         self.hermes = HermesTrackingApiClient(session)
-        self.ups = UpsTrackingApiClient(
-            session,
-            entry.options.get(CONF_UPS_CLIENT_ID, "")
-            or entry.data.get(CONF_UPS_CLIENT_ID, ""),
-            entry.options.get(CONF_UPS_CLIENT_SECRET, "")
-            or entry.data.get(CONF_UPS_CLIENT_SECRET, ""),
-        )
         self.dhl_account = DhlAccountClient(session)
         # number -> detected carrier; kept in memory (re-detected after a
         # restart, which just means one extra probe per number).
@@ -522,8 +508,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                 if _frozen(n) is None
                 and overrides.get(n, CARRIER_DHL) == CARRIER_DHL
                 and self.carriers.get(n, CARRIER_UNKNOWN)
-                not in (CARRIER_DPD, CARRIER_HERMES, CARRIER_UPS)
-                and not (_looks_like_ups(n) and overrides.get(n) != CARRIER_DHL)
+                not in (CARRIER_DPD, CARRIER_HERMES)
             ]
         )
 
@@ -555,20 +540,8 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                 item = await self._dpd_lookup(number, postcode)
             elif forced == CARRIER_HERMES:
                 item = await self._hermes_lookup(number)
-            elif forced == CARRIER_UPS:
-                item = await self._ups_lookup(number)
             elif dhl_confirmed:
                 item, carrier = normalize_dhl_shipment(raw_dhl), CARRIER_DHL
-            elif (
-                self.ups.configured
-                and known != CARRIER_DHL
-                and (_looks_like_ups(number) or known == CARRIER_UPS)
-            ):
-                res = await self._ups_lookup(number)
-                if _has_data(res):
-                    item, carrier = res, CARRIER_UPS
-                else:
-                    item, carrier = await self._detect(number, postcode, known)
             else:
                 item, carrier = await self._detect(number, postcode, known)
 
@@ -693,21 +666,6 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             _LOGGER.warning("Hermes lookup for %s failed: %s", number, err)
             return None
 
-    async def _ups_lookup(self, number: str) -> dict | None:
-        try:
-            return await self.ups.fetch(number)
-        except UpsAuthError as err:
-            _LOGGER.warning(
-                "UPS lookup for %s failed - check the UPS Client ID/Secret "
-                "in the integration options: %s",
-                number,
-                err,
-            )
-            return None
-        except UpsTrackingApiError as err:
-            _LOGGER.warning("UPS lookup for %s failed: %s", number, err)
-            return None
-
 
 class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
     """Fetches every parcel on a myDPD account, with full scan history."""
@@ -807,6 +765,69 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
         try:
             self._session = await self.client.login(username, password)
         except DpdAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+
+
+class UpsAccountDataUpdateCoordinator(_BaseCoordinator):
+    """Every shipment on a UPS My Choice account (auto-discovered)."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
+        super().__init__(
+            hass, _LOGGER, name=f"{DOMAIN}_ups", update_interval=update_interval
+        )
+        self.entry = entry
+        self.client = UpsAccountClient(async_get_clientsession(hass))
+        # Kept in memory: the My Choice auth/address tokens expire and
+        # persisting them would reload the entry on every poll.
+        self._session: UpsSession | None = None
+
+    async def _async_update_data(self) -> dict[str, dict]:
+        self._mark_polled()
+        await self._load_archive()
+        if self._session is None:
+            await self._login()
+        try:
+            shipments = await self.client.fetch_shipments(self._session)
+        except UpsAuthError:
+            _LOGGER.info("UPS session expired, logging in again")
+            await self._login()
+            try:
+                shipments = await self.client.fetch_shipments(self._session)
+            except UpsApiError as err:
+                raise UpdateFailed(f"Error fetching UPS shipments: {err}") from err
+        except UpsApiError as err:
+            raise UpdateFailed(f"Error fetching UPS shipments: {err}") from err
+
+        names = {
+            str(k).strip(): str(v).strip()
+            for k, v in (self.entry.options.get(CONF_NAMES, {}) or {}).items()
+            if str(v).strip()
+        }
+        result: dict[str, dict] = {}
+        for item in shipments:
+            shipment_id = item.get("id")
+            if not shipment_id:
+                continue
+            item["forced"] = None
+            item["carrier_name"] = item["name"]
+            item["custom_name"] = names.get(shipment_id)
+            item["name"] = names.get(shipment_id) or item["carrier_name"]
+            await self._apply_archive(item)
+            result[shipment_id] = item
+
+        self._apply_direction_overrides(result)
+        await self._save_archive(set(result))
+        self._notify_changes(result)
+        _LOGGER.debug("Paketverfolgung (UPS): %d shipment(s)", len(result))
+        return result
+
+    async def _login(self) -> None:
+        try:
+            self._session = await self.client.login(
+                self.entry.data[CONF_UPS_USERNAME],
+                self.entry.data[CONF_UPS_PASSWORD],
+            )
+        except UpsAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
 
 

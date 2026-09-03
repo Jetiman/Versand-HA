@@ -36,12 +36,14 @@ from .const import (
 from .coordinator import (
     DpdAccountDataUpdateCoordinator,
     TrackingNumbersDataUpdateCoordinator,
+    UpsAccountDataUpdateCoordinator,
 )
 
 _SHIPMENT_COORDINATORS = (
     TrackingNumbersDataUpdateCoordinator,
     DpdAccountDataUpdateCoordinator,
     AmazonAccountDataUpdateCoordinator,
+    UpsAccountDataUpdateCoordinator,
 )
 
 _DELIVERY_TODAY_UID = f"{DOMAIN}_out_for_delivery_today"
