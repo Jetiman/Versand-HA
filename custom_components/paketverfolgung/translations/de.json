@@ -38,14 +38,6 @@
         "data": {
           "amazon_otp": "Bestätigungscode"
         }
-      },
-      "ups": {
-        "title": "Mit UPS-Konto anmelden",
-        "description": "Melde dich mit deinem ups.com-Konto an (E-Mail + Passwort). Es muss „UPS My Choice“ aktiviert sein. Alle eingehenden Sendungen an deine Adresse werden danach automatisch erkannt – ohne Sendungsnummern.",
-        "data": {
-          "ups_username": "E-Mail (ups.com-Konto)",
-          "ups_password": "Passwort"
-        }
       }
     },
     "error": {
@@ -64,8 +56,7 @@
       "options": {
         "dhl": "Sendungsnummern (DHL, DPD & Hermes)",
         "dpd": "DPD-Konto (alle Sendungen automatisch)",
-        "amazon": "Amazon.de-Konto (Lieferungen automatisch)",
-        "ups": "UPS-Konto (My Choice, alle Sendungen automatisch)"
+        "amazon": "Amazon.de-Konto (Lieferungen automatisch)"
       }
     }
   },
@@ -96,12 +87,6 @@
       },
       "amazon_options": {
         "description": "Aktualisierungsintervall für Amazon-Lieferungen anpassen.",
-        "data": {
-          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
-        }
-      },
-      "ups_options": {
-        "description": "Aktualisierungsintervall für UPS-Sendungen anpassen.",
         "data": {
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }

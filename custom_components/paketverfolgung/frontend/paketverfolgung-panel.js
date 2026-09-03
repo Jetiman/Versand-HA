@@ -12,13 +12,7 @@
  * (one per shipment/parcel, identified by the `tracking_id` attribute).
  */
 
-const PROVIDER_LABELS = {
-  dhl: "DHL",
-  dpd: "DPD",
-  hermes: "Hermes",
-  ups: "UPS",
-  amazon: "Amazon",
-};
+const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes", amazon: "Amazon" };
 
 class PaketverfolgungPanel extends HTMLElement {
   constructor() {

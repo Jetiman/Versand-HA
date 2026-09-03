@@ -38,14 +38,6 @@
         "data": {
           "amazon_otp": "Verification code"
         }
-      },
-      "ups": {
-        "title": "Sign in with a UPS account",
-        "description": "Sign in with your ups.com account (e-mail + password). “UPS My Choice” must be active. All inbound shipments to your address are then discovered automatically – no tracking numbers needed.",
-        "data": {
-          "ups_username": "E-mail (ups.com account)",
-          "ups_password": "Password"
-        }
       }
     },
     "error": {
@@ -64,8 +56,7 @@
       "options": {
         "dhl": "Tracking numbers (DHL, DPD & Hermes)",
         "dpd": "DPD account (all parcels automatically)",
-        "amazon": "Amazon.de account (deliveries automatically)",
-        "ups": "UPS account (My Choice, shipments discovered automatically)"
+        "amazon": "Amazon.de account (deliveries automatically)"
       }
     }
   },
@@ -96,12 +87,6 @@
       },
       "amazon_options": {
         "description": "Adjust the update interval for Amazon deliveries.",
-        "data": {
-          "update_interval_minutes": "Update interval (minutes)"
-        }
-      },
-      "ups_options": {
-        "description": "Adjust the refresh interval for UPS shipments.",
         "data": {
           "update_interval_minutes": "Update interval (minutes)"
         }

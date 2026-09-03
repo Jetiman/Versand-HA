@@ -24,8 +24,6 @@ from .const import (
     CONF_AMAZON_USERNAME,
     CONF_CARRIER_OVERRIDES,
     CONF_DIRECTION_OVERRIDES,
-    CONF_UPS_PASSWORD,
-    CONF_UPS_USERNAME,
     CONF_DEFAULT_POSTCODE,
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_REDIRECT,
@@ -42,11 +40,9 @@ from .const import (
     PROVIDER_AMAZON,
     PROVIDER_DPD,
     PROVIDER_NUMBERS,
-    PROVIDER_UPS,
 )
 from .dhl_account import DhlAccountClient, DhlAuthError, build_login, extract_code
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError
-from .ups_api import UpsAccountClient, UpsApiError, UpsAuthError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -111,17 +107,6 @@ _AMAZON_OTP_SCHEMA = vol.Schema(
     {vol.Required(CONF_AMAZON_OTP): selector.TextSelector(selector.TextSelectorConfig())}
 )
 
-_UPS_LOGIN_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_UPS_USERNAME): selector.TextSelector(
-            selector.TextSelectorConfig(type=selector.TextSelectorType.EMAIL)
-        ),
-        vol.Required(CONF_UPS_PASSWORD): selector.TextSelector(
-            selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
-        ),
-    }
-)
-
 
 class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Paketverfolgung."""
@@ -136,8 +121,6 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_dpd()
             if user_input[CONF_PROVIDER] == PROVIDER_AMAZON:
                 return await self.async_step_amazon()
-            if user_input[CONF_PROVIDER] == PROVIDER_UPS:
-                return await self.async_step_ups()
             return await self.async_step_dhl()
 
         return self.async_show_form(
@@ -148,12 +131,7 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_PROVIDER, default=PROVIDER_NUMBERS
                     ): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[
-                                PROVIDER_NUMBERS,
-                                PROVIDER_DPD,
-                                PROVIDER_AMAZON,
-                                PROVIDER_UPS,
-                            ],
+                            options=[PROVIDER_NUMBERS, PROVIDER_DPD, PROVIDER_AMAZON],
                             translation_key="provider",
                         )
                     ),
@@ -296,42 +274,6 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="amazon_otp", data_schema=_AMAZON_OTP_SCHEMA, errors=errors
         )
 
-    async def async_step_ups(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
-        """Connect a UPS My Choice account (ups.com e-mail + password)."""
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            username = user_input[CONF_UPS_USERNAME].strip()
-            password = user_input[CONF_UPS_PASSWORD]
-            client = UpsAccountClient(async_get_clientsession(self.hass))
-            try:
-                await client.login(username, password)
-            except UpsAuthError as err:
-                _LOGGER.warning("UPS login failed: %s", err)
-                errors["base"] = "invalid_auth"
-            except UpsApiError as err:
-                _LOGGER.warning("UPS login error: %s", err)
-                errors["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001 - surface anything else as a clean error
-                _LOGGER.exception("Unexpected error during UPS login")
-                errors["base"] = "cannot_connect"
-            else:
-                await self.async_set_unique_id(f"{PROVIDER_UPS}_{username.lower()}")
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(
-                    title=f"UPS ({username})",
-                    data={
-                        CONF_PROVIDER: PROVIDER_UPS,
-                        CONF_UPS_USERNAME: username,
-                        CONF_UPS_PASSWORD: password,
-                    },
-                )
-
-        return self.async_show_form(
-            step_id="ups", data_schema=_UPS_LOGIN_SCHEMA, errors=errors
-        )
-
     @staticmethod
     @callback
     def async_get_options_flow(entry: ConfigEntry) -> OptionsFlow:
@@ -355,8 +297,6 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
             return await self.async_step_dpd_options(user_input)
         if provider == PROVIDER_AMAZON:
             return await self.async_step_amazon_options(user_input)
-        if provider == PROVIDER_UPS:
-            return await self.async_step_ups_options(user_input)
         return await self.async_step_dhl_options(user_input)
 
     def _current(self, key, default=None):
@@ -517,25 +457,6 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
             )
         return self.async_show_form(
             step_id="amazon_options",
-            data_schema=_update_interval_schema(
-                self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
-            ),
-        )
-
-    async def async_step_ups_options(
-        self, user_input: dict[str, Any] | None = None
-    ) -> Any:
-        """UPS exposes just the refresh interval."""
-        if user_input is not None:
-            return self.async_create_entry(
-                title="",
-                data={
-                    **self._entry.options,
-                    CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
-                },
-            )
-        return self.async_show_form(
-            step_id="ups_options",
             data_schema=_update_interval_schema(
                 self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
             ),

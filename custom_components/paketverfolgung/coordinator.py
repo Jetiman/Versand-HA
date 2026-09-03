@@ -43,8 +43,6 @@ from .const import (
     CONF_NOTIFY_TARGETS,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
-    CONF_UPS_PASSWORD,
-    CONF_UPS_USERNAME,
     CONF_TRACKING_NUMBERS,
     DEFAULT_STATUS,
     DOMAIN,
@@ -68,7 +66,6 @@ from .dhl_api import DhlApiClient, DhlApiError
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError, DpdSession
 from .dpd_tracking_api import DpdTrackingApiClient, DpdTrackingApiError
 from .hermes_tracking_api import HermesTrackingApiClient, HermesTrackingApiError
-from .ups_api import UpsAccountClient, UpsApiError, UpsAuthError, UpsSession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -765,69 +762,6 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
         try:
             self._session = await self.client.login(username, password)
         except DpdAuthError as err:
-            raise ConfigEntryAuthFailed(str(err)) from err
-
-
-class UpsAccountDataUpdateCoordinator(_BaseCoordinator):
-    """Every shipment on a UPS My Choice account (auto-discovered)."""
-
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
-        super().__init__(
-            hass, _LOGGER, name=f"{DOMAIN}_ups", update_interval=update_interval
-        )
-        self.entry = entry
-        self.client = UpsAccountClient(async_get_clientsession(hass))
-        # Kept in memory: the My Choice auth/address tokens expire and
-        # persisting them would reload the entry on every poll.
-        self._session: UpsSession | None = None
-
-    async def _async_update_data(self) -> dict[str, dict]:
-        self._mark_polled()
-        await self._load_archive()
-        if self._session is None:
-            await self._login()
-        try:
-            shipments = await self.client.fetch_shipments(self._session)
-        except UpsAuthError:
-            _LOGGER.info("UPS session expired, logging in again")
-            await self._login()
-            try:
-                shipments = await self.client.fetch_shipments(self._session)
-            except UpsApiError as err:
-                raise UpdateFailed(f"Error fetching UPS shipments: {err}") from err
-        except UpsApiError as err:
-            raise UpdateFailed(f"Error fetching UPS shipments: {err}") from err
-
-        names = {
-            str(k).strip(): str(v).strip()
-            for k, v in (self.entry.options.get(CONF_NAMES, {}) or {}).items()
-            if str(v).strip()
-        }
-        result: dict[str, dict] = {}
-        for item in shipments:
-            shipment_id = item.get("id")
-            if not shipment_id:
-                continue
-            item["forced"] = None
-            item["carrier_name"] = item["name"]
-            item["custom_name"] = names.get(shipment_id)
-            item["name"] = names.get(shipment_id) or item["carrier_name"]
-            await self._apply_archive(item)
-            result[shipment_id] = item
-
-        self._apply_direction_overrides(result)
-        await self._save_archive(set(result))
-        self._notify_changes(result)
-        _LOGGER.debug("Paketverfolgung (UPS): %d shipment(s)", len(result))
-        return result
-
-    async def _login(self) -> None:
-        try:
-            self._session = await self.client.login(
-                self.entry.data[CONF_UPS_USERNAME],
-                self.entry.data[CONF_UPS_PASSWORD],
-            )
-        except UpsAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
 
 
