@@ -412,6 +412,11 @@ class PaketverfolgungPanel extends HTMLElement {
           <ha-icon icon="mdi:cog-outline"></ha-icon>
           Integration öffnen (Konten, PLZ, Intervall …)
         </button>
+        <div class="pv-footer-hint pv-hint-tight">
+          Zeigt beim Eintrag „Sendungsnummern“ über das Zahnrad alle Optionen
+          (u. a. die DHL-Konto-Anmeldung). Ein DPD- oder Amazon-Konto fügst du
+          dort über „Eintrag hinzufügen“ hinzu.
+        </div>
         <div class="pv-set-title">Benachrichtigungen</div>
         <label class="pv-switch">
           <input type="checkbox" data-notify-toggle ${nc.enabled ? "checked" : ""} ${
@@ -430,11 +435,6 @@ class PaketverfolgungPanel extends HTMLElement {
             : ""
         }
         ${nc.enabled ? this._notifyPickerHtml(nc) : ""}
-        <div class="pv-footer-hint">
-          „Integration öffnen“ zeigt beim Eintrag „Sendungsnummern“ über das
-          Zahnrad alle Optionen (u. a. die DHL-Konto-Anmeldung). Ein DPD- oder
-          Amazon-Konto fügst du dort über „Eintrag hinzufügen“ hinzu.
-        </div>
         ${this._buildInfo()}
         </div>
       </details>
@@ -1091,6 +1091,7 @@ const STYLES = `
   .pv-notify-list .pv-check { padding: 6px 0; font-size: 13px; }
   .pv-notify-list .pv-check[hidden] { display: none; }
   .pv-footer-hint { font-size: 12px; color: var(--secondary-text-color); }
+  .pv-hint-tight { margin: -6px 2px 0; line-height: 1.4; }
 
   .pv-back {
     display: inline-block; margin-bottom: 16px; cursor: pointer;
