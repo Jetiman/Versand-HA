@@ -925,14 +925,21 @@ const STYLES = `
     font-size: 20px; font-weight: 400;
     position: sticky; top: 0; z-index: 2;
   }
-  .pv-content { max-width: 980px; margin: 0 auto; padding: 16px; }
+  .pv-content {
+    max-width: 980px; margin: 14px auto; padding: 18px 16px 20px;
+    background: var(--ha-card-background, var(--card-background-color));
+    border: 1px solid var(--ha-card-border-color, var(--divider-color));
+    border-radius: var(--ha-card-border-radius, 16px);
+    box-shadow: var(--ha-card-box-shadow, none);
+  }
+  @media (max-width: 600px) { .pv-content { margin: 10px; } }
 
   .pv-stats {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
   }
   .pv-stat {
     background: var(--card-background-color); border-radius: 12px; padding: 14px;
-    box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.1)); text-align: center;
+    border: 1px solid var(--divider-color); text-align: center;
   }
   .pv-stat-value { font-size: 26px; font-weight: 600; color: var(--primary-text-color); }
   .pv-stat-label { font-size: 12px; color: var(--secondary-text-color); margin-top: 2px; }
@@ -971,9 +978,9 @@ const STYLES = `
   .pv-list { display: flex; flex-direction: column; gap: 8px; }
   .pv-row {
     display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;
-    background: var(--card-background-color); border: none; border-radius: 12px;
+    background: var(--card-background-color); border-radius: 12px;
+    border: 1px solid var(--divider-color);
     padding: 12px; cursor: pointer; color: var(--primary-text-color);
-    box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.1));
   }
   .pv-row:hover { background: var(--secondary-background-color); }
   .pv-row-num {
@@ -1130,7 +1137,7 @@ const STYLES = `
   .pv-meta {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px;
     background: var(--card-background-color); border-radius: 12px; padding: 16px;
-    margin-bottom: 24px; box-shadow: var(--ha-card-box-shadow, 0 2px 4px rgba(0,0,0,.1));
+    border: 1px solid var(--divider-color); margin-bottom: 24px;
   }
   .pv-meta-key { font-size: 12px; color: var(--secondary-text-color); }
   .pv-meta-val { font-size: 14px; color: var(--primary-text-color); margin-top: 2px; overflow-wrap: anywhere; }
