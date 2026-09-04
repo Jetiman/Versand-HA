@@ -425,17 +425,10 @@ class PaketverfolgungPanel extends HTMLElement {
       )}</div>`;
     }
 
-    const sub =
-      `${total} Sendung${total === 1 ? "" : "en"}` +
-      (outForDelivery ? ` · ${outForDelivery} in Zustellung` : "");
-
     return `
       <div class="pv-header">
         <span class="pv-logo">${LOGO_SVG}</span>
-        <div class="pv-header-text">
-          <div class="pv-brand">Paketverfolgung</div>
-          <div class="pv-brand-sub">${esc(sub)}</div>
-        </div>
+        <div class="pv-brand">Paketverfolgung</div>
       </div>
       <div class="pv-stats">${stats}</div>
       <button class="pv-next" data-refresh-all>
@@ -1025,14 +1018,11 @@ const STYLES = `
   @media (max-width: 600px) { .pv-content { margin: 4px 10px 20px; } }
 
   .pv-header {
-    display: flex; align-items: center; gap: 14px;
-    padding-bottom: 16px; margin-bottom: 16px;
-    border-bottom: 1px solid var(--divider-color);
+    display: flex; align-items: center; gap: 14px; margin-bottom: 18px;
   }
   .pv-logo { flex: none; width: 44px; height: 44px; display: block; }
   .pv-logo svg { width: 100%; height: 100%; }
   .pv-brand { font-size: 21px; font-weight: 600; color: var(--primary-text-color); }
-  .pv-brand-sub { font-size: 13px; color: var(--secondary-text-color); margin-top: 2px; }
 
   .pv-stats {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
