@@ -1009,20 +1009,20 @@ const STYLES = `
     color: var(--primary-text-color);
   }
   .pv-content {
-    max-width: 980px; margin: 4px auto 20px; padding: 18px 16px 20px;
+    max-width: 980px; margin: 8px auto 20px; padding: 28px 16px 20px;
     background: var(--ha-card-background, var(--card-background-color));
     border: 1px solid var(--ha-card-border-color, var(--divider-color));
     border-radius: var(--ha-card-border-radius, 16px);
     box-shadow: var(--ha-card-box-shadow, none);
   }
-  @media (max-width: 600px) { .pv-content { margin: 4px 10px 20px; } }
+  @media (max-width: 600px) { .pv-content { margin: 8px 10px 20px; } }
 
   .pv-header {
-    display: flex; align-items: center; gap: 14px; margin-bottom: 18px;
+    display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
   }
-  .pv-logo { flex: none; width: 44px; height: 44px; display: block; }
+  .pv-logo { flex: none; width: 58px; height: 58px; display: block; }
   .pv-logo svg { width: 100%; height: 100%; }
-  .pv-brand { font-size: 21px; font-weight: 600; color: var(--primary-text-color); }
+  .pv-brand { font-size: 23px; font-weight: 600; color: var(--primary-text-color); }
 
   .pv-stats {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
