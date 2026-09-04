@@ -124,7 +124,7 @@ CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES)
 # incl. any beta suffix; INTEGRATION_COMMIT is stamped by the release
 # commit (see the release flow) - "0000000" on an unreleased working tree.
 INTEGRATION_VERSION = "1.14.0-beta.7"
-INTEGRATION_COMMIT = "1e74445"
+INTEGRATION_COMMIT = "b9a893a"
 
 # Custom sidebar panel (buildless web component served from ./frontend).
 PANEL_URL_PATH = "paketverfolgung"
