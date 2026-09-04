@@ -14,6 +14,29 @@
 
 const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes", amazon: "Amazon" };
 
+// The integration's brand icon (brand/icon.svg), inlined so the panel needs
+// no extra static asset.
+const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-hidden="true">
+  <polygon points="128,40 216,78 128,116 40,78" fill="#E3A96A"/>
+  <polygon points="40,78 128,116 128,208 40,170" fill="#B97A3D"/>
+  <polygon points="216,78 128,116 128,208 216,170" fill="#C9884B"/>
+  <polygon points="128,40 152,50.5 128,61 104,50.5" fill="#F3D9B1"/>
+  <polygon points="118,44.4 138,53 138,103 118,94.4" fill="#F3D9B1"/>
+  <polygon points="118,94.4 128,98.8 128,204.8 118,200.4" fill="#8A5A2B" opacity="0.55"/>
+  <polygon points="128,98.8 138,103 138,209 128,204.8" fill="#8A5A2B" opacity="0.35"/>
+  <polygon points="40,116 128,153.4 128,164.6 40,127.2" fill="#F3D9B1" opacity="0.9"/>
+  <polygon points="128,153.4 216,116 216,127.2 128,164.6" fill="#F3D9B1" opacity="0.9"/>
+  <polygon points="128,40 216,78 216,170 128,208 40,170 40,78" fill="none" stroke="#6E4423" stroke-width="4" stroke-linejoin="round"/>
+  <polyline points="40,78 128,116 216,78" fill="none" stroke="#6E4423" stroke-width="4" stroke-linejoin="round"/>
+  <line x1="128" y1="116" x2="128" y2="208" stroke="#6E4423" stroke-width="4"/>
+  <g transform="translate(168,150)">
+    <circle cx="34" cy="34" r="40" fill="#2F6FED"/>
+    <circle cx="34" cy="34" r="40" fill="none" stroke="#F5F8FF" stroke-width="5"/>
+    <path d="M34 14 C22 14 13 23 13 35 C13 50 34 62 34 62 C34 62 55 50 55 35 C55 23 46 14 34 14 Z" fill="#F5F8FF"/>
+    <circle cx="34" cy="34" r="8" fill="#2F6FED"/>
+  </g>
+</svg>`;
+
 class PaketverfolgungPanel extends HTMLElement {
   constructor() {
     super();
@@ -324,10 +347,7 @@ class PaketverfolgungPanel extends HTMLElement {
 
     this.innerHTML = `
       <style>${STYLES}</style>
-      <div class="pv-toolbar">
-        <ha-menu-button></ha-menu-button>
-        <div class="pv-title">Paketverfolgung</div>
-      </div>
+      <div class="pv-toolbar"><ha-menu-button></ha-menu-button></div>
       <div class="pv-content">${body}</div>
     `;
 
@@ -405,7 +425,18 @@ class PaketverfolgungPanel extends HTMLElement {
       )}</div>`;
     }
 
+    const sub =
+      `${total} Sendung${total === 1 ? "" : "en"}` +
+      (outForDelivery ? ` · ${outForDelivery} in Zustellung` : "");
+
     return `
+      <div class="pv-header">
+        <span class="pv-logo">${LOGO_SVG}</span>
+        <div class="pv-header-text">
+          <div class="pv-brand">Paketverfolgung</div>
+          <div class="pv-brand-sub">${esc(sub)}</div>
+        </div>
+      </div>
       <div class="pv-stats">${stats}</div>
       <button class="pv-next" data-refresh-all>
         <ha-icon icon="mdi:timer-sync-outline"></ha-icon>
@@ -980,21 +1011,28 @@ function fmtRelative(value) {
 const STYLES = `
   :host { display: block; background: var(--primary-background-color); min-height: 100vh; }
   .pv-toolbar {
-    display: flex; align-items: center; gap: 16px;
-    height: var(--header-height, 56px); padding: 0 16px;
-    background: var(--app-header-background-color, var(--primary-color));
-    color: var(--app-header-text-color, #fff);
-    font-size: 20px; font-weight: 400;
-    position: sticky; top: 0; z-index: 2;
+    display: flex; align-items: center;
+    height: 48px; padding: 4px 8px;
+    color: var(--primary-text-color);
   }
   .pv-content {
-    max-width: 980px; margin: 14px auto; padding: 18px 16px 20px;
+    max-width: 980px; margin: 4px auto 20px; padding: 18px 16px 20px;
     background: var(--ha-card-background, var(--card-background-color));
     border: 1px solid var(--ha-card-border-color, var(--divider-color));
     border-radius: var(--ha-card-border-radius, 16px);
     box-shadow: var(--ha-card-box-shadow, none);
   }
-  @media (max-width: 600px) { .pv-content { margin: 10px; } }
+  @media (max-width: 600px) { .pv-content { margin: 4px 10px 20px; } }
+
+  .pv-header {
+    display: flex; align-items: center; gap: 14px;
+    padding-bottom: 16px; margin-bottom: 16px;
+    border-bottom: 1px solid var(--divider-color);
+  }
+  .pv-logo { flex: none; width: 44px; height: 44px; display: block; }
+  .pv-logo svg { width: 100%; height: 100%; }
+  .pv-brand { font-size: 21px; font-weight: 600; color: var(--primary-text-color); }
+  .pv-brand-sub { font-size: 13px; color: var(--secondary-text-color); margin-top: 2px; }
 
   .pv-stats {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
