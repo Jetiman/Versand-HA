@@ -342,16 +342,17 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     ) -> None:
         name = item.get("name") or item.get("id")
         carrier = (item.get("carrier") or "").upper()
-        status = item.get("status") or ""
+        status = (item.get("status") or "").strip()
+        # The status line is "what changed" - make it the headline so it's
+        # readable at a glance; the shipment name goes in the body.
         if action == "detected":
-            title = "Neue Sendung"
-            message = f"{name}" + (f" ({carrier})" if carrier else "")
-        elif item.get("delivered"):
-            title = "Zugestellt"
-            message = f"{name}: {status}"
+            headline = "Neue Sendung" + (f" · {carrier}" if carrier else "")
+        elif not status or status == NO_DATA_STATUS:
+            headline = "Zugestellt" if item.get("delivered") else "Sendungs-Update"
         else:
-            title = "Sendungs-Update"
-            message = f"{name}: {status}"
+            headline = status
+        title = f"\U0001f4e6 {headline}"
+        message = name
 
         registry = er.async_get(self.hass)
         entity_id = registry.async_get_entity_id(
@@ -380,7 +381,7 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                     "notify",
                     service,
                     {
-                        "title": f"Paketverfolgung – {title}",
+                        "title": title,
                         "message": message,
                         "data": {"clickAction": click_path},
                     },
