@@ -2,7 +2,7 @@
 
 One sensor entity per tracked shipment/parcel (from either coordinator -
 they share the same normalized shape), plus a single provider-wide
-"Heute in Zustellung" summary sensor. Entities appear and disappear as
+"In Zustellung" summary sensor. Entities appear and disappear as
 shipments enter and leave the coordinators' data.
 """
 from __future__ import annotations
@@ -318,7 +318,7 @@ class _AllCoordinatorsSensor(SensorEntity):
 class CombinedOutForDeliveryTodaySensor(_AllCoordinatorsSensor):
     """Counts shipments currently out for delivery, across *all* providers."""
 
-    _attr_name = "Heute in Zustellung"
+    _attr_name = "In Zustellung"
     _attr_icon = "mdi:truck-delivery"
     _attr_native_unit_of_measurement = "Sendungen"
 

@@ -335,7 +335,7 @@ class PaketverfolgungPanel extends HTMLElement {
     const stats = [
       ["Sendungen", total],
       ["Unterwegs", inTransit],
-      ["Heute in Zustellung", outForDelivery],
+      ["In Zustellung", outForDelivery],
     ]
       .map(
         ([label, value]) => `

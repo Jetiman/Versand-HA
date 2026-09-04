@@ -85,7 +85,7 @@ Pro Sendung ein Sensor mit:
 
 Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
-- **„Heute in Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Gesamtzahl der Sendungen, die gerade im Zustellfahrzeug sind; Attribut `shipments` enthält die Liste (inkl. Anbieter), `next_update` den nächsten Abfragezeitpunkt.
+- **„In Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Gesamtzahl der Sendungen, die gerade im Zustellfahrzeug sind; Attribut `shipments` enthält die Liste (inkl. Anbieter), `next_update` den nächsten Abfragezeitpunkt.
 - **„Nächste Aktualisierung“** (`sensor.naechste_aktualisierung`, Diagnose): Zeitstempel der nächsten Abfrage – HA zeigt das automatisch als „in X Minuten“.
 
 ## Benachrichtigungen
@@ -102,7 +102,7 @@ Die Einstellung gilt **global** (für alle Einträge) und wird über den Dienst 
 
 Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolgung**:
 
-- **Übersicht:** Kacheln (Gesamt / Unterwegs / Heute in Zustellung), eine Zeile „Nächste Aktualisierung in ~X Min“ (Klick = sofort aktualisieren), Eingabefeld „Sendungsnummer hinzufügen (DHL, DPD, Hermes)“ und die nummerierte Liste aller Sendungen – zuletzt geändert zuerst, mit Datum und Uhrzeit der letzten Änderung.
+- **Übersicht:** Kacheln (Gesamt / Unterwegs / In Zustellung), eine Zeile „Nächste Aktualisierung in ~X Min“ (Klick = sofort aktualisieren), Eingabefeld „Sendungsnummer hinzufügen (DHL, DPD, Hermes)“ und die nummerierte Liste aller Sendungen – zuletzt geändert zuerst, mit Datum und Uhrzeit der letzten Änderung.
 - **Archiv:** 24 Stunden nach der Zustellung wandert eine Sendung in den ausklappbaren Bereich „Archiv“ am Ende der Liste (Kacheln und aktive Liste bleiben so übersichtlich). Archivierte Sendungen werden nicht mehr abgefragt, bleiben aber inkl. Verlauf abrufbar. Der Zustellzeitpunkt kommt aus dem Verlauf; fehlt er (z. B. DPD-Konto ohne erreichbaren Verlauf), zählt der Zeitpunkt, an dem HA die Sendung zuerst als zugestellt gesehen hat – dieser wird gespeichert und übersteht Neustarts. Das Sensor-Attribut `archived` zeigt den Zustand auch außerhalb der Oberfläche.
 - **Detailseite:** Klick auf eine Sendung → aktueller Status, Eckdaten, Link zur Anbieter-Seite, Buttons „Jetzt aktualisieren“ / „Löschen“, ein **Namensfeld** (eigenes Label statt des Anbieter-Namens), ein Auswahlfeld zum manuellen Festlegen des Anbieters und der **komplette Sendungsverlauf** als Zeitleiste.
 - **Einstellungen:** ausklappbarer Bereich am Ende der Übersicht – Button „Integration öffnen“ (Konten, PLZ, Intervall) sowie direkt hier der **Benachrichtigungs-Schalter** und die **Ziel-Liste**.
