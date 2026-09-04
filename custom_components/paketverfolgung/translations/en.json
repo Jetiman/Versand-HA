@@ -160,6 +160,10 @@
         "out_for_delivery_only": {
           "name": "Only when out for delivery",
           "description": "When on, notify only once a shipment goes out for delivery or is delivered – no message for intermediate scans."
+        },
+        "short_name": {
+          "name": "Shorten shipment name",
+          "description": "Trims long shipment names (Amazon product titles etc.) in the notification body."
         }
       }
     },
@@ -176,6 +180,10 @@
           "description": "send, receive or auto."
         }
       }
+    },
+    "test_notification": {
+      "name": "Send a test notification",
+      "description": "Sends a sample notification to the configured targets, in the exact same format as a real one, with the current settings."
     }
   }
 }

@@ -133,3 +133,18 @@ set_notifications:
       default: false
       selector:
         boolean:
+    short_name:
+      name: Sendungsnamen kürzen
+      description: >-
+        Kürzt lange Sendungsnamen (Amazon-Produkttitel usw.) im Text der
+        Benachrichtigung.
+      required: false
+      default: false
+      selector:
+        boolean:
+
+test_notification:
+  name: Test-Benachrichtigung senden
+  description: >-
+    Schickt eine Beispiel-Benachrichtigung an die konfigurierten Ziele – im
+    exakt gleichen Format wie eine echte, mit den aktuellen Einstellungen.

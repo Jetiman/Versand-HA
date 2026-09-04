@@ -64,8 +64,12 @@ CONF_NOTIFY_TARGETS = "notify_targets"
 # When set, only notify once a shipment reaches "out for delivery" (or
 # "delivered") - no message for every intermediate scan.
 CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY = "notify_out_for_delivery_only"
+# When set, the shipment name in the notification body is trimmed (long
+# Amazon product titles etc.).
+CONF_NOTIFY_SHORT_NAME = "notify_short_name"
 EVENT_NOTIFICATION = f"{DOMAIN}_notification"
 SERVICE_SET_NOTIFICATIONS = "set_notifications"
+SERVICE_TEST_NOTIFICATION = "test_notification"
 
 # Dispatcher signal fired after every coordinator refresh (success or not).
 # The cross-provider summary sensors listen on this instead of subscribing
@@ -119,7 +123,7 @@ CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES)
 # identifiable at a glance. INTEGRATION_VERSION carries the full label
 # incl. any beta suffix; INTEGRATION_COMMIT is stamped by the release
 # commit (see the release flow) - "0000000" on an unreleased working tree.
-INTEGRATION_VERSION = "1.14.0-beta.6"
+INTEGRATION_VERSION = "1.14.0-beta.7"
 INTEGRATION_COMMIT = "1e74445"
 
 # Custom sidebar panel (buildless web component served from ./frontend).

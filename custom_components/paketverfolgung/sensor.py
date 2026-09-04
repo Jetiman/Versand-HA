@@ -24,6 +24,7 @@ from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .const import (
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
+    CONF_NOTIFY_SHORT_NAME,
     CONF_NOTIFY_TARGETS,
     CONF_PROVIDER,
     DEFAULT_ICON,
@@ -360,6 +361,7 @@ class CombinedOutForDeliveryTodaySensor(_AllCoordinatorsSensor):
             "notify_out_for_delivery_only": bool(
                 opts.get(CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY)
             ),
+            "notify_short_name": bool(opts.get(CONF_NOTIFY_SHORT_NAME)),
             "integration_version": INTEGRATION_VERSION,
             "integration_commit": INTEGRATION_COMMIT,
         }

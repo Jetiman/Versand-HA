@@ -186,6 +186,7 @@ class PaketverfolgungPanel extends HTMLElement {
       targets: Array.isArray(a.notify_targets) ? a.notify_targets : [],
       services: Array.isArray(a.notify_services) ? a.notify_services : [],
       ofdOnly: a.notify_out_for_delivery_only === true,
+      shortName: a.notify_short_name === true,
     };
   }
 
@@ -232,7 +233,7 @@ class PaketverfolgungPanel extends HTMLElement {
     });
   }
 
-  _setNotifications(enabled, targets, ofdOnly) {
+  _setNotifications(enabled, targets, ofdOnly, shortName) {
     this._notifyBusy = true;
     this._sig = null;
     this._render(true);
@@ -241,12 +242,40 @@ class PaketverfolgungPanel extends HTMLElement {
         enabled,
         targets,
         out_for_delivery_only: ofdOnly === true,
+        short_name: shortName === true,
       })
     ).finally(() => {
       this._notifyBusy = false;
       this._sig = null;
       this._render(true);
     });
+  }
+
+  _testNotification() {
+    this._testBusy = true;
+    this._testMsg = "";
+    this._sig = null;
+    this._render(true);
+    Promise.resolve(
+      this._hass.callService("paketverfolgung", "test_notification", {})
+    )
+      .then(() => {
+        this._testMsg = "Test gesendet ✓";
+      })
+      .catch((e) => {
+        this._testMsg = "Fehler: " + ((e && e.message) || e);
+      })
+      .finally(() => {
+        this._testBusy = false;
+        this._sig = null;
+        this._render(true);
+        clearTimeout(this._testTimer);
+        this._testTimer = setTimeout(() => {
+          this._testMsg = "";
+          this._sig = null;
+          this._render(true);
+        }, 5000);
+      });
   }
 
   /* ---------- rendering ---------- */
@@ -269,6 +298,8 @@ class PaketverfolgungPanel extends HTMLElement {
       notifyBusy: this._notifyBusy,
       notifyPickerOpen: this._notifyPickerOpen,
       notify: nc,
+      testBusy: this._testBusy || false,
+      testMsg: this._testMsg || "",
       build: this._buildInfo(),
       items: shipments.map((s) => [
         s.entity_id,
@@ -431,7 +462,23 @@ class PaketverfolgungPanel extends HTMLElement {
                    nc.ofdOnly ? "checked" : ""
                  } ${this._notifyBusy ? "disabled" : ""} />
                  <span>Nur wenn eine Sendung in Zustellung geht <em>(Preview)</em></span>
-               </label>`
+               </label>
+               <label class="pv-switch pv-switch-sub">
+                 <input type="checkbox" data-notify-short ${
+                   nc.shortName ? "checked" : ""
+                 } ${this._notifyBusy ? "disabled" : ""} />
+                 <span>Langen Sendungsnamen kürzen</span>
+               </label>
+               <div class="pv-test-row">
+                 <button class="pv-mini-btn" data-notify-test ${
+                   this._testBusy ? "disabled" : ""
+                 }>Test senden</button>
+                 ${
+                   this._testMsg
+                     ? `<span class="pv-test-msg">${esc(this._testMsg)}</span>`
+                     : ""
+                 }
+               </div>`
             : ""
         }
         ${nc.enabled ? this._notifyPickerHtml(nc) : ""}
@@ -685,6 +732,11 @@ class PaketverfolgungPanel extends HTMLElement {
       this._render(true);
       return;
     }
+    if (ev.target.closest("[data-notify-test]")) {
+      ev.preventDefault();
+      if (!this._testBusy) this._testNotification();
+      return;
+    }
     const refreshAll = ev.target.closest("[data-refresh-all]");
     if (refreshAll) {
       const ids = this._shipments().map((s) => s.entity_id);
@@ -734,12 +786,22 @@ class PaketverfolgungPanel extends HTMLElement {
   _onChange(ev) {
     if (ev.target.matches("[data-notify-toggle]")) {
       const nc = this._notifyConfig();
-      this._setNotifications(ev.target.checked, nc.targets, nc.ofdOnly);
+      this._setNotifications(
+        ev.target.checked,
+        nc.targets,
+        nc.ofdOnly,
+        nc.shortName
+      );
       return;
     }
     if (ev.target.matches("[data-notify-ofd]")) {
       const nc = this._notifyConfig();
-      this._setNotifications(true, nc.targets, ev.target.checked);
+      this._setNotifications(true, nc.targets, ev.target.checked, nc.shortName);
+      return;
+    }
+    if (ev.target.matches("[data-notify-short]")) {
+      const nc = this._notifyConfig();
+      this._setNotifications(true, nc.targets, nc.ofdOnly, ev.target.checked);
       return;
     }
     if (ev.target.matches("[data-notify-target]")) {
@@ -749,7 +811,7 @@ class PaketverfolgungPanel extends HTMLElement {
       )
         .filter((el) => el.checked)
         .map((el) => el.getAttribute("data-notify-target"));
-      this._setNotifications(true, targets, nc.ofdOnly);
+      this._setNotifications(true, targets, nc.ofdOnly, nc.shortName);
       return;
     }
     const pick = ev.target.closest("[data-carrier]");
@@ -1058,6 +1120,14 @@ const STYLES = `
   .pv-switch input, .pv-check input { width: 18px; height: 18px; flex: none; accent-color: var(--primary-color); }
   .pv-switch-sub { margin: -4px 0 0 28px; font-size: 13px; color: var(--secondary-text-color); }
   .pv-switch-sub em { font-style: normal; opacity: 0.7; }
+  .pv-test-row { display: flex; align-items: center; gap: 10px; margin: 2px 0 0 28px; }
+  .pv-mini-btn {
+    padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+    border: 1px solid var(--divider-color); background: var(--secondary-background-color);
+    color: var(--primary-text-color);
+  }
+  .pv-mini-btn[disabled] { opacity: .5; cursor: default; }
+  .pv-test-msg { font-size: 12px; color: var(--secondary-text-color); }
   .pv-version {
     margin-top: 10px; text-align: right; font-size: 11px;
     color: var(--secondary-text-color); opacity: 0.6; font-variant-numeric: tabular-nums;

@@ -41,6 +41,7 @@ from .const import (
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
+    CONF_NOTIFY_SHORT_NAME,
     CONF_NOTIFY_TARGETS,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
@@ -85,6 +86,38 @@ _VOLATILE_STATUS_RE = re.compile(
 
 def _stable_status(status: str | None) -> str:
     return _VOLATILE_STATUS_RE.sub("", status or "").strip(" .,")
+
+
+def _short_name(name: str, limit: int = 42) -> str:
+    """Trim a long shipment name (Amazon product titles) for a notification.
+
+    Word-boundary cut - no comma split, German uses "," as a decimal point
+    ("Kabel 0,25M").
+    """
+    name = (name or "").strip()
+    if len(name) <= limit:
+        return name
+    cut = name[:limit].rsplit(" ", 1)[0].rstrip(" ,;:.-–—") or name[:limit]
+    return cut + " …"
+
+
+def format_notification(
+    item: dict, action: str, short_name: bool
+) -> tuple[str, str]:
+    """(title, message) for a shipment notification. Title = the status line
+    (what changed), message = the shipment name."""
+    name = item.get("name") or item.get("id") or "Sendung"
+    if short_name:
+        name = _short_name(name)
+    carrier = (item.get("carrier") or "").upper()
+    status = (item.get("status") or "").strip()
+    if action == "detected":
+        headline = "Neue Sendung" + (f" · {carrier}" if carrier else "")
+    elif not status or status == NO_DATA_STATUS:
+        headline = "Zugestellt" if item.get("delivered") else "Sendungs-Update"
+    else:
+        headline = status
+    return f"\U0001f4e6 {headline}", name
 
 
 # DHL's sendungsrichtung -> the panel's canonical direction values. Note the
@@ -341,18 +374,12 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         previous_status: str | None,
     ) -> None:
         name = item.get("name") or item.get("id")
-        carrier = (item.get("carrier") or "").upper()
         status = (item.get("status") or "").strip()
-        # The status line is "what changed" - make it the headline so it's
-        # readable at a glance; the shipment name goes in the body.
-        if action == "detected":
-            headline = "Neue Sendung" + (f" · {carrier}" if carrier else "")
-        elif not status or status == NO_DATA_STATUS:
-            headline = "Zugestellt" if item.get("delivered") else "Sendungs-Update"
-        else:
-            headline = status
-        title = f"\U0001f4e6 {headline}"
-        message = name
+        title, message = format_notification(
+            item,
+            action,
+            bool(self.entry.options.get(CONF_NOTIFY_SHORT_NAME)),
+        )
 
         registry = er.async_get(self.hass)
         entity_id = registry.async_get_entity_id(

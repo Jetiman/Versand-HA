@@ -27,6 +27,7 @@ from .const import (
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
+    CONF_NOTIFY_SHORT_NAME,
     CONF_NOTIFY_TARGETS,
     CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
@@ -49,10 +50,12 @@ from .const import (
     SERVICE_SET_DIRECTION,
     SERVICE_SET_NAME,
     SERVICE_SET_NOTIFICATIONS,
+    SERVICE_TEST_NOTIFICATION,
 )
 from .coordinator import (
     DpdAccountDataUpdateCoordinator,
     TrackingNumbersDataUpdateCoordinator,
+    format_notification,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -143,6 +146,7 @@ _SET_NOTIFICATIONS_SCHEMA = vol.Schema(
         vol.Optional("enabled", default=True): vol.Coerce(bool),
         vol.Optional("targets", default=list): _as_str_list,
         vol.Optional("out_for_delivery_only", default=False): vol.Coerce(bool),
+        vol.Optional("short_name", default=False): vol.Coerce(bool),
     }
 )
 
@@ -212,7 +216,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 bool(call.data.get("enabled", True)),
                 call.data.get("targets", []),
                 bool(call.data.get("out_for_delivery_only", False)),
+                bool(call.data.get("short_name", False)),
             )
+
+        async def _async_test_notification(call: ServiceCall) -> None:
+            await _test_notification(hass)
 
         hass.services.async_register(
             DOMAIN,
@@ -254,6 +262,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_SET_NOTIFICATIONS,
             _async_set_notifications,
             schema=_SET_NOTIFICATIONS_SCHEMA,
+        )
+        hass.services.async_register(
+            DOMAIN, SERVICE_TEST_NOTIFICATION, _async_test_notification
         )
 
     return True
@@ -425,6 +436,7 @@ def _set_notifications(
     enabled: bool,
     targets: list[str],
     out_for_delivery_only: bool = False,
+    short_name: bool = False,
 ) -> None:
     """Store the notification on/off flag + target list on every entry."""
     clean = [
@@ -440,6 +452,7 @@ def _set_notifications(
                 CONF_NOTIFY_ENABLED: enabled,
                 CONF_NOTIFY_TARGETS: clean,
                 CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY: out_for_delivery_only,
+                CONF_NOTIFY_SHORT_NAME: short_name,
             },
         )
     for coordinator in hass.data.get(DOMAIN, {}).values():
@@ -450,6 +463,48 @@ def _set_notifications(
         "an" if enabled else "aus",
         clean,
     )
+
+
+async def _test_notification(hass: HomeAssistant) -> None:
+    """Send a sample notification to the configured targets, in the exact
+    format a real one would use (respects the current options)."""
+    entries = hass.config_entries.async_entries(DOMAIN)
+    opts = entries[0].options if entries else {}
+    targets = [
+        t[len("notify."):] if str(t).startswith("notify.") else str(t)
+        for t in (opts.get(CONF_NOTIFY_TARGETS) or [])
+        if str(t).strip()
+    ]
+    if not targets:
+        raise ServiceValidationError(
+            "Keine Benachrichtigungs-Ziele konfiguriert - unten in den "
+            "Einstellungen unter 'Ziele' mindestens einen Dienst wählen."
+        )
+    sample = {
+        "id": "TEST",
+        "name": (
+            "MejaRizon Micro HDMI auf Mini HDMI Kabel 0,25M, kompatibel mit "
+            "Kamera-Tablet-Monitor, 1080p Audio-Video-Signalübertragung"
+        ),
+        "carrier": "dhl",
+        "status": "In Zustellung. Zustellung heute 14:00 – 18:00 Uhr",
+        "delivered": False,
+    }
+    title, message = format_notification(
+        sample, "changed", bool(opts.get(CONF_NOTIFY_SHORT_NAME))
+    )
+    for service in targets:
+        await hass.services.async_call(
+            "notify",
+            service,
+            {
+                "title": f"Test · {title}",
+                "message": message,
+                "data": {"clickAction": f"/{PANEL_URL_PATH}"},
+            },
+            blocking=False,
+        )
+    _LOGGER.info("Paketverfolgung: Test-Benachrichtigung an %s", targets)
 
 
 def _reload_relevant(entry: ConfigEntry) -> str:
@@ -465,6 +520,7 @@ def _reload_relevant(entry: ConfigEntry) -> str:
         CONF_NOTIFY_ENABLED,
         CONF_NOTIFY_TARGETS,
         CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
+        CONF_NOTIFY_SHORT_NAME,
     )
     data = {k: v for k, v in entry.data.items() if k not in skip_data}
     options = {k: v for k, v in entry.options.items() if k not in skip_options}
