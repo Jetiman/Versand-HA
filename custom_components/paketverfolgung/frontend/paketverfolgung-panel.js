@@ -1032,16 +1032,6 @@ const STYLES = `
     border-radius: var(--ha-card-border-radius, 16px);
     box-shadow: var(--ha-card-box-shadow, none);
   }
-  @media (max-width: 600px) {
-    .pv-content { margin: 8px 20px 20px; padding-top: 20px; }
-    .pv-header { gap: 12px; margin-bottom: 16px; }
-    .pv-logo { width: 44px; height: 44px; }
-    .pv-brand { font-size: 20px; }
-    .pv-stats { margin-bottom: 12px; }
-    .pv-stat { padding: 10px; }
-    .pv-stat-value { font-size: 22px; }
-  }
-
   .pv-header {
     display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
   }
@@ -1058,6 +1048,16 @@ const STYLES = `
   }
   .pv-stat-value { font-size: 26px; font-weight: 600; color: var(--primary-text-color); }
   .pv-stat-label { font-size: 12px; color: var(--secondary-text-color); margin-top: 2px; }
+
+  @media (max-width: 600px) {
+    .pv-content { margin: 8px 20px 20px; padding-top: 20px; }
+    .pv-header { gap: 12px; margin-bottom: 16px; }
+    .pv-logo { width: 44px; height: 44px; }
+    .pv-brand { font-size: 20px; }
+    .pv-stats { margin-bottom: 12px; }
+    .pv-stat { padding: 10px; }
+    .pv-stat-value { font-size: 22px; }
+  }
 
   .pv-next {
     display: flex; align-items: center; gap: 8px; width: 100%; cursor: pointer;
