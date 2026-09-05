@@ -534,12 +534,13 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             return {}
 
         def _frozen(n: str) -> dict | None:
-            """A previously-delivered item, unless its carrier override just
-            changed - once a carrier confirms delivery there is nothing left
-            to learn, so it's no longer re-queried (only its archive clock
-            keeps ticking, from cached data)."""
+            """A previously-archived item, unless its carrier override just
+            changed - archived shipments are no longer re-queried. A
+            delivered-but-not-yet-archived shipment keeps being queried
+            normally for the rest of the grace period (its status could
+            still change, e.g. a correction from the carrier)."""
             prev = (self.data or {}).get(n)
-            if prev and prev.get("delivered") and overrides.get(n) in (
+            if prev and prev.get("archived") and overrides.get(n) in (
                 None,
                 prev.get("carrier"),
             ):
@@ -548,7 +549,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
 
         # Only batch-query DHL for numbers that could still be DHL: not
         # locked to another carrier, not pinned to a non-DHL one, and not
-        # already delivered.
+        # already archived.
         dhl_by_id = await self._dhl_lookup(
             [
                 n
@@ -574,8 +575,8 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                 item.setdefault("carrier_name", item.get("name"))
                 item["custom_name"] = names.get(number)
                 item["name"] = names.get(number) or item["carrier_name"]
+                item["archived"] = True
                 self.carriers[number] = item["carrier"]
-                await self._apply_archive(item)
                 result[number] = item
                 continue
 
