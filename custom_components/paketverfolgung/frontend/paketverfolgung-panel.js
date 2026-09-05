@@ -615,6 +615,9 @@ class PaketverfolgungPanel extends HTMLElement {
     } else if (s.archived) {
       note = `<div class="pv-note">Archiviert – vor über 24 Stunden zugestellt. Diese Sendung
         wird nicht mehr abgefragt, bleibt aber im Archiv abrufbar.</div>`;
+    } else if (s.delivered) {
+      note = `<div class="pv-note">Zugestellt – wird nicht mehr abgefragt. Wandert automatisch
+        24 Stunden nach der Zustellung ins Archiv, oder direkt über den Button oben.</div>`;
     } else if (!s.events.length && (s.provider === "DPD" || s.provider === "Hermes" || s.provider === "Amazon")) {
       note = `<div class="pv-note">Für diese Sendung liegt noch kein Verlauf vor.</div>`;
     }
@@ -637,6 +640,11 @@ class PaketverfolgungPanel extends HTMLElement {
           s.tracking_url
             ? `<a class="pv-linkbtn" href="${esc(s.tracking_url)}" target="_blank"
                 rel="noreferrer noopener">Beim Anbieter öffnen</a>`
+            : ""
+        }
+        ${
+          s.delivered && !s.archived
+            ? `<button data-archive-now="${esc(s.tracking_id)}">Ins Archiv verschieben</button>`
             : ""
         }
         ${
@@ -781,6 +789,15 @@ class PaketverfolgungPanel extends HTMLElement {
       });
       refresh.disabled = true;
       refresh.textContent = "Wird aktualisiert …";
+      return;
+    }
+    const archiveNow = ev.target.closest("[data-archive-now]");
+    if (archiveNow) {
+      this._hass.callService("paketverfolgung", "archive_now", {
+        tracking_number: archiveNow.getAttribute("data-archive-now"),
+      });
+      archiveNow.disabled = true;
+      archiveNow.textContent = "Wird archiviert …";
       return;
     }
     const del = ev.target.closest("[data-delete]");

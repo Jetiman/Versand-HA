@@ -93,6 +93,7 @@ SERVICE_REMOVE_TRACKING_NUMBER = "remove_tracking_number"
 SERVICE_SET_CARRIER = "set_tracking_carrier"
 SERVICE_SET_NAME = "set_tracking_name"
 SERVICE_SET_DIRECTION = "set_tracking_direction"
+SERVICE_ARCHIVE_NOW = "archive_now"
 ATTR_TRACKING_NUMBER = "tracking_number"
 ATTR_CARRIER = "carrier"
 ATTR_NAME = "name"
@@ -107,6 +108,11 @@ DIRECTION_SEND = "send"
 DIRECTION_RECEIVE = "receive"
 DIRECTION_AUTO = "auto"
 DIRECTIONS = (DIRECTION_SEND, DIRECTION_RECEIVE)
+
+# Per-id flag (dict keyed by tracking number/parcel id -> True) letting the
+# user move a delivered shipment into the archive right away instead of
+# waiting for the ARCHIVE_AFTER_HOURS grace period.
+CONF_MANUAL_ARCHIVE = "manual_archive"
 
 # Carrier a tracking number was detected to belong to. Kept per number in
 # the tracking-number coordinator (in memory - re-detected after a
@@ -123,7 +129,7 @@ CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES)
 # identifiable at a glance. INTEGRATION_VERSION carries the full label
 # incl. any beta suffix; INTEGRATION_COMMIT is stamped by the release
 # commit (see the release flow) - "0000000" on an unreleased working tree.
-INTEGRATION_VERSION = "1.14.0"
+INTEGRATION_VERSION = "1.14.1-beta.1"
 INTEGRATION_COMMIT = "1bfa115"
 
 # Custom sidebar panel (buildless web component served from ./frontend).

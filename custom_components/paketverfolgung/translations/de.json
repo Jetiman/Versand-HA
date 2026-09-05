@@ -184,6 +184,16 @@
     "test_notification": {
       "name": "Test-Benachrichtigung senden",
       "description": "Schickt eine Beispiel-Benachrichtigung an die konfigurierten Ziele – im gleichen Format wie eine echte, mit den aktuellen Einstellungen."
+    },
+    "archive_now": {
+      "name": "Jetzt archivieren",
+      "description": "Verschiebt eine bereits zugestellte Sendung sofort ins Archiv, statt die 24-Stunden-Frist abzuwarten.",
+      "fields": {
+        "tracking_number": {
+          "name": "Sendungsnummer",
+          "description": "Die Sendungs-/Trackingnummer (bei Amazon die Bestellnummer)."
+        }
+      }
     }
   }
 }

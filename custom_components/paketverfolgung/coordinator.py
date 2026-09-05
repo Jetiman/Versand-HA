@@ -38,6 +38,7 @@ from .const import (
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_SESSION,
     CONF_DIRECTION_OVERRIDES,
+    CONF_MANUAL_ARCHIVE,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
@@ -454,7 +455,8 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 moment = dt_util.parse_datetime(iso) or dt_util.utcnow()
 
         item["delivered_at"] = moment.isoformat()
-        item["archived"] = dt_util.utcnow() - moment >= ARCHIVE_AFTER
+        manual = sid in (self.entry.options.get(CONF_MANUAL_ARCHIVE, {}) or {})
+        item["archived"] = manual or dt_util.utcnow() - moment >= ARCHIVE_AFTER
 
     async def _estimate_delivery_moment(self, sid: str, item: dict) -> datetime:
         """Best guess at when an already-delivered parcel (no dated event)
@@ -532,10 +534,12 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             return {}
 
         def _frozen(n: str) -> dict | None:
-            """A previously-archived item, unless its carrier override just
-            changed - archived shipments are no longer re-queried."""
+            """A previously-delivered item, unless its carrier override just
+            changed - once a carrier confirms delivery there is nothing left
+            to learn, so it's no longer re-queried (only its archive clock
+            keeps ticking, from cached data)."""
             prev = (self.data or {}).get(n)
-            if prev and prev.get("archived") and overrides.get(n) in (
+            if prev and prev.get("delivered") and overrides.get(n) in (
                 None,
                 prev.get("carrier"),
             ):
@@ -544,7 +548,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
 
         # Only batch-query DHL for numbers that could still be DHL: not
         # locked to another carrier, not pinned to a non-DHL one, and not
-        # already archived.
+        # already delivered.
         dhl_by_id = await self._dhl_lookup(
             [
                 n
@@ -570,8 +574,8 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                 item.setdefault("carrier_name", item.get("name"))
                 item["custom_name"] = names.get(number)
                 item["name"] = names.get(number) or item["carrier_name"]
-                item["archived"] = True
                 self.carriers[number] = item["carrier"]
+                await self._apply_archive(item)
                 result[number] = item
                 continue
 
