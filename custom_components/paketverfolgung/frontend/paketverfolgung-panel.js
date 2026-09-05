@@ -1227,6 +1227,7 @@ const STYLES = `
   .pv-detail-updated { font-size: 12px; color: var(--secondary-text-color); margin-top: 4px; }
 
   .pv-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .pv-actions > * { text-align: center; }
   .pv-linkbtn {
     padding: 10px 16px; border-radius: 8px; font-size: 14px; text-decoration: none;
     background: var(--secondary-background-color); color: var(--primary-text-color);
@@ -1235,6 +1236,10 @@ const STYLES = `
   .pv-actions button.pv-delete {
     background: transparent; color: var(--error-color, #c62828);
     border: 1px solid var(--error-color, #c62828);
+  }
+  @media (max-width: 600px) {
+    .pv-actions { flex-direction: column; }
+    .pv-actions > * { width: 100%; box-sizing: border-box; }
   }
 
   .pv-carrier, .pv-rename {
