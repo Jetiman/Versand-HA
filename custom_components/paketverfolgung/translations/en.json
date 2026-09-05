@@ -184,6 +184,16 @@
     "test_notification": {
       "name": "Send a test notification",
       "description": "Sends a sample notification to the configured targets, in the exact same format as a real one, with the current settings."
+    },
+    "archive_now": {
+      "name": "Archive now",
+      "description": "Moves an already-delivered shipment into the archive right away, instead of waiting out the 24-hour grace period.",
+      "fields": {
+        "tracking_number": {
+          "name": "Tracking number",
+          "description": "The tracking number (Amazon: the order number)."
+        }
+      }
     }
   }
 }

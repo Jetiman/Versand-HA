@@ -24,6 +24,7 @@ from .const import (
     CONF_CARRIER_OVERRIDES,
     CONF_DHL_SESSION,
     CONF_DIRECTION_OVERRIDES,
+    CONF_MANUAL_ARCHIVE,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
@@ -45,6 +46,7 @@ from .const import (
     PROVIDER_DPD,
     PROVIDER_NUMBERS,
     SERVICE_ADD_TRACKING_NUMBER,
+    SERVICE_ARCHIVE_NOW,
     SERVICE_REMOVE_TRACKING_NUMBER,
     SERVICE_SET_CARRIER,
     SERVICE_SET_DIRECTION,
@@ -210,6 +212,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 hass, call.data[ATTR_TRACKING_NUMBER], call.data[ATTR_DIRECTION]
             )
 
+        async def _async_archive_now(call: ServiceCall) -> ServiceResponse:
+            return await _archive_now(hass, call.data[ATTR_TRACKING_NUMBER])
+
         async def _async_set_notifications(call: ServiceCall) -> None:
             _set_notifications(
                 hass,
@@ -248,6 +253,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_SET_DIRECTION,
             _async_set_direction,
             schema=_SET_DIRECTION_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_ARCHIVE_NOW,
+            _async_archive_now,
+            schema=_ADD_TRACKING_NUMBER_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
         )
         hass.services.async_register(
@@ -347,6 +359,7 @@ async def _remove_tracking_number(
             CONF_CARRIER_OVERRIDES: _without(CONF_CARRIER_OVERRIDES),
             CONF_NAMES: _without(CONF_NAMES),
             CONF_DIRECTION_OVERRIDES: _without(CONF_DIRECTION_OVERRIDES),
+            CONF_MANUAL_ARCHIVE: _without(CONF_MANUAL_ARCHIVE),
         },
     )
     _LOGGER.info("Paketverfolgung: %s wurde entfernt", cleaned)
@@ -429,6 +442,23 @@ async def _set_direction(
     )
     _LOGGER.info("Paketverfolgung: %s -> Richtung %s", cleaned, direction)
     return {"tracking_number": cleaned, "direction": direction}
+
+
+async def _archive_now(hass: HomeAssistant, tracking_number: str) -> ServiceResponse:
+    """Move an already-delivered shipment into the archive right away,
+    instead of waiting for the ARCHIVE_AFTER_HOURS grace period."""
+    cleaned = tracking_number.strip()
+    entry = _entry_for_shipment(hass, cleaned)
+    manual = dict(entry.options.get(CONF_MANUAL_ARCHIVE, {}))
+    manual[cleaned] = True
+    hass.config_entries.async_update_entry(
+        entry, options={**entry.options, CONF_MANUAL_ARCHIVE: manual}
+    )
+    coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if coordinator is not None and hasattr(coordinator, "async_request_refresh"):
+        await coordinator.async_request_refresh()
+    _LOGGER.info("Paketverfolgung: %s -> manuell archiviert", cleaned)
+    return {"tracking_number": cleaned}
 
 
 def _set_notifications(
