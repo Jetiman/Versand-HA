@@ -1032,7 +1032,15 @@ const STYLES = `
     border-radius: var(--ha-card-border-radius, 16px);
     box-shadow: var(--ha-card-box-shadow, none);
   }
-  @media (max-width: 600px) { .pv-content { margin: 8px 20px 20px; } }
+  @media (max-width: 600px) {
+    .pv-content { margin: 8px 20px 20px; padding-top: 20px; }
+    .pv-header { gap: 12px; margin-bottom: 16px; }
+    .pv-logo { width: 44px; height: 44px; }
+    .pv-brand { font-size: 20px; }
+    .pv-stats { margin-bottom: 12px; }
+    .pv-stat { padding: 10px; }
+    .pv-stat-value { font-size: 22px; }
+  }
 
   .pv-header {
     display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
