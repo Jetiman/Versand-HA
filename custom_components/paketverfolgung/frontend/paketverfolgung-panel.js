@@ -442,7 +442,7 @@ class PaketverfolgungPanel extends HTMLElement {
         canAdd
           ? `<form class="pv-add" autocomplete="off">
               <input name="tracking" type="text" inputmode="numeric"
-                placeholder="Sendungsnummer hinzufügen (DHL, DPD, Hermes)" />
+                placeholder="Sendungsnummer hinzufügen" />
               <button type="submit" ${this._addBusy ? "disabled" : ""}>
                 ${this._addBusy ? "…" : "Hinzufügen"}
               </button>
@@ -1032,7 +1032,7 @@ const STYLES = `
     border-radius: var(--ha-card-border-radius, 16px);
     box-shadow: var(--ha-card-box-shadow, none);
   }
-  @media (max-width: 600px) { .pv-content { margin: 8px 10px 20px; } }
+  @media (max-width: 600px) { .pv-content { margin: 8px 20px 20px; } }
 
   .pv-header {
     display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
