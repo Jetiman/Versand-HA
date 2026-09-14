@@ -27,6 +27,8 @@ from .const import (
     CONF_MANUAL_ARCHIVE,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_ON_NEW,
+    CONF_NOTIFY_ON_STATUS_CHANGE,
     CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
     CONF_NOTIFY_SHORT_NAME,
     CONF_NOTIFY_TARGETS,
@@ -147,6 +149,8 @@ _SET_NOTIFICATIONS_SCHEMA = vol.Schema(
     {
         vol.Optional("enabled", default=True): vol.Coerce(bool),
         vol.Optional("targets", default=list): _as_str_list,
+        vol.Optional("on_new", default=True): vol.Coerce(bool),
+        vol.Optional("on_status_change", default=True): vol.Coerce(bool),
         vol.Optional("out_for_delivery_only", default=False): vol.Coerce(bool),
         vol.Optional("short_name", default=False): vol.Coerce(bool),
     }
@@ -220,6 +224,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 hass,
                 bool(call.data.get("enabled", True)),
                 call.data.get("targets", []),
+                bool(call.data.get("on_new", True)),
+                bool(call.data.get("on_status_change", True)),
                 bool(call.data.get("out_for_delivery_only", False)),
                 bool(call.data.get("short_name", False)),
             )
@@ -465,6 +471,8 @@ def _set_notifications(
     hass: HomeAssistant,
     enabled: bool,
     targets: list[str],
+    on_new: bool = True,
+    on_status_change: bool = True,
     out_for_delivery_only: bool = False,
     short_name: bool = False,
 ) -> None:
@@ -481,6 +489,8 @@ def _set_notifications(
                 **entry.options,
                 CONF_NOTIFY_ENABLED: enabled,
                 CONF_NOTIFY_TARGETS: clean,
+                CONF_NOTIFY_ON_NEW: on_new,
+                CONF_NOTIFY_ON_STATUS_CHANGE: on_status_change,
                 CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY: out_for_delivery_only,
                 CONF_NOTIFY_SHORT_NAME: short_name,
             },
@@ -489,9 +499,11 @@ def _set_notifications(
         if hasattr(coordinator, "async_update_listeners"):
             coordinator.async_update_listeners()
     _LOGGER.info(
-        "Paketverfolgung: Benachrichtigungen %s -> %s",
+        "Paketverfolgung: Benachrichtigungen %s -> %s (neu=%s, status=%s)",
         "an" if enabled else "aus",
         clean,
+        on_new,
+        on_status_change,
     )
 
 
@@ -549,6 +561,8 @@ def _reload_relevant(entry: ConfigEntry) -> str:
     skip_options = (
         CONF_NOTIFY_ENABLED,
         CONF_NOTIFY_TARGETS,
+        CONF_NOTIFY_ON_NEW,
+        CONF_NOTIFY_ON_STATUS_CHANGE,
         CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
         CONF_NOTIFY_SHORT_NAME,
     )

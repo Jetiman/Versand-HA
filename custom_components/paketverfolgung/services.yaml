@@ -117,9 +117,9 @@ set_tracking_name:
 set_notifications:
   name: Benachrichtigungen einstellen
   description: >-
-    Schaltet die Benachrichtigungen bei neuer Sendung / Statusänderung an
-    oder aus und legt die Ziele fest (notify.*-Dienste). Gilt für alle
-    Einträge. Wird auch von der Oberfläche verwendet.
+    Schaltet die Benachrichtigungen an oder aus, einzeln für "neue Sendung"
+    und "Statusänderung", und legt die Ziele fest (notify.*-Dienste). Gilt
+    für alle Einträge. Wird auch von der Oberfläche verwendet.
   fields:
     enabled:
       name: Aktiviert
@@ -138,11 +138,26 @@ set_notifications:
           multiple: true
           custom_value: true
           options: []
+    on_new:
+      name: Bei neuer Sendung
+      description: Benachrichtigt, sobald eine neue Sendung erkannt wird.
+      required: false
+      default: true
+      selector:
+        boolean:
+    on_status_change:
+      name: Bei Statusänderung
+      description: Benachrichtigt, wenn sich der Status einer bestehenden Sendung ändert.
+      required: false
+      default: true
+      selector:
+        boolean:
     out_for_delivery_only:
       name: Nur bei „In Zustellung"
       description: >-
-        Wenn an, wird nur benachrichtigt, sobald eine Sendung in Zustellung
-        geht oder zugestellt wird – keine Meldung bei Zwischenschritten.
+        Schränkt die Statusänderungs-Benachrichtigung ein: nur sobald eine
+        Sendung in Zustellung geht oder zugestellt wird – keine Meldung bei
+        Zwischenschritten. Wirkt sich nicht auf "Bei neuer Sendung" aus.
       required: false
       default: false
       selector:

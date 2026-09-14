@@ -61,8 +61,14 @@ CONF_DEFAULT_POSTCODE = "default_postcode"
 # the `set_notifications` service, so the panel can toggle them globally.
 CONF_NOTIFY_ENABLED = "notify_enabled"
 CONF_NOTIFY_TARGETS = "notify_targets"
-# When set, only notify once a shipment reaches "out for delivery" (or
-# "delivered") - no message for every intermediate scan.
+# The two notification triggers are independent switches, both defaulting
+# to on: a brand-new shipment being detected, and any later status change.
+# Turning one off must not silently affect the other.
+CONF_NOTIFY_ON_NEW = "notify_on_new"
+CONF_NOTIFY_ON_STATUS_CHANGE = "notify_on_status_change"
+# When set, restricts the *status-change* trigger above to just the moment
+# a shipment reaches "out for delivery" (or "delivered") - no message for
+# every intermediate scan. Has no effect on the new-shipment trigger.
 CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY = "notify_out_for_delivery_only"
 # When set, the shipment name in the notification body is trimmed (long
 # Amazon product titles etc.).

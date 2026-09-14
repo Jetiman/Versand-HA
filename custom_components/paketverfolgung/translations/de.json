@@ -147,7 +147,7 @@
     },
     "set_notifications": {
       "name": "Benachrichtigungen einstellen",
-      "description": "Schaltet die Benachrichtigungen bei neuer Sendung / Statusänderung an oder aus und legt die Ziele fest.",
+      "description": "Schaltet die Benachrichtigungen an oder aus, einzeln für neue Sendung und Statusänderung, und legt die Ziele fest.",
       "fields": {
         "enabled": {
           "name": "Aktiviert",
@@ -157,9 +157,17 @@
           "name": "Ziele",
           "description": "notify.*-Dienste (z. B. mobile_app_galaxy_s22)."
         },
+        "on_new": {
+          "name": "Bei neuer Sendung",
+          "description": "Benachrichtigt, sobald eine neue Sendung erkannt wird."
+        },
+        "on_status_change": {
+          "name": "Bei Statusänderung",
+          "description": "Benachrichtigt, wenn sich der Status einer bestehenden Sendung ändert."
+        },
         "out_for_delivery_only": {
           "name": "Nur bei „In Zustellung“",
-          "description": "Wenn an, wird nur benachrichtigt, sobald eine Sendung in Zustellung geht oder zugestellt wird – keine Meldung bei Zwischenschritten."
+          "description": "Schränkt die Statusänderungs-Benachrichtigung ein: nur sobald eine Sendung in Zustellung geht oder zugestellt wird. Wirkt sich nicht auf „Bei neuer Sendung“ aus."
         },
         "short_name": {
           "name": "Sendungsnamen kürzen",

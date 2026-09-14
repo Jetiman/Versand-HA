@@ -90,9 +90,9 @@ Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
 ## Benachrichtigungen
 
-In der Oberfläche unten: **Einstellungen** aufklappen → Schalter **„Bei neuer Sendung oder Statusänderung benachrichtigen“** an → im Feld **„Ziele“** deine `notify.*`-Dienste ankreuzen (z. B. `notify.mobile_app_galaxy_s22`). Mehrere Ziele möglich; ein Filterfeld hilft bei vielen Diensten.
+In der Oberfläche unten: **Einstellungen** aufklappen → Schalter **„Benachrichtigungen aktivieren“** an → im Feld **„Ziele“** deine `notify.*`-Dienste ankreuzen (z. B. `notify.mobile_app_galaxy_s22`). Mehrere Ziele möglich; ein Filterfeld hilft bei vielen Diensten.
 
-Ist es aktiv, schickt die Integration bei einer **neuen Sendung** oder einer **Statusänderung** direkt eine Nachricht an jedes Ziel – der **Status** steht als Titel (📦), der **Sendungsname** als Text. Keine zusätzliche Automation nötig. Optional lässt sich das auf **„nur bei ‚In Zustellung‘“** einschränken.
+Darunter zwei unabhängige Schalter, die sich nicht gegenseitig beeinflussen: **„Bei neuer Sendung“** und **„Bei Statusänderung“**. Ist einer davon aktiv, schickt die Integration entsprechend direkt eine Nachricht an jedes Ziel – der **Status** steht als Titel (📦), der **Sendungsname** als Text. Keine zusätzliche Automation nötig. Nur **„Bei Statusänderung“** lässt sich zusätzlich auf **„nur wenn eine Sendung in Zustellung geht“** einschränken – „Bei neuer Sendung“ ist davon unberührt.
 
 Zusätzlich wird das Event **`paketverfolgung_notification`** ausgelöst (Daten: `action` = `detected`/`changed`, `tracking_id`, `name`, `carrier`, `delivery_carrier`, `status`, `previous_status`, `group`, `delivered`, `tracking_url`) – falls du die Nachricht lieber selbst per Automation formatieren willst.
 

@@ -208,6 +208,8 @@ class PaketverfolgungPanel extends HTMLElement {
       enabled: a.notify_enabled === true,
       targets: Array.isArray(a.notify_targets) ? a.notify_targets : [],
       services: Array.isArray(a.notify_services) ? a.notify_services : [],
+      onNew: a.notify_on_new !== false,
+      onStatusChange: a.notify_on_status_change !== false,
       ofdOnly: a.notify_out_for_delivery_only === true,
       shortName: a.notify_short_name === true,
     };
@@ -256,7 +258,7 @@ class PaketverfolgungPanel extends HTMLElement {
     });
   }
 
-  _setNotifications(enabled, targets, ofdOnly, shortName) {
+  _setNotifications(enabled, targets, onNew, onStatusChange, ofdOnly, shortName) {
     this._notifyBusy = true;
     this._sig = null;
     this._render(true);
@@ -264,6 +266,8 @@ class PaketverfolgungPanel extends HTMLElement {
       this._hass.callService("paketverfolgung", "set_notifications", {
         enabled,
         targets,
+        on_new: onNew === true,
+        on_status_change: onStatusChange === true,
         out_for_delivery_only: ofdOnly === true,
         short_name: shortName === true,
       })
@@ -477,16 +481,32 @@ class PaketverfolgungPanel extends HTMLElement {
           <input type="checkbox" data-notify-toggle ${nc.enabled ? "checked" : ""} ${
       this._notifyBusy ? "disabled" : ""
     } />
-          <span>Bei neuer Sendung oder Statusänderung benachrichtigen</span>
+          <span>Benachrichtigungen aktivieren</span>
         </label>
         ${
           nc.enabled
             ? `<label class="pv-switch pv-switch-sub">
-                 <input type="checkbox" data-notify-ofd ${
-                   nc.ofdOnly ? "checked" : ""
+                 <input type="checkbox" data-notify-new ${
+                   nc.onNew ? "checked" : ""
                  } ${this._notifyBusy ? "disabled" : ""} />
-                 <span>Nur wenn eine Sendung in Zustellung geht <em>(Preview)</em></span>
+                 <span>Bei neuer Sendung</span>
                </label>
+               <label class="pv-switch pv-switch-sub">
+                 <input type="checkbox" data-notify-status ${
+                   nc.onStatusChange ? "checked" : ""
+                 } ${this._notifyBusy ? "disabled" : ""} />
+                 <span>Bei Statusänderung</span>
+               </label>
+               ${
+                 nc.onStatusChange
+                   ? `<label class="pv-switch pv-switch-subsub">
+                        <input type="checkbox" data-notify-ofd ${
+                          nc.ofdOnly ? "checked" : ""
+                        } ${this._notifyBusy ? "disabled" : ""} />
+                        <span>… nur wenn eine Sendung in Zustellung geht <em>(Preview)</em></span>
+                      </label>`
+                   : ""
+               }
                <label class="pv-switch pv-switch-sub">
                  <input type="checkbox" data-notify-short ${
                    nc.shortName ? "checked" : ""
@@ -830,6 +850,32 @@ class PaketverfolgungPanel extends HTMLElement {
       this._setNotifications(
         ev.target.checked,
         nc.targets,
+        nc.onNew,
+        nc.onStatusChange,
+        nc.ofdOnly,
+        nc.shortName
+      );
+      return;
+    }
+    if (ev.target.matches("[data-notify-new]")) {
+      const nc = this._notifyConfig();
+      this._setNotifications(
+        true,
+        nc.targets,
+        ev.target.checked,
+        nc.onStatusChange,
+        nc.ofdOnly,
+        nc.shortName
+      );
+      return;
+    }
+    if (ev.target.matches("[data-notify-status]")) {
+      const nc = this._notifyConfig();
+      this._setNotifications(
+        true,
+        nc.targets,
+        nc.onNew,
+        ev.target.checked,
         nc.ofdOnly,
         nc.shortName
       );
@@ -837,12 +883,26 @@ class PaketverfolgungPanel extends HTMLElement {
     }
     if (ev.target.matches("[data-notify-ofd]")) {
       const nc = this._notifyConfig();
-      this._setNotifications(true, nc.targets, ev.target.checked, nc.shortName);
+      this._setNotifications(
+        true,
+        nc.targets,
+        nc.onNew,
+        nc.onStatusChange,
+        ev.target.checked,
+        nc.shortName
+      );
       return;
     }
     if (ev.target.matches("[data-notify-short]")) {
       const nc = this._notifyConfig();
-      this._setNotifications(true, nc.targets, nc.ofdOnly, ev.target.checked);
+      this._setNotifications(
+        true,
+        nc.targets,
+        nc.onNew,
+        nc.onStatusChange,
+        nc.ofdOnly,
+        ev.target.checked
+      );
       return;
     }
     if (ev.target.matches("[data-notify-target]")) {
@@ -852,7 +912,14 @@ class PaketverfolgungPanel extends HTMLElement {
       )
         .filter((el) => el.checked)
         .map((el) => el.getAttribute("data-notify-target"));
-      this._setNotifications(true, targets, nc.ofdOnly, nc.shortName);
+      this._setNotifications(
+        true,
+        targets,
+        nc.onNew,
+        nc.onStatusChange,
+        nc.ofdOnly,
+        nc.shortName
+      );
       return;
     }
     const pick = ev.target.closest("[data-carrier]");
@@ -1173,6 +1240,8 @@ const STYLES = `
   .pv-switch input, .pv-check input { width: 18px; height: 18px; flex: none; accent-color: var(--primary-color); }
   .pv-switch-sub { margin: -4px 0 0 28px; font-size: 13px; color: var(--secondary-text-color); }
   .pv-switch-sub em { font-style: normal; opacity: 0.7; }
+  .pv-switch-subsub { margin: -4px 0 0 56px; font-size: 13px; color: var(--secondary-text-color); }
+  .pv-switch-subsub em { font-style: normal; opacity: 0.7; }
   .pv-test-row { display: flex; align-items: center; gap: 10px; margin: 2px 0 0 28px; }
   .pv-mini-btn {
     padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;

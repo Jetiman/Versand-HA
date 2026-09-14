@@ -41,6 +41,8 @@ from .const import (
     CONF_MANUAL_ARCHIVE,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_ON_NEW,
+    CONF_NOTIFY_ON_STATUS_CHANGE,
     CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
     CONF_NOTIFY_SHORT_NAME,
     CONF_NOTIFY_TARGETS,
@@ -324,19 +326,25 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         return out
 
     def _notify_changes(self, new: dict[str, dict]) -> None:
-        """Send a notification on a new shipment or a status change.
+        """Send a notification on a new shipment and/or a status change.
 
-        The first run after enabling only records the baseline, so you
-        don't get a burst for shipments that already existed.
+        The two triggers are independent switches (both default on) - e.g.
+        turning off the status-change trigger must not affect the
+        new-shipment one. The first run after enabling only records the
+        baseline, so you don't get a burst for shipments that already
+        existed.
         """
         primed = self._notify_primed
         self._notify_primed = True
         opts = self.entry.options
         if not opts.get(CONF_NOTIFY_ENABLED):
             return
-        # "Only on out-for-delivery" mode: skip the new-shipment and every
-        # intermediate-scan message; notify only when a shipment *enters*
-        # the out-for-delivery (or delivered) phase.
+        notify_new = opts.get(CONF_NOTIFY_ON_NEW, True)
+        notify_status_change = opts.get(CONF_NOTIFY_ON_STATUS_CHANGE, True)
+        # "Only on out-for-delivery" mode narrows the status-change trigger
+        # only: skip every intermediate-scan message, notify just when a
+        # shipment *enters* the out-for-delivery (or delivered) phase. It
+        # has no bearing on the new-shipment trigger.
         ofd_only = bool(opts.get(CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY))
         ofd_groups = (GROUP_OUT_FOR_DELIVERY, GROUP_DELIVERED)
         targets = self._notify_targets()
@@ -350,9 +358,11 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             if prev is None:
                 if not (primed and status != NO_DATA_STATUS):
                     continue
-                if ofd_only and group not in ofd_groups:
+                if not notify_new:
                     continue
                 self._push_notification(targets, "detected", item, None)
+                continue
+            if not notify_status_change:
                 continue
             changed = _stable_status(status) != _stable_status(
                 prev.get("status")

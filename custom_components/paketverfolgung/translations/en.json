@@ -147,7 +147,7 @@
     },
     "set_notifications": {
       "name": "Set notifications",
-      "description": "Turns notifications on a new shipment / status change on or off and sets the targets.",
+      "description": "Turns notifications on or off, separately for new shipments and status changes, and sets the targets.",
       "fields": {
         "enabled": {
           "name": "Enabled",
@@ -157,9 +157,17 @@
           "name": "Targets",
           "description": "notify.* services (e.g. mobile_app_galaxy_s22)."
         },
+        "on_new": {
+          "name": "On new shipment",
+          "description": "Notify as soon as a new shipment is detected."
+        },
+        "on_status_change": {
+          "name": "On status change",
+          "description": "Notify when an existing shipment's status changes."
+        },
         "out_for_delivery_only": {
           "name": "Only when out for delivery",
-          "description": "When on, notify only once a shipment goes out for delivery or is delivered – no message for intermediate scans."
+          "description": "Narrows the status-change notification: only once a shipment goes out for delivery or is delivered. Has no effect on \"On new shipment\"."
         },
         "short_name": {
           "name": "Shorten shipment name",

@@ -23,6 +23,8 @@ from homeassistant.util import slugify
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .const import (
     CONF_NOTIFY_ENABLED,
+    CONF_NOTIFY_ON_NEW,
+    CONF_NOTIFY_ON_STATUS_CHANGE,
     CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
     CONF_NOTIFY_SHORT_NAME,
     CONF_NOTIFY_TARGETS,
@@ -358,6 +360,10 @@ class CombinedOutForDeliveryTodaySensor(_AllCoordinatorsSensor):
             "notify_enabled": bool(opts.get(CONF_NOTIFY_ENABLED)),
             "notify_targets": list(opts.get(CONF_NOTIFY_TARGETS) or []),
             "notify_services": notify_services,
+            "notify_on_new": bool(opts.get(CONF_NOTIFY_ON_NEW, True)),
+            "notify_on_status_change": bool(
+                opts.get(CONF_NOTIFY_ON_STATUS_CHANGE, True)
+            ),
             "notify_out_for_delivery_only": bool(
                 opts.get(CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY)
             ),
