@@ -187,7 +187,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # it currently has no shipment entities (a DPD/Amazon account between
     # parcels) - a DataUpdateCoordinator stops its timer once its last
     # listener goes away, and it still needs to poll to discover new ones.
-    entry.async_on_unload(coordinator.async_add_listener(lambda: None))
+    # The callback itself must be kept alive with a strong reference (stashed
+    # on the coordinator) - the coordinator only holds a weak reference to
+    # it, so a bare lambda passed inline can be garbage-collected, silently
+    # dropping the listener count to zero and stopping the polling loop.
+    coordinator._keepalive_listener = lambda: None
+    entry.async_on_unload(
+        coordinator.async_add_listener(coordinator._keepalive_listener)
+    )
     await _async_register_panel(hass)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
