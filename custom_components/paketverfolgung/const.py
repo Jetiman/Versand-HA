@@ -235,6 +235,12 @@ DEFAULT_UPDATE_INTERVAL = timedelta(minutes=DEFAULT_UPDATE_INTERVAL_MINUTES)
 # instead of the configured interval, so the stop count stays current.
 AMAZON_STOPS_UPDATE_INTERVAL = timedelta(minutes=1)
 
+# Upper bound for one whole poll. Every HTTP call has its own timeout, but
+# if anything in a poll ever hangs, the coordinator would never schedule
+# another refresh and nothing would be logged. This aborts such a poll with
+# a visible error so the next one still runs.
+POLL_WATCHDOG_SECONDS = 900
+
 # A delivered shipment moves into the panel's "Archiv" section this many
 # hours after it was delivered (and stops being re-queried).
 ARCHIVE_AFTER_HOURS = 24

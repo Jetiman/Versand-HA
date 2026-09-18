@@ -12,6 +12,7 @@ shape so the sensor/panel code is carrier-agnostic:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import datetime, timedelta
@@ -63,6 +64,7 @@ from .const import (
     NO_DATA_STATUS,
     PANEL_URL_PATH,
     PROGRESS_GROUP,
+    POLL_WATCHDOG_SECONDS,
     PROGRESS_STATUS,
     SIGNAL_COORDINATOR_UPDATED,
     TRACKING_PAGE_URL,
@@ -280,6 +282,20 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self._archive_store: Store | None = None
         self._archive_dirty = False
         self._notify_primed = False
+
+    async def _async_update_data(self) -> dict[str, dict]:
+        try:
+            async with asyncio.timeout(POLL_WATCHDOG_SECONDS) as watchdog:
+                return await self._poll()
+        except TimeoutError as err:
+            if not watchdog.expired():
+                raise
+            raise UpdateFailed(
+                f"Abruf nach {POLL_WATCHDOG_SECONDS} s abgebrochen (hing)"
+            ) from err
+
+    async def _poll(self) -> dict[str, dict]:
+        raise NotImplementedError
 
     @property
     def next_poll(self) -> datetime | None:
@@ -519,7 +535,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
     def _config(self, key, default=None):
         return self.entry.options.get(key, self.entry.data.get(key, default))
 
-    async def _async_update_data(self) -> dict[str, dict]:
+    async def _poll(self) -> dict[str, dict]:
         self._mark_polled()
         await self._load_archive()
         numbers = [
@@ -743,7 +759,7 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
         self._session: DpdSession | None = None
         self._events: dict[str, list[dict]] = {}
 
-    async def _async_update_data(self) -> dict[str, dict]:
+    async def _poll(self) -> dict[str, dict]:
         self._mark_polled()
         await self._load_archive()
         if self._session is None:

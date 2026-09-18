@@ -118,7 +118,7 @@ class AmazonAccountDataUpdateCoordinator(_BaseCoordinator):
         )
         self.entry = entry
 
-    async def _async_update_data(self) -> dict[str, dict]:
+    async def _poll(self) -> dict[str, dict]:
         self._mark_polled()
         await self._load_archive()
         store = self.entry.data.get(CONF_AMAZON_COOKIES)
