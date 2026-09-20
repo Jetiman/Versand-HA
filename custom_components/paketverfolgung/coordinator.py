@@ -4,7 +4,7 @@ Two coordinators, both producing the same normalized ``dict[id, shipment]``
 shape so the sensor/panel code is carrier-agnostic:
 
 * ``TrackingNumbersDataUpdateCoordinator`` - a manually-managed list of
-  tracking numbers. Each number's carrier (DHL, DPD or Hermes) is
+  tracking numbers. Each number's carrier (DHL, DPD, Hermes or UPS) is
   auto-detected and remembered, then only that carrier is queried on
   later refreshes.
 * ``DpdAccountDataUpdateCoordinator`` - every parcel on a myDPD account,
@@ -33,6 +33,7 @@ from .const import (
     CARRIER_DPD,
     CARRIER_HERMES,
     CARRIER_UNKNOWN,
+    CARRIER_UPS,
     CARRIERS,
     CONF_CARRIER_OVERRIDES,
     CONF_DEFAULT_POSTCODE,
@@ -68,12 +69,16 @@ from .const import (
     PROGRESS_STATUS,
     SIGNAL_COORDINATOR_UPDATED,
     TRACKING_PAGE_URL,
+    UPS_BUDGET_CAPACITY,
+    UPS_BUDGET_REFILL_SECONDS,
+    UPS_NUMBER_PATTERN,
 )
 from .dhl_account import DhlAccountClient, DhlAuthError
 from .dhl_api import DhlApiClient, DhlApiError
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError, DpdSession
 from .dpd_tracking_api import DpdTrackingApiClient, DpdTrackingApiError
 from .hermes_tracking_api import HermesTrackingApiClient, HermesTrackingApiError
+from .ups_tracking_api import UpsBudget, UpsTrackingApiClient, UpsTrackingApiError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -87,6 +92,13 @@ _HISTORY_FETCHES_PER_POLL = 12
 _VOLATILE_STATUS_RE = re.compile(
     r"[.,\s]*\b\d+\s*(?:Stopps?|Lieferstopps?|stops?)\b[^.]*", re.I
 )
+
+
+_UPS_NUMBER_RE = re.compile(UPS_NUMBER_PATTERN)
+
+
+def _looks_like_ups(number: str) -> bool:
+    return bool(_UPS_NUMBER_RE.match(number.strip().upper()))
 
 
 def _stable_status(status: str | None) -> str:
@@ -516,7 +528,7 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
 
 class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
-    """Tracks a manually-managed list of DHL / DPD / Hermes tracking numbers."""
+    """Tracks a manually-managed list of DHL / DPD / Hermes / UPS tracking numbers."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
@@ -531,6 +543,15 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         self.carriers: dict[str, str] = {}
         # last DHL-account-discovery outcome, for diagnostics
         self.dhl_account_status: str | None = None
+        # UPS allows only a few lookups per connection (see UpsBudget). The
+        # balance, the last data per number and when each was last asked
+        # live in a Store so a restart neither refills the budget nor
+        # blanks the UPS sensors.
+        self._ups_store = Store(hass, 1, f"{DOMAIN}.ups.{entry.entry_id}")
+        self._ups_loaded = False
+        self._ups_budget = UpsBudget(UPS_BUDGET_CAPACITY, UPS_BUDGET_REFILL_SECONDS)
+        self._ups_items: dict[str, dict] = {}
+        self._ups_checked: dict[str, str] = {}
 
     def _config(self, key, default=None):
         return self.entry.options.get(key, self.entry.data.get(key, default))
@@ -573,15 +594,24 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                 return prev
             return None
 
+        def _is_ups(n: str) -> bool:
+            forced = overrides.get(n)
+            return forced == CARRIER_UPS or (forced is None and _looks_like_ups(n))
+
+        ups_fresh = await self._ups_lookup_batch(
+            [n for n in numbers if _frozen(n) is None and _is_ups(n)]
+        )
+
         # Only batch-query DHL for numbers that could still be DHL: not
-        # locked to another carrier, not pinned to a non-DHL one, and not
-        # already archived.
+        # locked to another carrier, not pinned to a non-DHL one, not a
+        # UPS number and not already archived.
         dhl_by_id = await self._dhl_lookup(
             [
                 n
                 for n in numbers
                 if _frozen(n) is None
                 and overrides.get(n, CARRIER_DHL) == CARRIER_DHL
+                and not _is_ups(n)
                 and self.carriers.get(n, CARRIER_UNKNOWN)
                 not in (CARRIER_DPD, CARRIER_HERMES)
             ]
@@ -615,6 +645,12 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                 item = await self._dpd_lookup(number, postcode)
             elif forced == CARRIER_HERMES:
                 item = await self._hermes_lookup(number)
+            elif _is_ups(number):
+                carrier = CARRIER_UPS
+                # Copy: the loop below adds per-poll fields (custom name,
+                # archive state) that must not leak into the cached data.
+                cached = ups_fresh.get(number) or self._ups_items.get(number)
+                item = dict(cached) if cached else None
             elif dhl_confirmed:
                 item, carrier = normalize_dhl_shipment(raw_dhl), CARRIER_DHL
             else:
@@ -643,6 +679,9 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
 
         for stale in [n for n in self.carriers if n not in numbers]:
             self.carriers.pop(stale, None)
+        for stale in [n for n in self._ups_items if n not in numbers]:
+            self._ups_items.pop(stale, None)
+            self._ups_checked.pop(stale, None)
         self._apply_direction_overrides(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
@@ -712,6 +751,72 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         if soft is not None:
             return soft, CARRIER_UNKNOWN  # show it, stay open for re-detection
         return None, CARRIER_UNKNOWN
+
+    async def _load_ups_state(self) -> None:
+        if self._ups_loaded:
+            return
+        self._ups_loaded = True
+        stored = await self._ups_store.async_load() or {}
+        self._ups_budget = UpsBudget.from_dict(
+            stored.get("budget"), UPS_BUDGET_CAPACITY, UPS_BUDGET_REFILL_SECONDS
+        )
+        self._ups_items = dict(stored.get("items") or {})
+        self._ups_checked = dict(stored.get("checked") or {})
+
+    async def _save_ups_state(self) -> None:
+        await self._ups_store.async_save(
+            {
+                "budget": self._ups_budget.to_dict(),
+                "items": self._ups_items,
+                "checked": self._ups_checked,
+            }
+        )
+
+    async def _ups_lookup_batch(self, numbers: list[str]) -> dict[str, dict]:
+        """Refresh as many UPS numbers as the request budget allows.
+
+        Never-fetched numbers go first, then the least recently asked. A
+        delivered parcel is final: once its data is held it isn't asked
+        again, so it doesn't eat budget. Numbers left over keep their last
+        data (see _poll).
+        """
+        await self._load_ups_state()
+        queue = sorted(
+            (
+                n
+                for n in numbers
+                if n not in self._ups_items
+                or not self._ups_items[n].get("delivered")
+            ),
+            key=lambda n: (n in self._ups_checked, self._ups_checked.get(n, "")),
+        )
+        if not queue or self._ups_budget.available() < 1:
+            return {}
+
+        fresh: dict[str, dict] = {}
+        client = UpsTrackingApiClient()
+        try:
+            try:
+                await client.bootstrap()
+            except UpsTrackingApiError as err:
+                _LOGGER.warning("UPS lookup skipped: %s", err)
+                return {}
+            for number in queue:
+                if not self._ups_budget.try_spend():
+                    break
+                self._ups_checked[number] = dt_util.utcnow().isoformat()
+                try:
+                    item = await client.fetch(number)
+                except UpsTrackingApiError as err:
+                    _LOGGER.warning("UPS lookup for %s failed: %s", number, err)
+                    break  # a block or a silent UPS: don't burn more budget
+                if item is not None:
+                    fresh[number] = item
+                    self._ups_items[number] = item
+        finally:
+            await client.close()
+            await self._save_ups_state()
+        return fresh
 
     async def _dhl_lookup(self, candidates: list[str]) -> dict[str, dict]:
         if not candidates:

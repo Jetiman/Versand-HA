@@ -9,10 +9,10 @@
         }
       },
       "dhl": {
-        "title": "Track parcel numbers (DHL, DPD & Hermes)",
-        "description": "Add one or more tracking numbers (press Enter after each). Whether a number belongs to DHL, DPD or Hermes is detected automatically - this entry covers all three carriers. You can also start empty and add numbers later via the options.",
+        "title": "Track parcel numbers (DHL, DPD, Hermes & UPS)",
+        "description": "Add one or more tracking numbers (press Enter after each). Whether a number belongs to DHL, DPD, Hermes or UPS is detected automatically - this entry covers all four carriers. You can also start empty and add numbers later via the options.",
         "data": {
-          "tracking_numbers": "Tracking numbers (DHL, DPD or Hermes)",
+          "tracking_numbers": "Tracking numbers (DHL, DPD, Hermes or UPS)",
           "default_postcode": "Your postcode (only needed if a DPD number is protected)"
         }
       },
@@ -54,7 +54,7 @@
   "selector": {
     "provider": {
       "options": {
-        "dhl": "Tracking numbers (DHL, DPD & Hermes)",
+        "dhl": "Tracking numbers (DHL, DPD, Hermes & UPS)",
         "dpd": "DPD account (all parcels automatically)",
         "amazon": "Amazon.de account (deliveries automatically)"
       }
@@ -63,9 +63,9 @@
   "options": {
     "step": {
       "dhl_options": {
-        "description": "Tracking numbers for DHL, DPD and Hermes - this entry covers all three carriers. Add or remove numbers, optionally set your postcode (only for protected DPD parcels), and adjust the update interval.",
+        "description": "Tracking numbers for DHL, DPD, Hermes and UPS - this entry covers all four carriers. Add or remove numbers, optionally set your postcode (only for protected DPD parcels), and adjust the update interval.",
         "data": {
-          "tracking_numbers": "Tracking numbers (DHL, DPD or Hermes)",
+          "tracking_numbers": "Tracking numbers (DHL, DPD, Hermes or UPS)",
           "default_postcode": "Your postcode (only needed if a DPD number is protected)",
           "update_interval_minutes": "Update interval (minutes)",
           "dhl_auto_discovery": "Connect a DHL account and auto-discover its shipments (experimental)"
@@ -99,11 +99,11 @@
   "services": {
     "add_tracking_number": {
       "name": "Add tracking number",
-      "description": "Adds a tracking number to Paketverfolgung, unless it's already tracked. The carrier (DHL, DPD or Hermes) is detected automatically.",
+      "description": "Adds a tracking number to Paketverfolgung, unless it's already tracked. The carrier (DHL, DPD, Hermes or UPS) is detected automatically.",
       "fields": {
         "tracking_number": {
           "name": "Tracking number",
-          "description": "The tracking number (DHL, DPD or Hermes)."
+          "description": "The tracking number (DHL, DPD, Hermes or UPS)."
         }
       }
     },
@@ -127,7 +127,7 @@
         },
         "carrier": {
           "name": "Carrier",
-          "description": "dhl, dpd, hermes or auto."
+          "description": "dhl, dpd, hermes, ups or auto."
         }
       }
     },

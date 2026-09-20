@@ -12,7 +12,7 @@
  * (one per shipment/parcel, identified by the `tracking_id` attribute).
  */
 
-const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes", amazon: "Amazon" };
+const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes", ups: "UPS", amazon: "Amazon" };
 
 // The integration's brand icon (brand/icon.svg), inlined so the panel needs
 // no extra static asset.
@@ -134,6 +134,8 @@ class PaketverfolgungPanel extends HTMLElement {
             ? "dpd"
             : url.includes("hermes")
             ? "hermes"
+            : url.includes("ups.com")
+            ? "ups"
             : "dhl")) + "";
       const group = a.group || "";
       const delivered = a.delivered === true || group === "delivered";
@@ -629,7 +631,7 @@ class PaketverfolgungPanel extends HTMLElement {
       note = `<div class="pv-note">Diese DPD-Sendung ist geschützt. Hinterlege deine PLZ
         in den Optionen der Integration, damit der Verlauf abgerufen werden kann.</div>`;
     } else if (s.provider === "?") {
-      note = `<div class="pv-note">Diese Sendung wird noch geprüft – kein Anbieter (DHL, DPD, Hermes, Amazon)
+      note = `<div class="pv-note">Diese Sendung wird noch geprüft – kein Anbieter (DHL, DPD, Hermes, UPS, Amazon)
         hat bisher Daten dazu geliefert. Sie bleibt in der Liste und wird bei jeder Aktualisierung
         erneut geprüft, bis du sie löschst oder oben den Anbieter manuell festlegst.</div>`;
     } else if (s.archived) {
@@ -638,6 +640,9 @@ class PaketverfolgungPanel extends HTMLElement {
     } else if (s.delivered) {
       note = `<div class="pv-note">Zugestellt – wandert automatisch 24 Stunden nach der Zustellung
         ins Archiv, oder direkt über den Button oben.</div>`;
+    } else if (!s.events.length && s.provider === "UPS") {
+      note = `<div class="pv-note">UPS erlaubt nur wenige Abfragen pro Stunde. Der Verlauf
+        erscheint, sobald eine Abfrage frei ist (Neustart oder Aktualisieren hilft nicht).</div>`;
     } else if (!s.events.length && (s.provider === "DPD" || s.provider === "Hermes" || s.provider === "Amazon")) {
       note = `<div class="pv-note">Für diese Sendung liegt noch kein Verlauf vor.</div>`;
     }
@@ -686,7 +691,7 @@ class PaketverfolgungPanel extends HTMLElement {
           ? `<label class="pv-carrier">
               <span>Anbieter${s.forced ? " (manuell gesetzt)" : ""}:</span>
               <select data-carrier="${esc(s.tracking_id)}">
-                ${["auto", "dhl", "dpd", "hermes"]
+                ${["auto", "dhl", "dpd", "hermes", "ups"]
                   .map((c) => {
                     const cur = s.forced || "auto";
                     const label =

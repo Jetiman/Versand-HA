@@ -5,7 +5,7 @@
 
 Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten-Oberfläche in Home Assistant an. Zwei Wege, die sich beliebig kombinieren lassen:
 
-- **Sendungsnummern** – du trägst Nummern ein, der Anbieter (**DHL**, **DPD** oder **Hermes**) wird pro Nummer automatisch erkannt.
+- **Sendungsnummern** – du trägst Nummern ein, der Anbieter (**DHL**, **DPD**, **Hermes** oder **UPS**) wird pro Nummer automatisch erkannt.
 - **DPD-Konto** – Login mit deinem myDPD-Konto, alle Sendungen werden automatisch erkannt.
 - **DHL-Konto** (optional) – Login mit deinem DHL-Konto, die Sendungen des Kontos werden automatisch mitgeführt.
 - **Amazon.de-Konto** (optional) – Login mit deinem Amazon-Konto, laufende Lieferungen werden automatisch erkannt (inkl. tatsächlichem Zusteller). ⚠️ Sicherheitshinweis unten beachten.
@@ -23,21 +23,22 @@ Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten
 
 > ⚠️ **Hinweis:** Alle genutzten Schnittstellen sind **inoffiziell** (keine dokumentierten APIs). Sie können sich jederzeit ohne Vorwarnung ändern.
 
-## Sendungsnummern (DHL, DPD & Hermes)
+## Sendungsnummern (DHL, DPD, Hermes & UPS)
 
-1. „Sendungsnummern (DHL, DPD & Hermes)“ wählen.
+1. „Sendungsnummern (DHL, DPD, Hermes & UPS)“ wählen.
 2. Eine oder mehrere Nummern eingeben (nach jeder Nummer Enter). Der Schritt kann leer übersprungen werden.
 3. Optional deine **PLZ** hinterlegen – manche DPD-Sendungen sind ohne Empfänger-PLZ nicht öffentlich abrufbar.
 
-Bei der nächsten Aktualisierung wird jede Nummer der Reihe nach bei DHL, DPD und Hermes nachgeschlagen. Der erkannte Anbieter wird gemerkt und danach nur noch dieser abgefragt.
+Bei der nächsten Aktualisierung wird jede Nummer der Reihe nach bei DHL, DPD und Hermes nachgeschlagen (UPS-Nummern im Format `1Z…` gehen direkt zu UPS). Der erkannte Anbieter wird gemerkt und danach nur noch dieser abgefragt.
 
-Liegt die Erkennung mal daneben, lässt sich der Anbieter pro Sendung fest vorgeben – auf der Detailseite in der Oberfläche über das Auswahlfeld „Anbieter", oder per Dienst `paketverfolgung.set_tracking_carrier` (`carrier: dhl` / `dpd` / `hermes` / `auto`).
+Liegt die Erkennung mal daneben, lässt sich der Anbieter pro Sendung fest vorgeben – auf der Detailseite in der Oberfläche über das Auswahlfeld „Anbieter", oder per Dienst `paketverfolgung.set_tracking_carrier` (`carrier: dhl` / `dpd` / `hermes` / `ups` / `auto`).
 
 Jeder Sendung lässt sich ein **eigener Name** geben (Detailseite → Feld „Name", oder Dienst `paketverfolgung.set_tracking_name`) – gilt auch für Sendungen aus dem DPD-Konto. Leeres Feld = Anbieter-Name.
 
 - **DHL:** öffentliche Sendungsverfolgungs-Suche (kein Login), inkl. komplettem Verlauf und Zustellzeitfenster.
 - **DPD:** öffentliche „Parcel Life Cycle“-Verfolgung von tracking.dpd.de, inkl. Verlauf.
 - **Hermes:** öffentliche Sendungsverfolgung von myhermes.de (v2-API `api.my-deliveries.de`), inkl. Verlauf.
+- **UPS:** öffentliche Sendungsverfolgung von ups.com (kein Konto, kein API-Schlüssel), inkl. Verlauf mit Ort. **Achtung, stark begrenzt:** UPS beantwortet pro Internetanschluss nur etwa 3 Abfragen und danach nur noch rund **eine alle 75 Minuten** – für alle UPS-Sendungen zusammen. Updates kommen also im Stundentakt, nicht im Minutentakt; mehrere UPS-Sendungen teilen sich das Kontingent reihum. Zugestellte Sendungen werden nicht mehr abgefragt. Das Kontingent wird gespeichert, ein Neustart füllt es nicht auf. Nummern, die nicht mit `1Z` beginnen, lassen sich über „Anbieter“ fest auf UPS setzen.
 
 > ℹ️ `tracking.dpd.de` blockt Anfragen aus manchen Rechenzentren/VPS-Netzen (TCP-Reset). Läuft dein Home Assistant auf einem gehosteten Server, funktioniert die **DPD-Nummernsuche** dort evtl. nicht (DHL und Hermes sind nicht betroffen; das DPD-**Konto** liefert weiterhin den aktuellen Status, nur den nachgeladenen Verlauf nicht).
 
@@ -81,7 +82,7 @@ Konzept aus [#3](https://github.com/Jetiman/Versand-HA/pull/3) von [@SniperWCW](
 Pro Sendung ein Sensor mit:
 
 - **Zustand:** Klartext-Status (z. B. „In Zustellung“, „Zugestellt“)
-- **Attribute:** `tracking_id`, `carrier` (`dhl`/`dpd`/`hermes`/`amazon`), `delivery_carrier` (bei Amazon der tatsächliche Zusteller), `group` (Phase), `direction`, `delivered`, `archived` (zugestellt vor über 24 h), `delivered_at` (Zeitpunkt der Zustellung), `tracking_url`, `events` (kompletter Verlauf, neueste zuerst), bei DHL zusätzlich `delivery_window_from`/`_to`
+- **Attribute:** `tracking_id`, `carrier` (`dhl`/`dpd`/`hermes`/`ups`/`amazon`), `delivery_carrier` (bei Amazon der tatsächliche Zusteller), `group` (Phase), `direction`, `delivered`, `archived` (zugestellt vor über 24 h), `delivered_at` (Zeitpunkt der Zustellung), `tracking_url`, `events` (kompletter Verlauf, neueste zuerst), bei DHL zusätzlich `delivery_window_from`/`_to`
 
 Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
@@ -115,4 +116,5 @@ Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie di
 - Hermes: keine automatische Kontoerkennung – Sendungsnummern müssen eingetragen werden. DHL bietet eine optionale Konto-Anmeldung (siehe oben), die aber auf einer inoffiziellen App-Schnittstelle beruht.
 - DPD: manche Sendungen sind ohne Empfänger-PLZ nicht öffentlich abrufbar; nur ein myDPD-Konto pro Eintrag. `tracking.dpd.de` ist aus manchen Server-/VPS-Netzen nicht erreichbar (siehe Hinweis oben).
 - Hermes: die genutzte Schnittstelle (`api.my-deliveries.de`) ist undokumentiert; falls sich das Antwortformat ändert, fehlt ggf. der Verlauf.
+- UPS: inoffizielle Schnittstelle hinter einem Bot-Schutz (Akamai), die nur wenige Abfragen pro Anschluss zulässt (siehe oben). Antwortet UPS gar nicht mehr, steht ein Hinweis im Log; das Kontingent füllt sich mit der Zeit wieder. Bricht der Schutz die Abfrage ab (z. B. aus Rechenzentrums-Netzen), fehlen die UPS-Daten.
 - Amazon: kein API, sondern Auslesen der Bestell-/Trackingseiten. Login scheitert aus VPS-/Rechenzentrums-Netzen oft an einem CAPTCHA; die Sitzung läuft regelmäßig ab und muss dann neu eingerichtet werden; Amazon-Seitenänderungen können die Erkennung brechen. Die Amazon-Sitzungscookies liegen im Klartext im Config-Entry/Backup. Nur ein Amazon-Konto pro Installation.

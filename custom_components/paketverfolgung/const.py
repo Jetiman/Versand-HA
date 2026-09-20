@@ -126,10 +126,11 @@ CONF_MANUAL_ARCHIVE = "manual_archive"
 CARRIER_DHL = "dhl"
 CARRIER_DPD = "dpd"
 CARRIER_HERMES = "hermes"
+CARRIER_UPS = "ups"
 CARRIER_UNKNOWN = "unknown"
 CARRIER_AUTO = "auto"  # override value meaning "go back to auto-detect"
 
-CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES)
+CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES, CARRIER_UPS)
 
 # Shown in the panel's settings footer so a build (esp. a beta) is
 # identifiable at a glance. INTEGRATION_VERSION carries the full label
@@ -187,6 +188,26 @@ HERMES_PLC_URL = "https://api.my-deliveries.de/tnt/v2/shipments/search/{id}"
 HERMES_TRACKING_PAGE_URL = (
     "https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation/#{id}"
 )
+
+# UPS's account-less tracking endpoint (the one ups.com/track's own page
+# calls). A GET to the API host seeds the session cookies incl. a CSRF
+# cookie; the POST then needs that cookie echoed as a header plus a
+# Chrome-consistent header set (see ups_tracking_api.py). Unofficial and
+# undocumented. UPS grants only a few lookups per internet connection - see
+# the request budget below.
+UPS_TRACKING_API_URL = "https://webapis.ups.com/track/api/Track/GetStatus?loc={locale}"
+UPS_TRACKING_PAGE_URL = "https://www.ups.com/track?loc=de_DE&tracknum={id}"
+UPS_LOCALE = "de_DE"
+UPS_COOKIE_XSRF = "X-XSRF-TOKEN-ST"
+UPS_HEADER_XSRF = "X-XSRF-TOKEN"
+# A UPS 1Z number: "1Z" + 6-char shipper + 2-digit service + 8 digits (18).
+UPS_NUMBER_PATTERN = r"^1Z[0-9A-Z]{16}$"
+# UPS answers an unvalidated session only a handful of times and then goes
+# silent for hours. Measured by the ha-ups project (MIT): 3 requests, then
+# roughly one per 75 minutes. Modelled as a persisted token bucket shared by
+# all UPS numbers; a request without a token is never sent.
+UPS_BUDGET_CAPACITY = 3
+UPS_BUDGET_REFILL_SECONDS = 4500
 
 # Broad lifecycle group shared by both carriers - drives the icon and the
 # combined "out for delivery" count regardless of provider.

@@ -9,10 +9,10 @@
         }
       },
       "dhl": {
-        "title": "Sendungsnummern verfolgen (DHL, DPD & Hermes)",
-        "description": "Füge eine oder mehrere Sendungsnummern hinzu (Enter nach jeder Nummer). Ob eine Nummer zu DHL, DPD oder Hermes gehört, wird automatisch erkannt – dieser Eintrag gilt für alle drei. Du kannst auch leer starten und Nummern später über die Optionen hinzufügen oder entfernen.",
+        "title": "Sendungsnummern verfolgen (DHL, DPD, Hermes & UPS)",
+        "description": "Füge eine oder mehrere Sendungsnummern hinzu (Enter nach jeder Nummer). Ob eine Nummer zu DHL, DPD, Hermes oder UPS gehört, wird automatisch erkannt – dieser Eintrag gilt für alle vier. Du kannst auch leer starten und Nummern später über die Optionen hinzufügen oder entfernen.",
         "data": {
-          "tracking_numbers": "Sendungsnummern (DHL, DPD oder Hermes)",
+          "tracking_numbers": "Sendungsnummern (DHL, DPD, Hermes oder UPS)",
           "default_postcode": "Deine PLZ (nur nötig, falls eine DPD-Nummer geschützt ist)"
         }
       },
@@ -54,7 +54,7 @@
   "selector": {
     "provider": {
       "options": {
-        "dhl": "Sendungsnummern (DHL, DPD & Hermes)",
+        "dhl": "Sendungsnummern (DHL, DPD, Hermes & UPS)",
         "dpd": "DPD-Konto (alle Sendungen automatisch)",
         "amazon": "Amazon.de-Konto (Lieferungen automatisch)"
       }
@@ -63,9 +63,9 @@
   "options": {
     "step": {
       "dhl_options": {
-        "description": "Sendungsnummern für DHL, DPD und Hermes – dieser Eintrag gilt für alle drei. Nummern hinzufügen oder entfernen, optional deine PLZ (nur für geschützte DPD-Sendungen) und das Aktualisierungsintervall anpassen.",
+        "description": "Sendungsnummern für DHL, DPD, Hermes und UPS – dieser Eintrag gilt für alle vier. Nummern hinzufügen oder entfernen, optional deine PLZ (nur für geschützte DPD-Sendungen) und das Aktualisierungsintervall anpassen.",
         "data": {
-          "tracking_numbers": "Sendungsnummern (DHL, DPD oder Hermes)",
+          "tracking_numbers": "Sendungsnummern (DHL, DPD, Hermes oder UPS)",
           "default_postcode": "Deine PLZ (nur nötig, falls eine DPD-Nummer geschützt ist)",
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
           "dhl_auto_discovery": "DHL-Konto verbinden und Sendungen automatisch erkennen (Test)"
@@ -99,11 +99,11 @@
   "services": {
     "add_tracking_number": {
       "name": "Sendungsnummer hinzufügen",
-      "description": "Fügt eine Sendungsnummer zur Paketverfolgung hinzu, falls sie noch nicht verfolgt wird. Der Anbieter (DHL, DPD oder Hermes) wird automatisch erkannt.",
+      "description": "Fügt eine Sendungsnummer zur Paketverfolgung hinzu, falls sie noch nicht verfolgt wird. Der Anbieter (DHL, DPD, Hermes oder UPS) wird automatisch erkannt.",
       "fields": {
         "tracking_number": {
           "name": "Sendungsnummer",
-          "description": "Die Sendungs-/Trackingnummer (DHL, DPD oder Hermes)."
+          "description": "Die Sendungs-/Trackingnummer (DHL, DPD, Hermes oder UPS)."
         }
       }
     },
@@ -127,7 +127,7 @@
         },
         "carrier": {
           "name": "Anbieter",
-          "description": "dhl, dpd, hermes oder auto."
+          "description": "dhl, dpd, hermes, ups oder auto."
         }
       }
     },
