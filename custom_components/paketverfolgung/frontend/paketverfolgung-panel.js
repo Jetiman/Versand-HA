@@ -641,8 +641,9 @@ class PaketverfolgungPanel extends HTMLElement {
       note = `<div class="pv-note">Zugestellt – wandert automatisch 24 Stunden nach der Zustellung
         ins Archiv, oder direkt über den Button oben.</div>`;
     } else if (!s.events.length && s.provider === "UPS") {
-      note = `<div class="pv-note">UPS erlaubt nur wenige Abfragen pro Stunde. Der Verlauf
-        erscheint, sobald eine Abfrage frei ist (Neustart oder Aktualisieren hilft nicht).</div>`;
+      note = `<div class="pv-note">UPS erlaubt nur wenige Abfragen pro Stunde und antwortet
+        nach einem Fehler erst nach ca. 2 Stunden wieder – oder blockt diese Verbindung (siehe Log).
+        Der Verlauf erscheint, sobald UPS antwortet (Neustart oder Aktualisieren hilft nicht).</div>`;
     } else if (!s.events.length && (s.provider === "DPD" || s.provider === "Hermes" || s.provider === "Amazon")) {
       note = `<div class="pv-note">Für diese Sendung liegt noch kein Verlauf vor.</div>`;
     }

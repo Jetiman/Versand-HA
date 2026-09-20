@@ -208,6 +208,10 @@ UPS_NUMBER_PATTERN = r"^1Z[0-9A-Z]{16}$"
 # all UPS numbers; a request without a token is never sent.
 UPS_BUDGET_CAPACITY = 3
 UPS_BUDGET_REFILL_SECONDS = 4500
+# After any failed UPS request (a hang, a block) no further request is sent
+# for this long. Asking again too early prolongs UPS's silence, so retrying
+# on every poll would only make it worse.
+UPS_STAND_DOWN_SECONDS = 7200
 
 # Broad lifecycle group shared by both carriers - drives the icon and the
 # combined "out for delivery" count regardless of provider.

@@ -13,8 +13,10 @@ shape so the sensor/panel code is carrier-agnostic:
 from __future__ import annotations
 
 import asyncio
+import copy
 import logging
 import re
+import time
 from datetime import datetime, timedelta
 
 from homeassistant.config_entries import ConfigEntry
@@ -72,6 +74,7 @@ from .const import (
     UPS_BUDGET_CAPACITY,
     UPS_BUDGET_REFILL_SECONDS,
     UPS_NUMBER_PATTERN,
+    UPS_STAND_DOWN_SECONDS,
 )
 from .dhl_account import DhlAccountClient, DhlAuthError
 from .dhl_api import DhlApiClient, DhlApiError
@@ -266,6 +269,9 @@ def _placeholder(number: str, carrier: str) -> dict:
 
 
 ARCHIVE_AFTER = timedelta(hours=ARCHIVE_AFTER_HOURS)
+# An archived shipment is only looked up again after this long - nothing
+# is expected to change, so once a day is enough.
+ARCHIVED_RECHECK = timedelta(hours=24)
 
 
 def _delivery_moment(item: dict) -> datetime | None:
@@ -552,6 +558,15 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         self._ups_budget = UpsBudget(UPS_BUDGET_CAPACITY, UPS_BUDGET_REFILL_SECONDS)
         self._ups_items: dict[str, dict] = {}
         self._ups_checked: dict[str, str] = {}
+        self._ups_pause_until = 0.0
+        # Kept across restarts so a restart doesn't re-probe every carrier for
+        # every number: the detected carrier per number, and the last data of
+        # each archived shipment with when it was last really looked up.
+        self._numbers_store = Store(hass, 1, f"{DOMAIN}.numbers.{entry.entry_id}")
+        self._numbers_loaded = False
+        self._numbers_saved: dict | None = None
+        self._archived_items: dict[str, dict] = {}
+        self._archived_checked: dict[str, str] = {}
 
     def _config(self, key, default=None):
         return self.entry.options.get(key, self.entry.data.get(key, default))
@@ -559,6 +574,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
     async def _poll(self) -> dict[str, dict]:
         self._mark_polled()
         await self._load_archive()
+        await self._load_numbers_state()
         numbers = [
             str(n).strip()
             for n in self._config(CONF_TRACKING_NUMBERS, [])
@@ -578,21 +594,24 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         }
         if not numbers:
             self.carriers.clear()
+            self._archived_items.clear()
+            self._archived_checked.clear()
+            await self._save_numbers_state()
             return {}
 
         def _frozen(n: str) -> dict | None:
-            """A previously-archived item, unless its carrier override just
-            changed - archived shipments are no longer re-queried. A
-            delivered-but-not-yet-archived shipment keeps being queried
+            """The stored data of an archived shipment, unless its carrier
+            override just changed or it is due for its daily re-check.
+            A delivered-but-not-yet-archived shipment keeps being queried
             normally for the rest of the grace period (its status could
             still change, e.g. a correction from the carrier)."""
-            prev = (self.data or {}).get(n)
-            if prev and prev.get("archived") and overrides.get(n) in (
-                None,
-                prev.get("carrier"),
-            ):
-                return prev
-            return None
+            prev = self._archived_items.get(n)
+            if not prev or overrides.get(n) not in (None, prev.get("carrier")):
+                return None
+            checked = dt_util.parse_datetime(self._archived_checked.get(n) or "")
+            if checked is None or dt_util.utcnow() - checked >= ARCHIVED_RECHECK:
+                return None
+            return prev
 
         def _is_ups(n: str) -> bool:
             forced = overrides.get(n)
@@ -610,10 +629,15 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                 n
                 for n in numbers
                 if _frozen(n) is None
-                and overrides.get(n, CARRIER_DHL) == CARRIER_DHL
-                and not _is_ups(n)
-                and self.carriers.get(n, CARRIER_UNKNOWN)
-                not in (CARRIER_DPD, CARRIER_HERMES)
+                and (
+                    overrides.get(n) == CARRIER_DHL
+                    or (
+                        overrides.get(n) is None
+                        and not _is_ups(n)
+                        and self.carriers.get(n, CARRIER_UNKNOWN)
+                        not in (CARRIER_DPD, CARRIER_HERMES)
+                    )
+                )
             ]
         )
 
@@ -656,10 +680,13 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             else:
                 item, carrier = await self._detect(number, postcode, known)
 
+            # _detect hands back last poll's own dict when a lookup blipped;
+            # that is a fallback, not a fresh answer.
+            got_fresh = item is not None and item is not (self.data or {}).get(number)
             if item is None:
                 # Nothing this cycle - keep the last real data (transient
                 # carrier outage, still-propagating number) over blanking.
-                previous = (self.data or {}).get(number)
+                previous = (self.data or {}).get(number) or self._archived_items.get(number)
                 if previous and previous.get("status") != NO_DATA_STATUS:
                     item = previous
                     if not forced and carrier == CARRIER_UNKNOWN:
@@ -675,6 +702,13 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             item["name"] = names.get(number) or item["carrier_name"]
             await self._apply_archive(item)
             self.carriers[number] = carrier
+            if item.get("archived"):
+                self._archived_items[number] = dict(item)
+                if got_fresh or number not in self._archived_checked:
+                    self._archived_checked[number] = dt_util.utcnow().isoformat()
+            else:
+                self._archived_items.pop(number, None)
+                self._archived_checked.pop(number, None)
             result[number] = item
 
         for stale in [n for n in self.carriers if n not in numbers]:
@@ -682,6 +716,10 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         for stale in [n for n in self._ups_items if n not in numbers]:
             self._ups_items.pop(stale, None)
             self._ups_checked.pop(stale, None)
+        for stale in [n for n in self._archived_items if n not in numbers]:
+            self._archived_items.pop(stale, None)
+            self._archived_checked.pop(stale, None)
+        await self._save_numbers_state()
         self._apply_direction_overrides(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
@@ -752,6 +790,39 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             return soft, CARRIER_UNKNOWN  # show it, stay open for re-detection
         return None, CARRIER_UNKNOWN
 
+    async def _load_numbers_state(self) -> None:
+        if self._numbers_loaded:
+            return
+        self._numbers_loaded = True
+        stored = await self._numbers_store.async_load() or {}
+        for number, carrier in (stored.get("carriers") or {}).items():
+            if carrier in CARRIERS:
+                self.carriers.setdefault(str(number), carrier)
+        self._archived_items = {
+            str(k): v
+            for k, v in (stored.get("archived_items") or {}).items()
+            if isinstance(v, dict)
+        }
+        self._archived_checked = dict(stored.get("archived_checked") or {})
+        self._numbers_saved = self._numbers_snapshot()
+
+    def _numbers_snapshot(self) -> dict:
+        return copy.deepcopy(
+            {
+                "carriers": {
+                    n: c for n, c in self.carriers.items() if c in CARRIERS
+                },
+                "archived_items": self._archived_items,
+                "archived_checked": self._archived_checked,
+            }
+        )
+
+    async def _save_numbers_state(self) -> None:
+        snapshot = self._numbers_snapshot()
+        if snapshot != self._numbers_saved:
+            await self._numbers_store.async_save(snapshot)
+            self._numbers_saved = snapshot
+
     async def _load_ups_state(self) -> None:
         if self._ups_loaded:
             return
@@ -762,6 +833,10 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         )
         self._ups_items = dict(stored.get("items") or {})
         self._ups_checked = dict(stored.get("checked") or {})
+        try:
+            self._ups_pause_until = float(stored.get("pause_until") or 0.0)
+        except (TypeError, ValueError):
+            self._ups_pause_until = 0.0
 
     async def _save_ups_state(self) -> None:
         await self._ups_store.async_save(
@@ -769,7 +844,20 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                 "budget": self._ups_budget.to_dict(),
                 "items": self._ups_items,
                 "checked": self._ups_checked,
+                "pause_until": self._ups_pause_until,
             }
+        )
+
+    def _ups_stand_down(self, reason: str) -> None:
+        self._ups_pause_until = time.time() + UPS_STAND_DOWN_SECONDS
+        resume = dt_util.as_local(
+            dt_util.utc_from_timestamp(self._ups_pause_until)
+        ).strftime("%H:%M")
+        _LOGGER.warning(
+            "UPS: %s. UPS is silent or blocking this connection - no further "
+            "UPS request until %s.",
+            reason,
+            resume,
         )
 
     async def _ups_lookup_batch(self, numbers: list[str]) -> dict[str, dict]:
@@ -792,6 +880,9 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         )
         if not queue or self._ups_budget.available() < 1:
             return {}
+        if time.time() < self._ups_pause_until:
+            _LOGGER.debug("UPS lookups paused until %s", self._ups_pause_until)
+            return {}
 
         fresh: dict[str, dict] = {}
         client = UpsTrackingApiClient()
@@ -799,7 +890,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             try:
                 await client.bootstrap()
             except UpsTrackingApiError as err:
-                _LOGGER.warning("UPS lookup skipped: %s", err)
+                self._ups_stand_down(f"bootstrap failed: {err}")
                 return {}
             for number in queue:
                 if not self._ups_budget.try_spend():
@@ -808,7 +899,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                 try:
                     item = await client.fetch(number)
                 except UpsTrackingApiError as err:
-                    _LOGGER.warning("UPS lookup for %s failed: %s", number, err)
+                    self._ups_stand_down(f"lookup for {number} failed: {err}")
                     break  # a block or a silent UPS: don't burn more budget
                 if item is not None:
                     fresh[number] = item
