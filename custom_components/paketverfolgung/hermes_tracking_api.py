@@ -117,6 +117,33 @@ class HermesTrackingApiClient:
         return _parse(number, payload)
 
 
+def _find_window(payload: dict) -> tuple[str | None, str | None]:
+    """Return Hermes' announced delivery window as (from, to) ISO strings.
+
+    myhermes.de shows the time slot from ``deliveryTimeFromUTC`` /
+    ``deliveryTimeToUTC`` (UTC, e.g. ``2026-10-06T08:15:00Z``). The keys sit
+    one level below the shipment object, so look through nested dicts (not
+    the parcelProgress history) and stay defensive: missing, empty or
+    non-string values give ``None`` and the attributes stay empty as before.
+    """
+    found: dict[str, str] = {}
+
+    def walk(obj: Any, depth: int) -> None:
+        if not isinstance(obj, dict) or depth > 3:
+            return
+        for want in ("deliveryTimeFromUTC", "deliveryTimeToUTC"):
+            if want not in found:
+                value = pick(obj, want)
+                if isinstance(value, str) and value.strip():
+                    found[want] = value.strip()
+        for key, value in obj.items():
+            if key != "parcelProgress":
+                walk(value, depth + 1)
+
+    walk(payload, 0)
+    return found.get("deliveryTimeFromUTC"), found.get("deliveryTimeToUTC")
+
+
 def _parse(number: str, payload: Any) -> dict | None:
     # The v2 endpoint returns a list of shipments; take the first.
     if isinstance(payload, list):
@@ -173,6 +200,7 @@ def _parse(number: str, payload: Any) -> dict | None:
     direction = "send" if direction_enum.startswith("SHIP") else "receive"
 
     sender = text(pick(pick(payload, "atg") or {}, "companyName"))
+    delivery_from, delivery_to = _find_window(payload)
     return {
         "id": number,
         "carrier": "hermes",
@@ -180,8 +208,8 @@ def _parse(number: str, payload: Any) -> dict | None:
         "status": status_text or DEFAULT_STATUS,
         "group": GROUP_DELIVERED if delivered else group,
         "direction": direction,
-        "delivery_from": None,
-        "delivery_to": None,
+        "delivery_from": delivery_from,
+        "delivery_to": delivery_to,
         "tracking_url": HERMES_TRACKING_PAGE_URL.format(id=number),
         "events": events,
         "delivered": delivered,
