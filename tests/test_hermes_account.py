@@ -243,3 +243,15 @@ def test_merge_shipment():
     e0 = account.parse_shipments(LIST)[0]
     assert hc.merge_shipment(e0, None)["name"] == "OTTO"
     assert hc.merge_shipment(e0, None)["delivered"] is True
+
+
+def test_placeholder_sender_is_not_used_as_name():
+    hc = _coordinator_module()
+    entry = account.parse_shipments(
+        [{"shipmentId": "H300", "userDescription": "Meine Sendung",
+          "sender": "Versender", "trackingStatus": "Zugestellt"}]
+    )[0]
+    assert hc.merge_shipment(entry, None)["name"] == "H300"
+    detail = {"id": "H300", "carrier": "hermes", "name": "H300", "status": "x",
+              "group": const.GROUP_DELIVERED, "events": [], "delivered": True}
+    assert hc.merge_shipment(entry, detail)["name"] == "H300"

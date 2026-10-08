@@ -37,7 +37,9 @@ _LOGGER = logging.getLogger(__name__)
 # In-flight parcels are refreshed every poll; delivered ones only backfilled
 # once, a few per poll, so an account with many old parcels stays cheap.
 _DETAIL_FETCHES_PER_POLL = 12
-_DEFAULT_DESCRIPTION = "Meine Sendung"  # Hermes' placeholder label
+# Hermes fills these in when the user gave no label / the sender is unknown.
+_PLACEHOLDER_LABELS = {"Meine Sendung"}
+_PLACEHOLDER_SENDERS = {"Versender"}
 
 
 def merge_shipment(entry: dict, detail: dict | None) -> dict:
@@ -64,10 +66,15 @@ def merge_shipment(entry: dict, detail: dict | None) -> dict:
     # Account shipments are always incoming.
     item["direction"] = "receive"
     label = entry.get("description")
-    if label and label != _DEFAULT_DESCRIPTION:
+    sender = entry.get("sender")
+    if label and label not in _PLACEHOLDER_LABELS:
         item["name"] = label
-    elif item.get("name") in (None, "", shipment_id) and entry.get("sender"):
-        item["name"] = entry["sender"]
+    elif (
+        item.get("name") in (None, "", shipment_id)
+        and sender
+        and sender not in _PLACEHOLDER_SENDERS
+    ):
+        item["name"] = sender
     return item
 
 
