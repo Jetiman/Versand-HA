@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, Supp
 from homeassistant.exceptions import ServiceValidationError
 
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
+from .hermes_coordinator import HermesAccountDataUpdateCoordinator
 from .const import (
     ATTR_CARRIER,
     ATTR_DIRECTION,
@@ -46,6 +47,7 @@ from .const import (
     PANEL_VERSION,
     PROVIDER_AMAZON,
     PROVIDER_DPD,
+    PROVIDER_HERMES,
     PROVIDER_NUMBERS,
     SERVICE_ADD_TRACKING_NUMBER,
     SERVICE_ARCHIVE_NOW,
@@ -169,6 +171,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     elif provider == PROVIDER_AMAZON:
         coordinator = AmazonAccountDataUpdateCoordinator(
+            hass, entry, update_interval=timedelta(minutes=minutes)
+        )
+    elif provider == PROVIDER_HERMES:
+        coordinator = HermesAccountDataUpdateCoordinator(
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
     else:

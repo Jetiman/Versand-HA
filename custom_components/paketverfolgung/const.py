@@ -156,9 +156,12 @@ PROVIDER_NUMBERS = "dhl"
 PROVIDER_DHL = PROVIDER_NUMBERS
 PROVIDER_DPD = "dpd"
 PROVIDER_AMAZON = "amazon"
+PROVIDER_HERMES = "hermes"
 
 CONF_DPD_USERNAME = "dpd_username"
 CONF_DPD_PASSWORD = "dpd_password"
+CONF_HERMES_USERNAME = "hermes_username"
+CONF_HERMES_PASSWORD = "hermes_password"
 
 # DPD "Paketnavigator3" SOAP API (Android app v4.1.2, package de.dpd.mobile).
 # Partner credentials are public constants baked into the app, reverse
@@ -184,6 +187,8 @@ DPD_PLC_URL = "https://tracking.dpd.de/rest/plc/de_DE/{id}"
 # Hermes Germany's public tracking JSON endpoint (the v2 API the
 # myhermes.de "Sendungsverfolgung" page calls). Works by parcel number,
 # no login, no postcode. Unofficial - schema undocumented.
+# myhermes.de account (login + "Empfangsübersicht"), see hermes_account.py.
+HERMES_ACCOUNT_BASE = "https://www.myhermes.de"
 HERMES_PLC_URL = "https://api.my-deliveries.de/tnt/v2/shipments/search/{id}"
 HERMES_TRACKING_PAGE_URL = (
     "https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation/#{id}"
