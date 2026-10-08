@@ -7,6 +7,7 @@ from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .amazon_api import AmazonApiError, AmazonAuthError
@@ -117,6 +118,43 @@ class AmazonAccountDataUpdateCoordinator(_BaseCoordinator):
             update_interval=update_interval,
         )
         self.entry = entry
+        self._keys_store = Store(hass, 1, f"{DOMAIN}.amazon_keys.{entry.entry_id}")
+        self._package_keys: dict[str, str] | None = None
+
+    async def _bind_package_keys(self, shipments: list[dict]) -> None:
+        """Give every package a sensor key that stays with that package.
+
+        Amazon lists an order's tracking links in changing order, and the
+        client names packages by their position, so two packages of one
+        order kept swapping keys - and every swap that landed a "delivered"
+        status on a key sent a delivery notification. A package is now
+        identified by (order, carrier tracking number); its key is chosen
+        once (the order number for the first package of an order,
+        "<order>_<n>" for later ones) and stored.
+        """
+        if self._package_keys is None:
+            stored = await self._keys_store.async_load() or {}
+            self._package_keys = {str(k): str(v) for k, v in stored.items()}
+        keys = self._package_keys
+        used = set(keys.values())
+        changed = False
+        for raw in shipments:
+            order = str(raw.get("order_id") or "").strip()
+            tracking = str(raw.get("tracking_id") or "").strip()
+            if not order or not tracking:
+                continue
+            ident = f"{order}|{tracking}"
+            key = keys.get(ident)
+            if key is None:
+                key, n = order, 2
+                while key in used:
+                    key, n = f"{order}_{n}", n + 1
+                keys[ident] = key
+                used.add(key)
+                changed = True
+            raw["id"] = key
+        if changed:
+            await self._keys_store.async_save(keys)
 
     async def _poll(self) -> dict[str, dict]:
         self._mark_polled()
@@ -142,6 +180,8 @@ class AmazonAccountDataUpdateCoordinator(_BaseCoordinator):
                 self.entry,
                 data={**self.entry.data, CONF_AMAZON_COOKIES: refreshed},
             )
+
+        await self._bind_package_keys(shipments)
 
         names = {
             str(k).strip(): str(v).strip()
