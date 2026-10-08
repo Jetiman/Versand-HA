@@ -37,7 +37,7 @@ Jeder Sendung lässt sich ein **eigener Name** geben (Detailseite → Feld „Na
 
 - **DHL:** öffentliche Sendungsverfolgungs-Suche (kein Login), inkl. komplettem Verlauf und Zustellzeitfenster.
 - **DPD:** öffentliche „Parcel Life Cycle“-Verfolgung von tracking.dpd.de, inkl. Verlauf.
-- **Hermes:** öffentliche Sendungsverfolgung von myhermes.de (v2-API `api.my-deliveries.de`), inkl. Verlauf.
+- **Hermes:** öffentliche Sendungsverfolgung von myhermes.de (v2-API `api.my-deliveries.de`), inkl. Verlauf und Zustellzeitfenster (Beitrag von [@dominikramachers](https://github.com/dominikramachers), [#4](https://github.com/Jetiman/Versand-HA/pull/4)).
 - **UPS:** öffentliche Sendungsverfolgung von ups.com (kein Konto, kein API-Schlüssel), inkl. Verlauf mit Ort. **Achtung, stark begrenzt:** UPS beantwortet pro Internetanschluss nur etwa 3 Abfragen und danach nur noch rund **eine alle 75 Minuten** – für alle UPS-Sendungen zusammen. Updates kommen also im Stundentakt, nicht im Minutentakt; mehrere UPS-Sendungen teilen sich das Kontingent reihum. Zugestellte Sendungen werden nicht mehr abgefragt. Nach einem Fehler oder Hänger pausiert UPS für 2 Stunden, denn zu frühes Nachfragen verlängert UPS' Schweigen. Das Kontingent wird gespeichert, ein Neustart füllt es nicht auf. Nummern, die nicht mit `1Z` beginnen, lassen sich über „Anbieter“ fest auf UPS setzen.
 
 > ℹ️ `tracking.dpd.de` blockt Anfragen aus manchen Rechenzentren/VPS-Netzen (TCP-Reset). Läuft dein Home Assistant auf einem gehosteten Server, funktioniert die **DPD-Nummernsuche** dort evtl. nicht (DHL und Hermes sind nicht betroffen; das DPD-**Konto** liefert weiterhin den aktuellen Status, nur den nachgeladenen Verlauf nicht).
