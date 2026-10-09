@@ -76,6 +76,8 @@ Idee und OAuth-Flow von [@SniperWCW](https://github.com/SniperWCW) ([#1](https:/
 - Sendungen aus dem Konto sind immer „empfangen“; eigene Namen funktionieren wie bei DPD (`paketverfolgung.set_tracking_name`).
 - ⚠️ Das Passwort wird im Klartext im Home-Assistant-Eintrag gespeichert (auch in Backups), weil Hermes keine Token-Anmeldung anbietet. Die Anmeldung beruht auf der inoffiziellen Web-Schnittstelle von myhermes.de und kann sich jederzeit ändern. Eine Anmeldung mit Captcha oder Zwei-Faktor wird nicht unterstützt.
 
+Beitrag von [@dominikramachers](https://github.com/dominikramachers) ([#5](https://github.com/Jetiman/Versand-HA/pull/5)).
+
 ## Amazon.de-Konto (optional)
 
 „Eintrag hinzufügen“ → **„Amazon.de-Konto“** → mit E-Mail und Passwort anmelden (bei aktivierter 2FA folgt ein Schritt für den Einmalcode). Danach werden bei jeder Aktualisierung deine **aktuellen Amazon-Bestellungen** ausgelesen – von „bestellt“ über „versandt“ bis „zugestellt“, mit Status, Trackingnummer, **tatsächlichem Zusteller** (z. B. „Versendet mit DHL“) und dem Amazon-Sendungsverlauf. Jede Sendung wird über die **Amazon-Bestellnummer** identifiziert und bleibt so von der Bestellung bis zur Zustellung dieselbe Entität (`sensor.amazon_<bestellnummer>`).
