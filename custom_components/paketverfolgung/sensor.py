@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
+from .hermes_coordinator import HermesAccountDataUpdateCoordinator
 from .const import (
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_ON_NEW,
@@ -48,6 +49,7 @@ _SHIPMENT_COORDINATORS = (
     TrackingNumbersDataUpdateCoordinator,
     DpdAccountDataUpdateCoordinator,
     AmazonAccountDataUpdateCoordinator,
+    HermesAccountDataUpdateCoordinator,
 )
 
 _DELIVERY_TODAY_UID = f"{DOMAIN}_out_for_delivery_today"

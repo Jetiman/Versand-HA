@@ -38,6 +38,14 @@
         "data": {
           "amazon_otp": "Bestätigungscode"
         }
+      },
+      "hermes": {
+        "title": "Mit Hermes-Konto anmelden",
+        "description": "Melde dich mit deinem myHermes-Konto an. Alle Sendungen aus deiner Empfangsübersicht (an dich unterwegs) werden danach automatisch erkannt, inklusive Zustellzeitfenster. Das Passwort wird lokal in Home Assistant gespeichert (im Klartext, auch in Backups).",
+        "data": {
+          "hermes_username": "E-Mail-Adresse",
+          "hermes_password": "Passwort"
+        }
       }
     },
     "error": {
@@ -45,7 +53,9 @@
       "cannot_connect": "Verbindung zu DPD fehlgeschlagen. Bitte später erneut versuchen.",
       "amazon_auth": "Amazon-Anmeldung fehlgeschlagen. Bitte E-Mail-Adresse und Passwort prüfen.",
       "amazon_otp": "Der Amazon-Bestätigungscode wurde nicht akzeptiert.",
-      "amazon_captcha": "Amazon verlangt eine CAPTCHA-/Browser-Bestätigung. Dieser Login kann derzeit nicht automatisch abgeschlossen werden."
+      "amazon_captcha": "Amazon verlangt eine CAPTCHA-/Browser-Bestätigung. Dieser Login kann derzeit nicht automatisch abgeschlossen werden.",
+      "hermes_auth": "Hermes-Anmeldung fehlgeschlagen. Bitte E-Mail-Adresse und Passwort prüfen.",
+      "hermes_connect": "Verbindung zu myHermes fehlgeschlagen. Bitte später erneut versuchen."
     },
     "abort": {
       "already_configured": "Das ist bereits eingerichtet."
@@ -56,7 +66,8 @@
       "options": {
         "dhl": "Sendungsnummern (DHL, DPD, Hermes & UPS)",
         "dpd": "DPD-Konto (alle Sendungen automatisch)",
-        "amazon": "Amazon.de-Konto (Lieferungen automatisch)"
+        "amazon": "Amazon.de-Konto (Lieferungen automatisch)",
+        "hermes": "Hermes-Konto (alle Sendungen automatisch)"
       }
     }
   },
@@ -87,6 +98,12 @@
       },
       "amazon_options": {
         "description": "Aktualisierungsintervall für Amazon-Lieferungen anpassen.",
+        "data": {
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+        }
+      },
+      "hermes_options": {
+        "description": "Aktualisierungsintervall für das Hermes-Konto anpassen.",
         "data": {
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }

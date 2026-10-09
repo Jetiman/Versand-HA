@@ -8,7 +8,10 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers import selector
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import (
+    async_create_clientsession,
+    async_get_clientsession,
+)
 
 from .amazon_api import (
     AmazonApiClient,
@@ -28,6 +31,8 @@ from .const import (
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_REDIRECT,
     CONF_DHL_SESSION,
+    CONF_HERMES_PASSWORD,
+    CONF_HERMES_USERNAME,
     CONF_NAMES,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
@@ -39,10 +44,12 @@ from .const import (
     MIN_UPDATE_INTERVAL_MINUTES,
     PROVIDER_AMAZON,
     PROVIDER_DPD,
+    PROVIDER_HERMES,
     PROVIDER_NUMBERS,
 )
 from .dhl_account import DhlAccountClient, DhlAuthError, build_login, extract_code
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError
+from .hermes_account import HermesAccountClient, HermesAccountError, HermesAuthError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,6 +99,17 @@ _DPD_LOGIN_SCHEMA = vol.Schema(
     }
 )
 
+_HERMES_LOGIN_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_HERMES_USERNAME): selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.EMAIL)
+        ),
+        vol.Required(CONF_HERMES_PASSWORD): selector.TextSelector(
+            selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+        ),
+    }
+)
+
 _AMAZON_LOGIN_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_AMAZON_USERNAME): selector.TextSelector(
@@ -121,6 +139,8 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_dpd()
             if user_input[CONF_PROVIDER] == PROVIDER_AMAZON:
                 return await self.async_step_amazon()
+            if user_input[CONF_PROVIDER] == PROVIDER_HERMES:
+                return await self.async_step_hermes()
             return await self.async_step_dhl()
 
         return self.async_show_form(
@@ -131,7 +151,12 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_PROVIDER, default=PROVIDER_NUMBERS
                     ): selector.SelectSelector(
                         selector.SelectSelectorConfig(
-                            options=[PROVIDER_NUMBERS, PROVIDER_DPD, PROVIDER_AMAZON],
+                            options=[
+                                PROVIDER_NUMBERS,
+                                PROVIDER_DPD,
+                                PROVIDER_AMAZON,
+                                PROVIDER_HERMES,
+                            ],
                             translation_key="provider",
                         )
                     ),
@@ -194,6 +219,41 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="dpd", data_schema=_DPD_LOGIN_SCHEMA, errors=errors
+        )
+
+    async def async_step_hermes(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Sign in to a myhermes.de account (incoming parcels)."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            username = user_input[CONF_HERMES_USERNAME].strip()
+            password = user_input[CONF_HERMES_PASSWORD]
+            # Own session = own cookie jar, never the shared one.
+            client = HermesAccountClient(async_create_clientsession(self.hass))
+            try:
+                await client.login(username, password)
+                await client.fetch_shipments()
+            except HermesAuthError as err:
+                _LOGGER.debug("Hermes login failed: %s", err)
+                errors["base"] = "hermes_auth"
+            except HermesAccountError as err:
+                _LOGGER.debug("Hermes login error: %s", err)
+                errors["base"] = "hermes_connect"
+            else:
+                await self.async_set_unique_id(f"{PROVIDER_HERMES}_{username.lower()}")
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(
+                    title=f"Hermes ({username})",
+                    data={
+                        CONF_PROVIDER: PROVIDER_HERMES,
+                        CONF_HERMES_USERNAME: username,
+                        CONF_HERMES_PASSWORD: password,
+                    },
+                )
+
+        return self.async_show_form(
+            step_id="hermes", data_schema=_HERMES_LOGIN_SCHEMA, errors=errors
         )
 
     async def async_step_amazon(
@@ -297,6 +357,8 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
             return await self.async_step_dpd_options(user_input)
         if provider == PROVIDER_AMAZON:
             return await self.async_step_amazon_options(user_input)
+        if provider == PROVIDER_HERMES:
+            return await self.async_step_hermes_options(user_input)
         return await self.async_step_dhl_options(user_input)
 
     def _current(self, key, default=None):
@@ -457,6 +519,25 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
             )
         return self.async_show_form(
             step_id="amazon_options",
+            data_schema=_update_interval_schema(
+                self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
+            ),
+        )
+
+    async def async_step_hermes_options(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """The Hermes account only exposes the refresh interval."""
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data={
+                    **self._entry.options,
+                    CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
+                },
+            )
+        return self.async_show_form(
+            step_id="hermes_options",
             data_schema=_update_interval_schema(
                 self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
             ),

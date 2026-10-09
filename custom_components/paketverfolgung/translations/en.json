@@ -38,6 +38,14 @@
         "data": {
           "amazon_otp": "Verification code"
         }
+      },
+      "hermes": {
+        "title": "Sign in with a Hermes account",
+        "description": "Sign in with your myHermes account. All parcels in your incoming-parcels overview are then discovered automatically, including the delivery window. The password is stored locally in Home Assistant (in plain text, also in backups).",
+        "data": {
+          "hermes_username": "Email address",
+          "hermes_password": "Password"
+        }
       }
     },
     "error": {
@@ -45,7 +53,9 @@
       "cannot_connect": "Could not connect to DPD. Please try again later.",
       "amazon_auth": "Amazon login failed. Please check your email address and password.",
       "amazon_otp": "The Amazon verification code was not accepted.",
-      "amazon_captcha": "Amazon requires a CAPTCHA/browser verification. This login cannot currently be completed automatically."
+      "amazon_captcha": "Amazon requires a CAPTCHA/browser verification. This login cannot currently be completed automatically.",
+      "hermes_auth": "Hermes sign-in failed. Please check email address and password.",
+      "hermes_connect": "Connection to myHermes failed. Please try again later."
     },
     "abort": {
       "already_configured": "This is already configured."
@@ -56,7 +66,8 @@
       "options": {
         "dhl": "Tracking numbers (DHL, DPD, Hermes & UPS)",
         "dpd": "DPD account (all parcels automatically)",
-        "amazon": "Amazon.de account (deliveries automatically)"
+        "amazon": "Amazon.de account (deliveries automatically)",
+        "hermes": "Hermes account (all parcels automatically)"
       }
     }
   },
@@ -89,6 +100,12 @@
         "description": "Adjust the update interval for Amazon deliveries.",
         "data": {
           "update_interval_minutes": "Update interval (minutes)"
+        }
+      },
+      "hermes_options": {
+        "description": "Adjust the refresh interval for the Hermes account.",
+        "data": {
+          "update_interval_minutes": "Refresh interval (minutes)"
         }
       }
     },

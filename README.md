@@ -8,6 +8,7 @@ Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten
 - **Sendungsnummern** – du trägst Nummern ein, der Anbieter (**DHL**, **DPD**, **Hermes** oder **UPS**) wird pro Nummer automatisch erkannt.
 - **DPD-Konto** – Login mit deinem myDPD-Konto, alle Sendungen werden automatisch erkannt.
 - **DHL-Konto** (optional) – Login mit deinem DHL-Konto, die Sendungen des Kontos werden automatisch mitgeführt.
+- **Hermes-Konto** (optional) – Login mit deinem myHermes-Konto, alle an dich unterwegs befindlichen Sendungen („Empfangsübersicht“) werden automatisch erkannt.
 - **Amazon.de-Konto** (optional) – Login mit deinem Amazon-Konto, laufende Lieferungen werden automatisch erkannt (inkl. tatsächlichem Zusteller). ⚠️ Sicherheitshinweis unten beachten.
 
 <p align="center"><img src="docs/panel.jpg" width="320" alt="Paketverfolgung-Oberfläche in der Home-Assistant-Seitenleiste"></p>
@@ -67,6 +68,14 @@ Der Diagnose-Sensor **„DHL-Konto Erkennung“** (`sensor.dhl_konto_erkennung`)
 
 Idee und OAuth-Flow von [@SniperWCW](https://github.com/SniperWCW) ([#1](https://github.com/Jetiman/Versand-HA/pull/1)) – der PR wurde nicht 1:1 übernommen, sondern das Konzept auf aktuellem Stand neu umgesetzt.
 
+## Hermes-Konto (optional)
+
+„Eintrag hinzufügen“ → **„Hermes-Konto“** → mit der E-Mail-Adresse und dem Passwort deines myHermes-Kontos anmelden. Danach erscheinen alle Sendungen aus deiner **Empfangsübersicht** (auf myhermes.de unter „Mein Konto“) automatisch als Sensoren; Verlauf und – sofern Hermes eines ankündigt – das Zustellzeitfenster kommen aus der öffentlichen Hermes-Verfolgung. Ein Eintrag pro Konto, Aktualisierungsintervall in den Optionen.
+
+- Der Eintrag ist unabhängig von „Sendungsnummern“: bereits dort eingetragene Hermes-Nummern bleiben unverändert. Steht dieselbe Sendung in beiden Einträgen, gibt es zwei Sensoren – dann die Nummer im Eintrag „Sendungsnummern“ entfernen.
+- Sendungen aus dem Konto sind immer „empfangen“; eigene Namen funktionieren wie bei DPD (`paketverfolgung.set_tracking_name`).
+- ⚠️ Das Passwort wird im Klartext im Home-Assistant-Eintrag gespeichert (auch in Backups), weil Hermes keine Token-Anmeldung anbietet. Die Anmeldung beruht auf der inoffiziellen Web-Schnittstelle von myhermes.de und kann sich jederzeit ändern. Eine Anmeldung mit Captcha oder Zwei-Faktor wird nicht unterstützt.
+
 ## Amazon.de-Konto (optional)
 
 „Eintrag hinzufügen“ → **„Amazon.de-Konto“** → mit E-Mail und Passwort anmelden (bei aktivierter 2FA folgt ein Schritt für den Einmalcode). Danach werden bei jeder Aktualisierung deine **aktuellen Amazon-Bestellungen** ausgelesen – von „bestellt“ über „versandt“ bis „zugestellt“, mit Status, Trackingnummer, **tatsächlichem Zusteller** (z. B. „Versendet mit DHL“) und dem Amazon-Sendungsverlauf. Jede Sendung wird über die **Amazon-Bestellnummer** identifiziert und bleibt so von der Bestellung bis zur Zustellung dieselbe Entität (`sensor.amazon_<bestellnummer>`).
@@ -113,7 +122,7 @@ Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie di
 ## Bekannte Einschränkungen
 
 - Alle Schnittstellen sind inoffiziell und können bei anbieterseitigen Änderungen brechen. Bitte in diesem Fall ein Issue öffnen.
-- Hermes: keine automatische Kontoerkennung – Sendungsnummern müssen eingetragen werden. DHL bietet eine optionale Konto-Anmeldung (siehe oben), die aber auf einer inoffiziellen App-Schnittstelle beruht.
+- Hermes: optionale Konto-Anmeldung (siehe oben, inoffizielle Web-Schnittstelle); ohne Konto müssen Sendungsnummern eingetragen werden. DHL bietet eine optionale Konto-Anmeldung (siehe oben), die aber auf einer inoffiziellen App-Schnittstelle beruht.
 - DPD: manche Sendungen sind ohne Empfänger-PLZ nicht öffentlich abrufbar; nur ein myDPD-Konto pro Eintrag. `tracking.dpd.de` ist aus manchen Server-/VPS-Netzen nicht erreichbar (siehe Hinweis oben).
 - Hermes: die genutzte Schnittstelle (`api.my-deliveries.de`) ist undokumentiert; falls sich das Antwortformat ändert, fehlt ggf. der Verlauf.
 - UPS: inoffizielle Schnittstelle hinter einem Bot-Schutz (Akamai), die nur wenige Abfragen pro Anschluss zulässt (siehe oben). Antwortet UPS gar nicht mehr, steht ein Hinweis im Log; das Kontingent füllt sich mit der Zeit wieder. Bricht der Schutz die Abfrage ab (z. B. aus Rechenzentrums-Netzen), fehlen die UPS-Daten.
