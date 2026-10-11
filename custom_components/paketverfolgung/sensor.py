@@ -244,9 +244,13 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
             "forced_carrier": s.get("forced"),
             "custom_name": s.get("custom_name"),
             "group": s.get("group"),
+            # Only typed-in numbers can be removed/re-assigned. The DHL-account
+            # coordinator is a subclass of the number coordinator, but its
+            # shipments come from the account, so it is excluded.
             "removable": isinstance(
                 self.coordinator, TrackingNumbersDataUpdateCoordinator
-            ),
+            )
+            and not isinstance(self.coordinator, DhlAccountDataUpdateCoordinator),
             "direction": s.get("direction"),
             "forced_direction": s.get("forced_direction"),
             "delivered": s.get("delivered"),
