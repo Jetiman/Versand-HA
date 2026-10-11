@@ -147,6 +147,24 @@ def format_notification(
 _DHL_DIRECTION = {"ANKOMMEND": "receive", "EINGEHEND": "receive", "AUSGEHEND": "send"}
 
 
+# DHL keeps reporting progress step 4 ("in delivery") after a failed delivery
+# attempt. Only the texts say it didn't work out: the status reads "Zustellversuch
+# am nächsten Werktag" and the newest event "Ihre Sendung konnte heute leider ...
+# nicht zugestellt werden. Ein neuer Zustellversuch erfolgt am nächsten
+# Werktag." Such a parcel is not out for delivery any more (the next morning's
+# "in das Zustellfahrzeug geladen" event brings it back).
+_DELIVERY_FAILED_RE = re.compile(
+    r"nicht\s+(?:erfolgreich\s+)?zugestellt\s+werden"
+    r"|neuer\s+zustellversuch"
+    r"|zustellversuch\s+am\s+n(?:ä|ae)chsten",
+    re.I,
+)
+
+
+def _delivery_failed(*texts: str | None) -> bool:
+    return any(_DELIVERY_FAILED_RE.search(t or "") for t in texts)
+
+
 def normalize_dhl_shipment(raw: dict) -> dict:
     """Turn a raw DHL search result into the shared shipment shape."""
     info = raw.get("sendungsinfo", {})
@@ -174,6 +192,10 @@ def normalize_dhl_shipment(raw: dict) -> dict:
     # for this, which PROGRESS_GROUP maps to "transit" - override it.
     if group == GROUP_TRANSIT and "elektronisch ang" in status.lower():
         group = GROUP_REGISTERED
+    if group == GROUP_OUT_FOR_DELIVERY and _delivery_failed(
+        status, events[0]["status"] if events else None
+    ):
+        group = GROUP_TRANSIT
 
     shipment_id = raw["id"]
     return {
