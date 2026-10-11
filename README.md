@@ -76,6 +76,8 @@ Wird die Sitzung von DHL irgendwann abgelehnt, fragt Home Assistant nach einer *
 
 > ℹ️ Die Login-Parameter stammen aus der DHL-App und sind inoffiziell – ändert DHL sie, muss die Anmeldung ggf. neu erfolgen oder die Funktion bricht.
 
+Umbau zum eigenen Eintrag (inkl. Neuanmeldung und Retouren-Behandlung) von [@dominikramachers](https://github.com/dominikramachers) ([#6](https://github.com/Jetiman/Versand-HA/pull/6)).
+
 Idee und OAuth-Flow von [@SniperWCW](https://github.com/SniperWCW) ([#1](https://github.com/Jetiman/Versand-HA/pull/1)) – der PR wurde nicht 1:1 übernommen, sondern das Konzept auf aktuellem Stand neu umgesetzt.
 
 ## Hermes-Konto (optional)
