@@ -110,7 +110,7 @@ Pro Sendung ein Sensor mit:
 Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
 - **„In Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Gesamtzahl der Sendungen, die gerade im Zustellfahrzeug sind; Attribut `shipments` enthält die Liste (inkl. Anbieter), `next_update` den nächsten Abfragezeitpunkt.
-- **„Nächste Aktualisierung“** (`sensor.naechste_aktualisierung`, Diagnose): Zeitstempel der nächsten Abfrage – HA zeigt das automatisch als „in X Minuten“.
+- **„Nächste Aktualisierung“** (`sensor.nachste_aktualisierung`, Diagnose): Zeitstempel der nächsten Abfrage – HA zeigt das automatisch als „in X Minuten“.
 
 ## Benachrichtigungen
 

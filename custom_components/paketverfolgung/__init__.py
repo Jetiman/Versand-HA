@@ -14,6 +14,7 @@ from homeassistant.exceptions import ServiceValidationError
 
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .hermes_coordinator import HermesAccountDataUpdateCoordinator
+from .owner import async_hand_over_summary_sensors
 from .const import (
     ATTR_CARRIER,
     ATTR_DIRECTION,
@@ -598,6 +599,11 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     if coordinator is not None:
         coordinator._reload_snapshot = now
     await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """An entry was deleted: pass the summary sensors on if it owned them."""
+    await async_hand_over_summary_sensors(hass, entry)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

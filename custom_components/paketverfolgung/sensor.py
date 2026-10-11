@@ -46,6 +46,7 @@ from .coordinator import (
     DpdAccountDataUpdateCoordinator,
     TrackingNumbersDataUpdateCoordinator,
 )
+from .owner import singleton_owner_id as _singleton_owner_id
 from .tracking_util import is_return
 
 _SHIPMENT_COORDINATORS = (
@@ -58,22 +59,6 @@ _SHIPMENT_COORDINATORS = (
 _DELIVERY_TODAY_UID = f"{DOMAIN}_out_for_delivery_today"
 _NEXT_REFRESH_UID = f"{DOMAIN}_next_refresh"
 _CANONICAL_UIDS = {_DELIVERY_TODAY_UID, _NEXT_REFRESH_UID}
-
-
-def _singleton_owner_id(hass: HomeAssistant) -> str | None:
-    """The one config entry that owns the cross-provider summary sensors.
-
-    Deterministic (tracking-number entry first, else lowest entry_id) so
-    the singletons don't hop between entries on restart and pile up
-    "_2"/"_3" registry duplicates.
-    """
-    entries = sorted(
-        hass.config_entries.async_entries(DOMAIN), key=lambda e: e.entry_id
-    )
-    for entry in entries:
-        if entry.data.get(CONF_PROVIDER, PROVIDER_NUMBERS) == PROVIDER_NUMBERS:
-            return entry.entry_id
-    return entries[0].entry_id if entries else None
 
 
 def _cleanup_singletons(hass: HomeAssistant, owner_id: str) -> None:
