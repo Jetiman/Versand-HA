@@ -41,9 +41,9 @@
       },
       "hermes": {
         "title": "Mit Hermes-Konto anmelden",
-        "description": "Melde dich mit deinem myHermes-Konto an. Alle Sendungen aus deiner Empfangsübersicht (an dich unterwegs) werden danach automatisch erkannt, inklusive Zustellzeitfenster. Das Passwort wird lokal in Home Assistant gespeichert (im Klartext, auch in Backups).",
+        "description": "Melde dich mit deinem myHermes-Konto an – mit dem **Benutzernamen**, mit dem du dich auf myhermes.de anmeldest (nicht unbedingt deine E-Mail-Adresse; vergessen? Auf myhermes.de „Benutzername anfordern“). Alle Sendungen aus deiner Empfangsübersicht (an dich unterwegs) werden danach automatisch erkannt, inklusive Zustellzeitfenster. Das Passwort wird lokal in Home Assistant gespeichert (im Klartext, auch in Backups).",
         "data": {
-          "hermes_username": "E-Mail-Adresse",
+          "hermes_username": "Benutzername",
           "hermes_password": "Passwort"
         }
       },
@@ -68,7 +68,7 @@
       "amazon_auth": "Amazon-Anmeldung fehlgeschlagen. Bitte E-Mail-Adresse und Passwort prüfen.",
       "amazon_otp": "Der Amazon-Bestätigungscode wurde nicht akzeptiert.",
       "amazon_captcha": "Amazon verlangt eine CAPTCHA-/Browser-Bestätigung. Dieser Login kann derzeit nicht automatisch abgeschlossen werden.",
-      "hermes_auth": "Hermes-Anmeldung fehlgeschlagen. Bitte E-Mail-Adresse und Passwort prüfen.",
+      "hermes_auth": "Hermes-Anmeldung fehlgeschlagen. Bitte Benutzername und Passwort prüfen – der Benutzername ist bei Hermes nicht unbedingt die E-Mail-Adresse.",
       "hermes_connect": "Verbindung zu myHermes fehlgeschlagen. Bitte später erneut versuchen.",
       "dhl_auth": "DHL-Anmeldung fehlgeschlagen. Bitte den Link erneut öffnen und die vollständige dhllogin://-Adresse aus der Konsole einfügen.",
       "dhl_connect": "Verbindung zu DHL fehlgeschlagen. Bitte später erneut versuchen."

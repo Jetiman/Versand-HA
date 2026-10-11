@@ -82,7 +82,7 @@ Idee und OAuth-Flow von [@SniperWCW](https://github.com/SniperWCW) ([#1](https:/
 
 ## Hermes-Konto (optional)
 
-„Eintrag hinzufügen“ → **„Hermes-Konto“** → mit der E-Mail-Adresse und dem Passwort deines myHermes-Kontos anmelden. Danach erscheinen alle Sendungen aus deiner **Empfangsübersicht** (auf myhermes.de unter „Mein Konto“) automatisch als Sensoren; Verlauf und – sofern Hermes eines ankündigt – das Zustellzeitfenster kommen aus der öffentlichen Hermes-Verfolgung. Ein Eintrag pro Konto, Aktualisierungsintervall in den Optionen.
+„Eintrag hinzufügen“ → **„Hermes-Konto“** → mit dem **Benutzernamen** und dem Passwort deines myHermes-Kontos anmelden. Der Benutzername ist bei Hermes nicht unbedingt deine E-Mail-Adresse – er steht auf myhermes.de im Login-Feld „Benutzername“; vergessen? Dort „Benutzername anfordern“. Danach erscheinen alle Sendungen aus deiner **Empfangsübersicht** (auf myhermes.de unter „Mein Konto“) automatisch als Sensoren; Verlauf und – sofern Hermes eines ankündigt – das Zustellzeitfenster kommen aus der öffentlichen Hermes-Verfolgung. Ein Eintrag pro Konto, Aktualisierungsintervall in den Optionen.
 
 - Der Eintrag ist unabhängig von „Sendungsnummern“: bereits dort eingetragene Hermes-Nummern bleiben unverändert. Steht dieselbe Sendung in beiden Einträgen, gibt es zwei Sensoren – dann die Nummer im Eintrag „Sendungsnummern“ entfernen.
 - Sendungen aus dem Konto sind immer „empfangen“; eigene Namen funktionieren wie bei DPD (`paketverfolgung.set_tracking_name`).

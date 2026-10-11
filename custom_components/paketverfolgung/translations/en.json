@@ -41,9 +41,9 @@
       },
       "hermes": {
         "title": "Sign in with a Hermes account",
-        "description": "Sign in with your myHermes account. All parcels in your incoming-parcels overview are then discovered automatically, including the delivery window. The password is stored locally in Home Assistant (in plain text, also in backups).",
+        "description": "Sign in with your myHermes account using the **username** you use on myhermes.de (not necessarily your email address; forgotten? Use “Request username” on myhermes.de). All parcels in your incoming-parcels overview are then discovered automatically, including the delivery window. The password is stored locally in Home Assistant (in plain text, also in backups).",
         "data": {
-          "hermes_username": "Email address",
+          "hermes_username": "Username",
           "hermes_password": "Password"
         }
       },
@@ -68,7 +68,7 @@
       "amazon_auth": "Amazon login failed. Please check your email address and password.",
       "amazon_otp": "The Amazon verification code was not accepted.",
       "amazon_captcha": "Amazon requires a CAPTCHA/browser verification. This login cannot currently be completed automatically.",
-      "hermes_auth": "Hermes sign-in failed. Please check email address and password.",
+      "hermes_auth": "Hermes sign-in failed. Please check username and password - at Hermes the username is not necessarily your email address.",
       "hermes_connect": "Connection to myHermes failed. Please try again later.",
       "dhl_auth": "DHL sign-in failed. Please open the link again and paste the full dhllogin:// address from the console.",
       "dhl_connect": "Could not connect to DHL. Please try again later."

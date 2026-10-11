@@ -109,8 +109,10 @@ _DPD_LOGIN_SCHEMA = vol.Schema(
 
 _HERMES_LOGIN_SCHEMA = vol.Schema(
     {
+        # myhermes.de logs in with a "Benutzername" that is not necessarily the
+        # e-mail address, so this must be free text, not an e-mail field.
         vol.Required(CONF_HERMES_USERNAME): selector.TextSelector(
-            selector.TextSelectorConfig(type=selector.TextSelectorType.EMAIL)
+            selector.TextSelectorConfig(type=selector.TextSelectorType.TEXT)
         ),
         vol.Required(CONF_HERMES_PASSWORD): selector.TextSelector(
             selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
