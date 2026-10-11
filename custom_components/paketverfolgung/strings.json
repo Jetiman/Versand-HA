@@ -46,6 +46,20 @@
           "hermes_username": "E-Mail-Adresse",
           "hermes_password": "Passwort"
         }
+      },
+      "dhl_account": {
+        "title": "Mit DHL-Konto anmelden (Experimentell)",
+        "description": "Alle Sendungen deines DHL-Kontos werden danach automatisch erkannt. Es wird kein Passwort gespeichert, nur die Anmelde-Sitzung von DHL.\n\n1. Öffne in einem neuen Browser-Tab die Entwicklerwerkzeuge (**F12**) und wechsle auf den Reiter **Konsole** (am einfachsten in Chrome, Edge oder Firefox). Falls sich die Konsole beim Weiterleiten leert, setze „Protokoll beibehalten“ (Preserve log).\n2. Öffne in **diesem** Tab den folgenden Link und melde dich mit deinem DHL-Konto an:\n\n{login_url}\n\n3. Danach zeigt die Seite scheinbar nichts an – das ist normal. In der **Konsole** erscheint jetzt eine Meldung mit einer Adresse, die mit `dhllogin://` beginnt (sie steht nicht in der Adresszeile). Kopiere die Adresse oder die ganze Zeile und füge sie unten ein.\n\nDie Adresse gilt nur kurz und nur einmal. Bei einem Fehler den Link erneut öffnen.",
+        "data": {
+          "dhl_redirect": "Adresse aus der Konsole (dhllogin://…)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "DHL-Konto erneut anmelden",
+        "description": "Die DHL-Anmeldung ist abgelaufen oder wurde abgelehnt.\n\n1. Öffne die Entwicklerwerkzeuge (**F12**) in einem neuen Tab und wechsle auf **Konsole**.\n2. Öffne in diesem Tab den folgenden Link und melde dich an:\n\n{login_url}\n\n3. Kopiere die Adresse, die mit `dhllogin://` beginnt und in der Konsole erscheint (oder die ganze Zeile), und füge sie unten ein.",
+        "data": {
+          "dhl_redirect": "Adresse aus der Konsole (dhllogin://…)"
+        }
       }
     },
     "error": {
@@ -55,16 +69,21 @@
       "amazon_otp": "Der Amazon-Bestätigungscode wurde nicht akzeptiert.",
       "amazon_captcha": "Amazon verlangt eine CAPTCHA-/Browser-Bestätigung. Dieser Login kann derzeit nicht automatisch abgeschlossen werden.",
       "hermes_auth": "Hermes-Anmeldung fehlgeschlagen. Bitte E-Mail-Adresse und Passwort prüfen.",
-      "hermes_connect": "Verbindung zu myHermes fehlgeschlagen. Bitte später erneut versuchen."
+      "hermes_connect": "Verbindung zu myHermes fehlgeschlagen. Bitte später erneut versuchen.",
+      "dhl_auth": "DHL-Anmeldung fehlgeschlagen. Bitte den Link erneut öffnen und die vollständige dhllogin://-Adresse aus der Konsole einfügen.",
+      "dhl_connect": "Verbindung zu DHL fehlgeschlagen. Bitte später erneut versuchen."
     },
     "abort": {
-      "already_configured": "Das ist bereits eingerichtet."
+      "already_configured": "Das ist bereits eingerichtet.",
+      "reauth_successful": "Die DHL-Anmeldung wurde erneuert.",
+      "reauth_unsupported": "Für diesen Eintrag ist keine erneute Anmeldung möglich. Bitte den Eintrag löschen und neu hinzufügen."
     }
   },
   "selector": {
     "provider": {
       "options": {
         "dhl": "Sendungsnummern (DHL, DPD, Hermes & UPS)",
+        "dhl_account": "DHL-Konto (alle Sendungen automatisch) (Experimentell)",
         "dpd": "DPD-Konto (alle Sendungen automatisch)",
         "amazon": "Amazon.de-Konto (Lieferungen automatisch)",
         "hermes": "Hermes-Konto (alle Sendungen automatisch)"
@@ -78,15 +97,7 @@
         "data": {
           "tracking_numbers": "Sendungsnummern (DHL, DPD, Hermes oder UPS)",
           "default_postcode": "Deine PLZ (nur nötig, falls eine DPD-Nummer geschützt ist)",
-          "update_interval_minutes": "Aktualisierungsintervall (Minuten)",
-          "dhl_auto_discovery": "DHL-Konto verbinden und Sendungen automatisch erkennen (Test)"
-        }
-      },
-      "dhl_login": {
-        "title": "DHL-Konto verbinden",
-        "description": "{known}1. Öffne diesen Link im Browser und melde dich mit deinem DHL-Konto an:\n\n{login_url}\n\n2. Danach leitet DHL auf eine Adresse weiter, die mit `dhllogin://` beginnt (die Seite lädt scheinbar nicht – das ist normal). Kopiere die komplette Adresse aus der Adresszeile und füge sie unten ein.",
-        "data": {
-          "dhl_redirect": "Weiterleitungs-Adresse (dhllogin://…)"
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }
       },
       "dpd_options": {
@@ -107,10 +118,17 @@
         "data": {
           "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
         }
+      },
+      "dhl_account_options": {
+        "description": "Aktualisierungsintervall für das DHL-Konto anpassen.",
+        "data": {
+          "update_interval_minutes": "Aktualisierungsintervall (Minuten)"
+        }
       }
     },
     "error": {
-      "dhl_auth": "DHL-Anmeldung fehlgeschlagen. Bitte den Link erneut öffnen und die vollständige dhllogin://-Adresse einfügen."
+      "dhl_auth": "DHL-Anmeldung fehlgeschlagen. Bitte den Link erneut öffnen und die vollständige dhllogin://-Adresse aus der Konsole einfügen.",
+      "dhl_connect": "Verbindung zu DHL fehlgeschlagen. Bitte später erneut versuchen."
     }
   },
   "services": {

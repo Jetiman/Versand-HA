@@ -46,6 +46,7 @@ from .const import (
     PANEL_URL_PATH,
     PANEL_VERSION,
     PROVIDER_AMAZON,
+    PROVIDER_DHL_ACCOUNT,
     PROVIDER_DPD,
     PROVIDER_HERMES,
     PROVIDER_NUMBERS,
@@ -59,6 +60,7 @@ from .const import (
     SERVICE_TEST_NOTIFICATION,
 )
 from .coordinator import (
+    DhlAccountDataUpdateCoordinator,
     DpdAccountDataUpdateCoordinator,
     TrackingNumbersDataUpdateCoordinator,
     format_notification,
@@ -175,6 +177,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     elif provider == PROVIDER_HERMES:
         coordinator = HermesAccountDataUpdateCoordinator(
+            hass, entry, update_interval=timedelta(minutes=minutes)
+        )
+    elif provider == PROVIDER_DHL_ACCOUNT:
+        coordinator = DhlAccountDataUpdateCoordinator(
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
     else:

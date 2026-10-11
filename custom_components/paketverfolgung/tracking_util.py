@@ -49,3 +49,22 @@ def first(value: Any) -> Any:
 
 def as_bool(value: Any) -> bool:
     return value is True or str(value).strip().lower() in ("true", "1", "yes")
+
+
+_RETURN_WORDS = ("rücksendung", "ruecksendung", "retour")
+
+
+def is_return(item: Any) -> bool:
+    """True for a return shipment ("Retoure" / "Rücksendung").
+
+    Carriers flag returns differently: the DPD account marks them with
+    ``direction == "return"``, others only say so in the status text.
+    Returns are not parcels that arrive at your door, so the "in delivery"
+    count and the notifications leave them out.
+    """
+    if not isinstance(item, dict):
+        return False
+    if str(item.get("direction") or "").lower() == "return":
+        return True
+    status = str(item.get("status") or "").lower()
+    return any(word in status for word in _RETURN_WORDS)

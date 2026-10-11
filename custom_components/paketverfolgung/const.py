@@ -14,14 +14,15 @@ USER_AGENT = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
 )
 
-# --- Optional DHL account login (auto-discovery of the account's shipments) ---
+# --- DHL account login (auto-discovery of the account's shipments) ---
 # The same int-verfolgen/data/search endpoint, called WITHOUT a piececode
 # but WITH `Cookie: dhli=<id_token>`, returns the shipments linked to the
 # logged-in DHL account. The login is the DHL app's OAuth/PKCE flow: the
 # user opens a login URL, signs in, DHL redirects to a `dhllogin://` URL,
 # and that URL's `code` is exchanged for tokens. Parameters lifted from
 # the iOS DHL app (package de.deutschepost.dhl) - may break if DHL rotates
-# them. This whole feature is opt-in and off by default.
+# them. Opt-in: either as its own "DHL-Konto" entry (recommended) or - as
+# before - as a switch on the "Sendungsnummern" entry.
 DHL_AUTH_BASE = "https://login.dhl.de/af5f9bb6-27ad-4af4-9445-008e7a5cddb8/login"
 DHL_CLIENT_ID = "83471082-5c13-4fce-8dcb-19d2a3fca413"
 DHL_REDIRECT_URI = "dhllogin://de.deutschepost.dhl/login"
@@ -157,6 +158,9 @@ PROVIDER_DHL = PROVIDER_NUMBERS
 PROVIDER_DPD = "dpd"
 PROVIDER_AMAZON = "amazon"
 PROVIDER_HERMES = "hermes"
+# Dedicated DHL-account entry (the provider id "dhl" is taken by the
+# tracking-number list, see above).
+PROVIDER_DHL_ACCOUNT = "dhl_account"
 
 CONF_DPD_USERNAME = "dpd_username"
 CONF_DPD_PASSWORD = "dpd_password"

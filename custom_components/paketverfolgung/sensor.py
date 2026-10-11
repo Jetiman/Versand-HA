@@ -23,6 +23,7 @@ from homeassistant.util import slugify
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .hermes_coordinator import HermesAccountDataUpdateCoordinator
 from .const import (
+    CONF_DHL_AUTO_DISCOVERY,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_ON_NEW,
     CONF_NOTIFY_ON_STATUS_CHANGE,
@@ -41,9 +42,11 @@ from .const import (
     SIGNAL_COORDINATOR_UPDATED,
 )
 from .coordinator import (
+    DhlAccountDataUpdateCoordinator,
     DpdAccountDataUpdateCoordinator,
     TrackingNumbersDataUpdateCoordinator,
 )
+from .tracking_util import is_return
 
 _SHIPMENT_COORDINATORS = (
     TrackingNumbersDataUpdateCoordinator,
@@ -138,9 +141,20 @@ async def async_setup_entry(
         _migrate_amazon_entity_ids(hass, entry.entry_id, coordinator)
     _setup_dynamic_entities(entry, coordinator, async_add_entities)
 
-    # Diagnostic read-out of the optional DHL-account auto-discovery.
-    if isinstance(coordinator, TrackingNumbersDataUpdateCoordinator):
+    # Diagnostic read-out of the DHL-account auto-discovery - only where it
+    # is in use (a "DHL-Konto" entry, or the number list with the switch on).
+    # Otherwise it would sit at "Aus" forever, so a leftover one is removed.
+    status_uid = f"{entry.entry_id}_dhl_account_status"
+    if isinstance(coordinator, DhlAccountDataUpdateCoordinator) or (
+        isinstance(coordinator, TrackingNumbersDataUpdateCoordinator)
+        and coordinator._config(CONF_DHL_AUTO_DISCOVERY)
+    ):
         async_add_entities([DhlAccountStatusSensor(coordinator, entry.entry_id)])
+    else:
+        registry = er.async_get(hass)
+        stale = registry.async_get_entity_id("sensor", DOMAIN, status_uid)
+        if stale:
+            registry.async_remove(stale)
 
     # The combined summary sensors span every provider; exactly one entry
     # owns them.
@@ -271,6 +285,8 @@ def _out_for_delivery(coordinator) -> list[dict]:
     for shipment in (coordinator.data or {}).values():
         if shipment.get("group") != GROUP_OUT_FOR_DELIVERY or shipment.get("delivered"):
             continue
+        if is_return(shipment):
+            continue  # a return leaves the house, it is not "in delivery"
         out.append(
             {
                 "tracking_id": shipment.get("id"),

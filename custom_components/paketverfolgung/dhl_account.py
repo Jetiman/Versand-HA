@@ -11,14 +11,18 @@ Reverse-engineered from the iOS DHL app (de.deutschepost.dhl). The flow:
    (non-archived) shipments.
 
 Everything here is best-effort against an undocumented API; failures raise
-``DhlAuthError`` so the coordinator can surface them without crashing.
+``DhlAuthError`` (login rejected / session expired - the user has to sign in
+again) or its subclass ``DhlConnectionError`` (network or server trouble -
+worth retrying later) so the coordinator can surface them without crashing.
 """
 from __future__ import annotations
 
 import base64
 import hashlib
+import html
 import json
 import logging
+import re
 import secrets
 import time
 from typing import Any
@@ -42,6 +46,15 @@ _LOGGER = logging.getLogger(__name__)
 
 class DhlAuthError(Exception):
     """DHL login failed, expired, or was rejected."""
+
+
+class DhlConnectionError(DhlAuthError):
+    """DHL could not be reached or answered with a server error.
+
+    A subclass of ``DhlAuthError`` so older callers that only catch the base
+    class keep working; the dedicated DHL-account entry tells the two apart
+    (retry later vs. ask the user to sign in again).
+    """
 
 
 def _b64url(raw: bytes) -> str:
@@ -69,15 +82,42 @@ def build_login(nonce: str | None = None) -> tuple[str, str]:
     return verifier, f"{DHL_AUTH_BASE}/authorize?{urlencode(params)}"
 
 
+_REDIRECT_RE = re.compile(r"dhllogin://[^\s'\"<>`]+", re.IGNORECASE)
+
+
 def extract_code(redirect_url: str) -> str:
-    """Pull the ``code`` out of a pasted ``dhllogin://...`` redirect URL."""
-    redirect_url = (redirect_url or "").strip()
-    if not redirect_url.startswith("dhllogin://"):
+    """Pull the ``code`` out of the pasted ``dhllogin://...`` redirect.
+
+    After the DHL sign-in the browser cannot open the ``dhllogin://`` address,
+    so it is not shown in the address bar - it only turns up in the browser's
+    developer console (F12 -> Console). People therefore paste whatever they
+    copied there: the bare address, or the whole console line around it
+    (``Failed to launch 'dhllogin://...?code=...' because ...``), sometimes
+    HTML-escaped. All of that is accepted; the address is cut out of the text.
+    """
+    text = html.unescape((redirect_url or "").strip())
+    match = _REDIRECT_RE.search(text)
+    if not match:
         raise DhlAuthError("Die DHL-Weiterleitung muss mit dhllogin:// beginnen.")
-    code = parse_qs(urlparse(redirect_url).query).get("code", [None])[0]
+    address = match.group(0).rstrip(".,;:)")
+    code = parse_qs(urlparse(address).query).get("code", [None])[0]
     if not code:
         raise DhlAuthError("In der DHL-Weiterleitung wurde kein Code gefunden.")
     return code
+
+
+def account_label(id_token: str | None) -> str | None:
+    """The account's e-mail address from the ID token (for the entry title)."""
+    if not id_token:
+        return None
+    try:
+        part = id_token.split(".")[1]
+        part += "=" * (-len(part) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(part.encode()))
+    except (ValueError, IndexError, TypeError):
+        return None
+    email = claims.get("email") if isinstance(claims, dict) else None
+    return str(email).strip() or None if email else None
 
 
 def _id_token_expiring(id_token: str | None, within: int = 600) -> bool:
@@ -141,23 +181,28 @@ class DhlAccountClient:
                 auth=BasicAuth(DHL_CLIENT_ID, ""),
                 timeout=20,
             ) as resp:
-                payload = await resp.json(content_type=None)
-                if resp.status != 200 or not isinstance(payload, dict) or not payload.get(
+                status = resp.status
+                try:
+                    payload = await resp.json(content_type=None)
+                except ValueError:
+                    payload = None
+                if status == 200 and isinstance(payload, dict) and payload.get(
                     "id_token"
                 ):
-                    keys = sorted(map(str, payload)) if isinstance(payload, dict) else []
-                    _LOGGER.debug(
-                        "DHL token request failed: status=%s keys=%s", resp.status, keys
-                    )
-                    raise DhlAuthError(
-                        f"DHL-Anmeldung fehlgeschlagen (Status {resp.status})."
-                    )
-                return payload
-        except ClientError as err:
-            raise DhlAuthError(f"Netzwerkfehler bei der DHL-Anmeldung: {err}") from err
+                    return payload
+                keys = sorted(map(str, payload)) if isinstance(payload, dict) else []
+                _LOGGER.debug("DHL token request failed: status=%s keys=%s", status, keys)
+                message = f"DHL-Anmeldung fehlgeschlagen (Status {status})."
+                if status >= 500 or status == 429:
+                    raise DhlConnectionError(message)
+                raise DhlAuthError(message)
+        except (ClientError, TimeoutError) as err:
+            raise DhlConnectionError(
+                f"Netzwerkfehler bei der DHL-Anmeldung: {err}"
+            ) from err
 
     async def fetch_shipment_ids(self, dhl_session: dict[str, Any]) -> list[str]:
-        """Non-archived shipment IDs (piececodes) linked to the account."""
+        """Non-archived, non-return shipment IDs (piececodes) of the account."""
         id_token = dhl_session.get("id_token")
         if not id_token:
             raise DhlAuthError("DHL-Sitzung ohne ID-Token - bitte neu anmelden.")
@@ -173,21 +218,28 @@ class DhlAccountClient:
             async with self._session.get(
                 SEARCH_URL, headers=headers, params=params, timeout=15
             ) as resp:
-                if resp.status == 401:
+                if resp.status in (401, 403):
                     raise DhlAuthError("DHL-Konto-Sitzung ist abgelaufen.")
                 if resp.status != 200:
-                    raise DhlAuthError(
+                    raise DhlConnectionError(
                         f"DHL-Kontoabfrage fehlgeschlagen (Status {resp.status})."
                     )
                 payload = await resp.json(content_type=None)
-        except ClientError as err:
-            raise DhlAuthError(f"Netzwerkfehler bei der DHL-Kontoabfrage: {err}") from err
+        except (ClientError, TimeoutError, ValueError) as err:
+            raise DhlConnectionError(
+                f"Netzwerkfehler bei der DHL-Kontoabfrage: {err}"
+            ) from err
 
         _LOGGER.debug("DHL account discovery response: %s", payload)
         ids: list[str] = []
         for shipment in (payload or {}).get("sendungen", []) or []:
             info = shipment.get("sendungsinfo") or {}
             if info.get("sendungsliste") == "ARCHIVIERT":
+                continue
+            details = shipment.get("sendungsdetails") or {}
+            if details.get("ruecksendung") is True or details.get("retoure") is True:
+                # Returns ("Rücksendung an den Absender") never arrive at your
+                # door, so they are not tracked at all.
                 continue
             shipment_id = shipment.get("id")
             if shipment_id and shipment_id not in ids:

@@ -46,6 +46,20 @@
           "hermes_username": "Email address",
           "hermes_password": "Password"
         }
+      },
+      "dhl_account": {
+        "title": "Sign in with a DHL account (Experimental)",
+        "description": "All shipments on your DHL account are then discovered automatically. No password is stored, only DHL's sign-in session.\n\n1. Open the developer tools (**F12**) in a new browser tab and switch to the **Console** tab (easiest in Chrome, Edge or Firefox). If the console clears during the redirect, enable \"Preserve log\".\n2. In **that** tab, open the following link and sign in with your DHL account:\n\n{login_url}\n\n3. The page then appears to show nothing - that is expected. A message containing an address that starts with `dhllogin://` now shows up in the **Console** (it is not in the address bar). Copy the address or the whole line and paste it below.\n\nThe address is only valid briefly and only once. If it fails, open the link again.",
+        "data": {
+          "dhl_redirect": "Address from the console (dhllogin://…)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in to DHL again",
+        "description": "The DHL sign-in has expired or was rejected.\n\n1. Open the developer tools (**F12**) in a new tab and switch to **Console**.\n2. In that tab, open the following link and sign in:\n\n{login_url}\n\n3. Copy the address starting with `dhllogin://` that appears in the console (or the whole line) and paste it below.",
+        "data": {
+          "dhl_redirect": "Address from the console (dhllogin://…)"
+        }
       }
     },
     "error": {
@@ -55,16 +69,21 @@
       "amazon_otp": "The Amazon verification code was not accepted.",
       "amazon_captcha": "Amazon requires a CAPTCHA/browser verification. This login cannot currently be completed automatically.",
       "hermes_auth": "Hermes sign-in failed. Please check email address and password.",
-      "hermes_connect": "Connection to myHermes failed. Please try again later."
+      "hermes_connect": "Connection to myHermes failed. Please try again later.",
+      "dhl_auth": "DHL sign-in failed. Please open the link again and paste the full dhllogin:// address from the console.",
+      "dhl_connect": "Could not connect to DHL. Please try again later."
     },
     "abort": {
-      "already_configured": "This is already configured."
+      "already_configured": "This is already configured.",
+      "reauth_successful": "The DHL sign-in was renewed.",
+      "reauth_unsupported": "This entry cannot be re-authenticated. Please delete it and add it again."
     }
   },
   "selector": {
     "provider": {
       "options": {
         "dhl": "Tracking numbers (DHL, DPD, Hermes & UPS)",
+        "dhl_account": "DHL account (all shipments automatically) (Experimental)",
         "dpd": "DPD account (all parcels automatically)",
         "amazon": "Amazon.de account (deliveries automatically)",
         "hermes": "Hermes account (all parcels automatically)"
@@ -78,15 +97,7 @@
         "data": {
           "tracking_numbers": "Tracking numbers (DHL, DPD, Hermes or UPS)",
           "default_postcode": "Your postcode (only needed if a DPD number is protected)",
-          "update_interval_minutes": "Update interval (minutes)",
-          "dhl_auto_discovery": "Connect a DHL account and auto-discover its shipments (experimental)"
-        }
-      },
-      "dhl_login": {
-        "title": "Connect a DHL account",
-        "description": "{known}1. Open this link in a browser and sign in with your DHL account:\n\n{login_url}\n\n2. DHL then redirects to an address starting with `dhllogin://` (the page appears not to load - that is expected). Copy the full address from the address bar and paste it below.",
-        "data": {
-          "dhl_redirect": "Redirect address (dhllogin://…)"
+          "update_interval_minutes": "Update interval (minutes)"
         }
       },
       "dpd_options": {
@@ -107,10 +118,17 @@
         "data": {
           "update_interval_minutes": "Refresh interval (minutes)"
         }
+      },
+      "dhl_account_options": {
+        "description": "Adjust the refresh interval for the DHL account.",
+        "data": {
+          "update_interval_minutes": "Refresh interval (minutes)"
+        }
       }
     },
     "error": {
-      "dhl_auth": "DHL login failed. Please open the link again and paste the full dhllogin:// address."
+      "dhl_auth": "DHL sign-in failed. Please open the link again and paste the full dhllogin:// address from the console.",
+      "dhl_connect": "Could not connect to DHL. Please try again later."
     }
   },
   "services": {

@@ -76,11 +76,12 @@ from .const import (
     UPS_NUMBER_PATTERN,
     UPS_STAND_DOWN_SECONDS,
 )
-from .dhl_account import DhlAccountClient, DhlAuthError
+from .dhl_account import DhlAccountClient, DhlAuthError, DhlConnectionError
 from .dhl_api import DhlApiClient, DhlApiError
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError, DpdSession
 from .dpd_tracking_api import DpdTrackingApiClient, DpdTrackingApiError
 from .hermes_tracking_api import HermesTrackingApiClient, HermesTrackingApiError
+from .tracking_util import is_return
 from .ups_tracking_api import UpsBudget, UpsTrackingApiClient, UpsTrackingApiError
 
 _LOGGER = logging.getLogger(__name__)
@@ -384,7 +385,7 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         targets = self._notify_targets()
         old = self.data or {}
         for sid, item in new.items():
-            if item.get("archived"):
+            if item.get("archived") or is_return(item):
                 continue
             prev = old.get(sid)
             status = item.get("status") or ""
@@ -936,6 +937,64 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         except HermesTrackingApiError as err:
             _LOGGER.warning("Hermes lookup for %s failed: %s", number, err)
             return None
+
+
+class DhlAccountDataUpdateCoordinator(TrackingNumbersDataUpdateCoordinator):
+    """A dedicated "DHL-Konto" entry: every shipment on a DHL account.
+
+    Reuses the tracking-number machinery (DHL lookup, history, archive,
+    notifications) but takes the shipment ids from the signed-in account
+    instead of a typed list. The OAuth token pair lives in ``entry.data``
+    and is refreshed by itself; when DHL rejects it, Home Assistant asks the
+    user to sign in again (reauth) instead of silently showing nothing.
+    """
+
+    def _config(self, key, default=None):
+        if key == CONF_TRACKING_NUMBERS:
+            return []  # nothing typed in - the account is the only source
+        if key == CONF_DHL_AUTO_DISCOVERY:
+            return True
+        if key == CONF_CARRIER_OVERRIDES:
+            return {}  # every id comes from DHL itself
+        return super()._config(key, default)
+
+    async def _merge_dhl_account_numbers(self, numbers: list[str]) -> list[str]:
+        dhl_session = self.entry.data.get(CONF_DHL_SESSION)
+        if not dhl_session:
+            self.dhl_account_status = "Kein DHL-Login hinterlegt"
+            raise ConfigEntryAuthFailed("Kein DHL-Login hinterlegt")
+        try:
+            fresh = await self.dhl_account.ensure_fresh(dict(dhl_session))
+            if fresh != dhl_session:
+                self.hass.config_entries.async_update_entry(
+                    self.entry,
+                    data={**self.entry.data, CONF_DHL_SESSION: fresh},
+                )
+            account_ids = await self.dhl_account.fetch_shipment_ids(fresh)
+        except DhlConnectionError as err:
+            self.dhl_account_status = str(err)
+            if self.data:
+                # DHL hiccup: carry on with the shipments we already know
+                # (their public tracking still works) instead of blanking.
+                _LOGGER.warning(
+                    "Paketverfolgung: DHL-Kontoabfrage fehlgeschlagen, "
+                    "verwende bekannte Sendungen: %s",
+                    err,
+                )
+                return [n for n in self.data if n not in numbers] + numbers
+            raise UpdateFailed(f"DHL-Kontoabfrage fehlgeschlagen: {err}") from err
+        except DhlAuthError as err:
+            self.dhl_account_status = str(err)
+            raise ConfigEntryAuthFailed(str(err)) from err
+
+        merged = list(numbers)
+        for shipment_id in account_ids:
+            if shipment_id not in merged:
+                merged.append(shipment_id)
+            self.carriers.setdefault(shipment_id, CARRIER_DHL)
+        self.dhl_account_status = f"{len(account_ids)} Sendung(en) erkannt"
+        _LOGGER.debug("Paketverfolgung: DHL-Konto -> %s", account_ids)
+        return merged
 
 
 class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
