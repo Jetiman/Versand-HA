@@ -59,7 +59,13 @@ _TEXT_GROUP = (
     ("zustellfahrzeug", GROUP_OUT_FOR_DELIVERY),
     ("in zustellung", GROUP_OUT_FOR_DELIVERY),
     ("voraussichtlich heute", GROUP_OUT_FOR_DELIVERY),
-    ("paketshop", GROUP_OUT_FOR_DELIVERY),
+    # The *sender* handing the parcel in at a PaketShop is the start of the
+    # journey ("Sendung wurde vom Absender im PaketShop abgegeben."), not the
+    # last mile - it must not match the "ready for pickup" wording below.
+    ("vom absender", GROUP_TRANSIT),
+    ("abholung", GROUP_OUT_FOR_DELIVERY),
+    ("abholbereit", GROUP_OUT_FOR_DELIVERY),
+    ("bereitgestellt", GROUP_OUT_FOR_DELIVERY),
     ("übernommen", GROUP_TRANSIT),
     ("versand vorbereitet", GROUP_TRANSIT),
     ("unterwegs", GROUP_TRANSIT),

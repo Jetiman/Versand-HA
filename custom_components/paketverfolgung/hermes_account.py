@@ -76,7 +76,16 @@ def group_from_status(status: str | None) -> str:
     text = (status or "").lower()
     if "zugestellt" in text or "abgeholt" in text:
         return GROUP_DELIVERED
-    if "in zustellung" in text or "zustellfahrzeug" in text or "paketshop" in text:
+    if "vom absender" in text:
+        # Sender dropped the parcel off at a PaketShop: start of the journey.
+        return GROUP_TRANSIT
+    if (
+        "in zustellung" in text
+        or "zustellfahrzeug" in text
+        or "abholung" in text
+        or "abholbereit" in text
+        or "bereitgestellt" in text
+    ):
         return GROUP_OUT_FOR_DELIVERY
     if "angekündigt" in text or "erwartet" in text or "avisiert" in text:
         return GROUP_REGISTERED
