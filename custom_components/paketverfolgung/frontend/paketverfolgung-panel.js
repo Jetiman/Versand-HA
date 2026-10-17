@@ -12,7 +12,7 @@
  * (one per shipment/parcel, identified by the `tracking_id` attribute).
  */
 
-const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes", ups: "UPS", amazon: "Amazon" };
+const PROVIDER_LABELS = { dhl: "DHL", dpd: "DPD", hermes: "Hermes", ups: "UPS", amazon: "Amazon", picnic: "Picnic" };
 
 // The integration's brand icon (brand/icon.svg), inlined so the panel needs
 // no extra static asset.
@@ -573,7 +573,7 @@ class PaketverfolgungPanel extends HTMLElement {
     const meta = [
       ["Anbieter", s.provider === "?" ? "in Prüfung" : s.provider],
       ["Zusteller", s.delivery_carrier],
-      [s.carrier === "amazon" ? "Bestellnummer" : "Sendungsnummer", s.tracking_id],
+      [s.carrier === "amazon" ? "Bestellnummer" : s.carrier === "picnic" ? "Lieferungsnummer" : "Sendungsnummer", s.tracking_id],
       [
         "Trackingnummer",
         s.carrier_tracking_id && s.carrier_tracking_id !== s.tracking_id

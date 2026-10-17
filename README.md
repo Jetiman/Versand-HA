@@ -10,6 +10,7 @@ Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten
 - **DHL-Konto** (optional, *experimentell*) – eigener Eintrag „DHL-Konto“: Login mit deinem DHL-Konto, alle Sendungen des Kontos werden automatisch erkannt.
 - **Hermes-Konto** (optional) – Login mit deinem myHermes-Konto, alle an dich unterwegs befindlichen Sendungen („Empfangsübersicht“) werden automatisch erkannt.
 - **Amazon.de-Konto** (optional) – Login mit deinem Amazon-Konto, laufende Lieferungen werden automatisch erkannt (inkl. tatsächlichem Zusteller). ⚠️ Sicherheitshinweis unten beachten.
+- **Picnic-Konto** (optional, *experimentell*) – Login mit deinem Picnic-Konto, deine Lebensmittel-Lieferungen werden mit Lieferfenster und Live-Ankunftszeit erkannt.
 
 <p align="center"><img src="docs/panel.jpg" width="320" alt="Paketverfolgung-Oberfläche in der Home-Assistant-Seitenleiste"></p>
 
@@ -133,6 +134,26 @@ Nach der Einrichtung erscheint automatisch ein eigener Menüpunkt **Paketverfolg
 
 Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie die Sensoren, nur aufbereitet.
 
+## Picnic-Konto (optional, experimentell)
+
+„Eintrag hinzufügen“ → **„Picnic-Konto“** → mit E-Mail-Adresse, Passwort und Land (DE / NL / FR) anmelden. Hat dein Konto die Zwei-Faktor-Anmeldung aktiv, schickt Picnic einen **SMS-Code**, der im nächsten Schritt abgefragt wird. Es wird **kein Passwort gespeichert**, nur die Anmelde-Sitzung von Picnic (sie wird bei jeder Abfrage mit dem von Picnic gelieferten neuen Token aktualisiert; läuft sie ab, bietet Home Assistant die erneute Anmeldung an).
+
+Jede Lieferung wird ein Sensor `sensor.picnic_<lieferungs-id>` und verhält sich wie jede andere Sendung (Panel, Archiv 24 h nach Zustellung, Benachrichtigungen, `delivery_window_from/to`):
+
+| Zustand | Status | Gruppe | Zeitfenster |
+| --- | --- | --- | --- |
+| bestellt, Lieferung später | „Lieferung geplant am Di. 20.10.“ | registriert | gebuchtes Lieferfenster |
+| Liefertag, Wagen noch nicht unterwegs | „Lieferung heute geplant“ | unterwegs | gebuchtes Fenster bzw. Picnics Tagesschätzung |
+| Wagen unterwegs | „In Zustellung“ | in Zustellung | **Live-Ankunftsfenster** (auf 5 Minuten gerundet, damit sich Kalendereinträge nicht minütlich ändern) |
+| zugestellt | „Zugestellt“ | zugestellt | gebuchtes Fenster; Zustellzeit im Verlauf |
+
+- **Dynamische Abfrage:** im eingestellten Intervall (Standard 15 min), rund um das gebuchte Fenster alle 3 Minuten, solange der Wagen unterwegs ist jede Minute. Das Zustellfenster steht damit jederzeit in den Sensorattributen, z. B. zum automatischen Anlegen und Verschieben eines Kalendereintrags.
+- **Bereits zugestellte Lieferungen:** in den Optionen bestimmt „Zugestellte Lieferungen anzeigen (Tage)“ (Standard 2, 0 = keine), wie lange abgeschlossene Lieferungen aufgelistet bleiben – praktisch zum Testen mit alten Bestellungen. Stornierte Lieferungen werden nicht angezeigt.
+- Der Name ist „Einkauf · N Artikel“ und lässt sich wie bei den anderen Anbietern per `paketverfolgung.set_tracking_name` ändern.
+- ℹ️ Die Schnittstelle ist die inoffizielle der Picnic-App (dieselbe wie in der Home-Assistant-Kerneinbindung „Picnic“) und kann sich jederzeit ändern. Nur ein Eintrag pro Picnic-Konto.
+
+Beitrag von [@dominikramachers](https://github.com/dominikramachers).
+
 ## Bekannte Einschränkungen
 
 - Alle Schnittstellen sind inoffiziell und können bei anbieterseitigen Änderungen brechen. Bitte in diesem Fall ein Issue öffnen.
@@ -141,3 +162,4 @@ Reine Weboberfläche ohne zusätzliche Abfragen – zeigt dieselben Daten wie di
 - Hermes: die genutzte Schnittstelle (`api.my-deliveries.de`) ist undokumentiert; falls sich das Antwortformat ändert, fehlt ggf. der Verlauf.
 - UPS: inoffizielle Schnittstelle hinter einem Bot-Schutz (Akamai), die nur wenige Abfragen pro Anschluss zulässt (siehe oben). Antwortet UPS gar nicht mehr, steht ein Hinweis im Log; das Kontingent füllt sich mit der Zeit wieder. Bricht der Schutz die Abfrage ab (z. B. aus Rechenzentrums-Netzen), fehlen die UPS-Daten.
 - Amazon: kein API, sondern Auslesen der Bestell-/Trackingseiten. Login scheitert aus VPS-/Rechenzentrums-Netzen oft an einem CAPTCHA; die Sitzung läuft regelmäßig ab und muss dann neu eingerichtet werden; Amazon-Seitenänderungen können die Erkennung brechen. Die Amazon-Sitzungscookies liegen im Klartext im Config-Entry/Backup. Nur ein Amazon-Konto pro Installation.
+- Picnic: inoffizielle App-Schnittstelle; ein Eintrag pro Konto; die Live-Ankunftszeit gibt es nur, solange der Wagen unterwegs ist. Das Anmelde-Token wird nicht dauerhaft garantiert – läuft es ab, fragt Home Assistant nach einer erneuten Anmeldung.
