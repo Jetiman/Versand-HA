@@ -161,6 +161,8 @@ PROVIDER_HERMES = "hermes"
 # Dedicated DHL-account entry (the provider id "dhl" is taken by the
 # tracking-number list, see above).
 PROVIDER_DHL_ACCOUNT = "dhl_account"
+# Picnic grocery delivery account (see picnic_account.py).
+PROVIDER_PICNIC = "picnic"
 
 CONF_DPD_USERNAME = "dpd_username"
 CONF_DPD_PASSWORD = "dpd_password"
@@ -221,6 +223,42 @@ UPS_BUDGET_REFILL_SECONDS = 4500
 # for this long. Asking again too early prolongs UPS's silence, so retrying
 # on every poll would only make it worse.
 UPS_STAND_DOWN_SECONDS = 7200
+
+# --- Picnic (grocery delivery) account -------------------------------------
+# Picnic has no public tracking page; the app talks to a JSON API at
+# storefront-prod.<country>.picnicinternational.com. Login is e-mail +
+# MD5(password) (+ optional SMS two-factor); afterwards only the auth token
+# (``x-picnic-auth``) is kept - the password is never stored. Reverse
+# engineered by the community (python-picnic-api2, used by Home Assistant's
+# own "picnic" integration). Unofficial and undocumented - may change.
+CARRIER_PICNIC = "picnic"
+CONF_PICNIC_USERNAME = "picnic_username"
+CONF_PICNIC_PASSWORD = "picnic_password"  # only used inside the config flow
+CONF_PICNIC_COUNTRY = "picnic_country"
+CONF_PICNIC_TOKEN = "picnic_token"
+CONF_PICNIC_CODE = "picnic_code"
+# How many days a delivered order stays listed (it moves into the archive
+# 24 h after delivery, see ARCHIVE_AFTER_HOURS). 0 = only open deliveries.
+CONF_PICNIC_HISTORY_DAYS = "picnic_history_days"
+DEFAULT_PICNIC_HISTORY_DAYS = 2
+MAX_PICNIC_HISTORY_DAYS = 90
+PICNIC_COUNTRIES = ("DE", "NL", "FR")
+PICNIC_DEFAULT_COUNTRY = "DE"
+PICNIC_API_URL = "https://storefront-prod.{country}.picnicinternational.com/api/{version}"
+PICNIC_API_VERSION = "15"
+PICNIC_CLIENT_ID = 30100
+PICNIC_AGENT = "30100;1.206.1-#15408"
+PICNIC_DEVICE_ID = "598F770380CA54B6"
+PICNIC_USER_AGENT = "okhttp/3.12.2"
+# The delivery ETA is shown rounded outwards to this many minutes so the
+# "Lieferungen" calendar entry is only rewritten when the window really moves.
+# Picnic's session token (a JWT with its feature flags) can exceed aiohttp's
+# default 8190-byte header limit, so the client session needs more room.
+PICNIC_SESSION_KWARGS = {"max_line_size": 65536, "max_field_size": 65536}
+PICNIC_ETA_ROUND_MINUTES = 5
+# Polling cadence while a delivery is close (see picnic_account.choose_interval).
+PICNIC_LIVE_INTERVAL = timedelta(minutes=1)
+PICNIC_SLOT_INTERVAL = timedelta(minutes=3)
 
 # Broad lifecycle group shared by both carriers - drives the icon and the
 # combined "out for delivery" count regardless of provider.
