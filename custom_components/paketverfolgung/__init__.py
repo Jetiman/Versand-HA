@@ -14,6 +14,7 @@ from homeassistant.exceptions import ServiceValidationError
 
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .hermes_coordinator import HermesAccountDataUpdateCoordinator
+from .picnic_coordinator import PicnicAccountDataUpdateCoordinator
 from .owner import async_hand_over_summary_sensors
 from .const import (
     ATTR_CARRIER,
@@ -34,6 +35,7 @@ from .const import (
     CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
     CONF_NOTIFY_SHORT_NAME,
     CONF_NOTIFY_TARGETS,
+    CONF_PICNIC_TOKEN,
     CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
     CONF_UPDATE_INTERVAL,
@@ -51,6 +53,7 @@ from .const import (
     PROVIDER_DPD,
     PROVIDER_HERMES,
     PROVIDER_NUMBERS,
+    PROVIDER_PICNIC,
     SERVICE_ADD_TRACKING_NUMBER,
     SERVICE_ARCHIVE_NOW,
     SERVICE_REMOVE_TRACKING_NUMBER,
@@ -178,6 +181,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     elif provider == PROVIDER_HERMES:
         coordinator = HermesAccountDataUpdateCoordinator(
+            hass, entry, update_interval=timedelta(minutes=minutes)
+        )
+    elif provider == PROVIDER_PICNIC:
+        coordinator = PicnicAccountDataUpdateCoordinator(
             hass, entry, update_interval=timedelta(minutes=minutes)
         )
     elif provider == PROVIDER_DHL_ACCOUNT:
@@ -572,12 +579,12 @@ async def _test_notification(hass: HomeAssistant) -> None:
 def _reload_relevant(entry: ConfigEntry) -> str:
     """A signature of the entry parts whose change warrants a reload.
 
-    Excluded: the rotating DHL OAuth token / Amazon session cookies that
+    Excluded: the rotating DHL OAuth token / Amazon session cookies / Picnic token that
     the coordinators persist back into ``entry.data`` themselves, and the
     notification options (read live each poll) so the panel toggle doesn't
     reload the integration.
     """
-    skip_data = (CONF_DHL_SESSION, CONF_AMAZON_COOKIES)
+    skip_data = (CONF_DHL_SESSION, CONF_AMAZON_COOKIES, CONF_PICNIC_TOKEN)
     skip_options = (
         CONF_NOTIFY_ENABLED,
         CONF_NOTIFY_TARGETS,

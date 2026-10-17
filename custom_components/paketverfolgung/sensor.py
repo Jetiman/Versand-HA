@@ -22,6 +22,7 @@ from homeassistant.util import slugify
 
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .hermes_coordinator import HermesAccountDataUpdateCoordinator
+from .picnic_coordinator import PicnicAccountDataUpdateCoordinator
 from .const import (
     CONF_DHL_AUTO_DISCOVERY,
     CONF_NOTIFY_ENABLED,
@@ -54,6 +55,7 @@ _SHIPMENT_COORDINATORS = (
     DpdAccountDataUpdateCoordinator,
     AmazonAccountDataUpdateCoordinator,
     HermesAccountDataUpdateCoordinator,
+    PicnicAccountDataUpdateCoordinator,
 )
 
 _DELIVERY_TODAY_UID = f"{DOMAIN}_out_for_delivery_today"
@@ -94,6 +96,14 @@ def _cleanup_singletons(hass: HomeAssistant, owner_id: str) -> None:
 def _amazon_entity_id(item_id: str) -> str:
     """Canonical entity id for an Amazon shipment: sensor.amazon_<order-number>."""
     return f"sensor.amazon_{slugify(item_id)}"
+
+
+def _picnic_entity_id(item_id: str) -> str:
+    """Stable entity id for a Picnic delivery: sensor.picnic_<delivery-id>.
+
+    The delivery's name carries the article count, which can still change, so
+    it must not decide the entity id."""
+    return f"sensor.picnic_{slugify(item_id)}"
 
 
 def _migrate_amazon_entity_ids(hass: HomeAssistant, entry_id: str, coordinator) -> None:
@@ -197,6 +207,8 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
         # existing id for the same unique_id.
         if isinstance(coordinator, AmazonAccountDataUpdateCoordinator):
             self.entity_id = _amazon_entity_id(item_id)
+        elif isinstance(coordinator, PicnicAccountDataUpdateCoordinator):
+            self.entity_id = _picnic_entity_id(item_id)
 
     @property
     def _shipment(self) -> dict:
