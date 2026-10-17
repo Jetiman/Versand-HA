@@ -583,11 +583,19 @@ class PaketverfolgungPanel extends HTMLElement {
       [
         "Zustellzeitfenster",
         // DHL sometimes gives only a date (no time) - that renders as
-        // "02:00 – 02:00"; skip a window with no real span.
+        // "02:00 – 02:00"; skip a window with no real span. Hermes gives a
+        // whole-day range (e.g. 17.10. 00:00 - 20.10. 23:59), shown below.
         s.delivery_from &&
         s.delivery_to &&
+        !isDayRange(s.delivery_from, s.delivery_to) &&
         fmtTime(s.delivery_from) !== fmtTime(s.delivery_to)
           ? `${fmtTime(s.delivery_from)} – ${fmtTime(s.delivery_to)}`
+          : null,
+      ],
+      [
+        "Zustellzeitraum",
+        isDayRange(s.delivery_from, s.delivery_to)
+          ? fmtDayRange(s.delivery_from, s.delivery_to)
           : null,
       ],
     ]
@@ -1037,6 +1045,28 @@ function fmtTime(value) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+}
+
+// Hermes announces the delivery as whole days (local 00:00 on the first day to
+// 23:59 on the last day) - that is a date range, not a time slot.
+function isDayRange(from, to) {
+  if (!from || !to) return false;
+  const a = new Date(from);
+  const b = new Date(to);
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return false;
+  return (
+    a.getHours() === 0 &&
+    a.getMinutes() === 0 &&
+    b.getHours() === 23 &&
+    b.getMinutes() >= 59
+  );
+}
+
+function fmtDayRange(from, to) {
+  const opts = { weekday: "short", day: "2-digit", month: "2-digit" };
+  const a = new Date(from).toLocaleDateString("de-DE", opts);
+  const b = new Date(to).toLocaleDateString("de-DE", opts);
+  return a === b ? a : `${a} – ${b}`;
 }
 
 function fmtCountdown(target) {
