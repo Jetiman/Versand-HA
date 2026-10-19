@@ -295,23 +295,76 @@ def test_transient_error_keeps_last_data():
         raise AssertionError("expected failure without previous data")
 
 
-def test_auth_error_is_not_swallowed():
-    import asyncio
-    hc = _coordinator_module()
-    coord = _bare_coordinator(hc, {"H1": {}})
+class _FakeClient:
+    """Stands in for HermesAccountClient: scripted login/list outcomes."""
 
+    def __init__(self, logins, lists):
+        self.logins, self.lists, self.login_calls = list(logins), list(lists), 0
+
+    async def login(self, *_a):
+        self.login_calls += 1
+        outcome = self.logins.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+
+    async def fetch_shipments(self):
+        outcome = self.lists.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+
+def _real_fetch_coordinator(hc, monkeypatch, client, data, logged_in=False):
+    """A coordinator running the real _poll/_fetch_entries/_login against a
+    fake client; the HA exceptions are distinct classes so a swallowed auth
+    failure cannot hide behind the shared stub."""
     class AuthFailed(Exception):
         pass
 
-    hc.ConfigEntryAuthFailed = AuthFailed
-
-    async def boom():
-        raise hc.ConfigEntryAuthFailed("bad password")
-
-    coord._fetch_entries = boom
-    try:
-        asyncio.run(coord._poll())
-    except AuthFailed:
+    class UpdateFailed(Exception):
         pass
-    else:
-        raise AssertionError("auth failures must propagate")
+
+    monkeypatch.setattr(hc, "ConfigEntryAuthFailed", AuthFailed)
+    monkeypatch.setattr(hc, "UpdateFailed", UpdateFailed)
+    coord = _bare_coordinator(hc, data)
+    coord._logged_in = logged_in
+    coord.client = client
+    coord.entry = types.SimpleNamespace(
+        data={hc.CONF_HERMES_USERNAME: "u", hc.CONF_HERMES_PASSWORD: "p"}
+    )
+    return coord, AuthFailed, UpdateFailed
+
+
+def test_wrong_password_is_not_swallowed(monkeypatch):
+    hc = _coordinator_module()
+    client = _FakeClient([account.HermesAuthError("bad password")], [])
+    coord, AuthFailed, _ = _real_fetch_coordinator(
+        hc, monkeypatch, client, {"H1": {"id": "H1"}}
+    )
+    with pytest.raises(AuthFailed):  # known data must not mask it
+        asyncio.run(coord._poll())
+
+
+def test_expired_session_still_fails_after_relogin(monkeypatch):
+    hc = _coordinator_module()
+    err = account.HermesAuthError("expired")
+    client = _FakeClient([None, None], [err, err])
+    coord, AuthFailed, _ = _real_fetch_coordinator(
+        hc, monkeypatch, client, {"H1": {"id": "H1"}}, logged_in=True
+    )
+    with pytest.raises(AuthFailed):
+        asyncio.run(coord._poll())
+    assert client.login_calls == 1  # one re-login, then give up
+
+
+def test_network_error_during_login_keeps_last_data(monkeypatch):
+    hc = _coordinator_module()
+    known = {"H1": {"id": "H1"}}
+    client = _FakeClient([account.HermesAccountError("dns")], [])
+    coord, _, _ = _real_fetch_coordinator(hc, monkeypatch, client, known)
+    assert asyncio.run(coord._poll()) is known
+
+    client = _FakeClient([account.HermesAccountError("dns")], [])
+    coord, _, UpdateFailed = _real_fetch_coordinator(hc, monkeypatch, client, None)
+    with pytest.raises(UpdateFailed):
+        asyncio.run(coord._poll())

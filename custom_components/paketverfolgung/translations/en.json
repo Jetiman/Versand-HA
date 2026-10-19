@@ -60,6 +60,31 @@
         "data": {
           "dhl_redirect": "Address from the console (dhllogin://…)"
         }
+      },
+      "picnic": {
+        "title": "Sign in with a Picnic account",
+        "description": "Sign in with your Picnic account. Your deliveries (booked window, live arrival time once the Picnic van is on its way) are then discovered automatically. **No password is stored**, only the Picnic session. If your account uses two-factor authentication you get an SMS code in the next step.\n\nNote: this is the unofficial API of the Picnic app; it may change at any time.",
+        "data": {
+          "picnic_username": "Email address",
+          "picnic_password": "Password",
+          "picnic_country": "Country"
+        }
+      },
+      "picnic_code": {
+        "title": "Picnic verification code",
+        "description": "Picnic sent you a verification code by SMS. Enter it here.",
+        "data": {
+          "picnic_code": "SMS code"
+        }
+      },
+      "picnic_reauth": {
+        "title": "Sign in to Picnic again",
+        "description": "The Picnic sign-in expired or was rejected. Please sign in again (the password is not stored).",
+        "data": {
+          "picnic_username": "Email address",
+          "picnic_password": "Password",
+          "picnic_country": "Country"
+        }
       }
     },
     "error": {
@@ -71,11 +96,15 @@
       "hermes_auth": "Hermes sign-in failed. Please check username and password - at Hermes the username is not necessarily your email address.",
       "hermes_connect": "Connection to myHermes failed. Please try again later.",
       "dhl_auth": "DHL sign-in failed. Please open the link again and paste the full dhllogin:// address from the console.",
-      "dhl_connect": "Could not connect to DHL. Please try again later."
+      "dhl_connect": "Could not connect to DHL. Please try again later.",
+      "picnic_auth": "Picnic sign-in failed. Please check email address, password and country.",
+      "picnic_connect": "Could not reach Picnic. Please try again later.",
+      "picnic_code": "The Picnic verification code was not accepted.",
+      "picnic_code_send": "Picnic could not send a verification code. Please try again later."
     },
     "abort": {
       "already_configured": "This is already configured.",
-      "reauth_successful": "The DHL sign-in was renewed.",
+      "reauth_successful": "The sign-in was renewed.",
       "reauth_unsupported": "This entry cannot be re-authenticated. Please delete it and add it again."
     }
   },
@@ -86,7 +115,8 @@
         "dhl_account": "DHL account (all shipments automatically) (Experimental)",
         "dpd": "DPD account (all parcels automatically)",
         "amazon": "Amazon.de account (deliveries automatically)",
-        "hermes": "Hermes account (all parcels automatically)"
+        "hermes": "Hermes account (all parcels automatically)",
+        "picnic": "Picnic account (grocery deliveries)"
       }
     }
   },
@@ -123,6 +153,13 @@
         "description": "Adjust the refresh interval for the DHL account.",
         "data": {
           "update_interval_minutes": "Refresh interval (minutes)"
+        }
+      },
+      "picnic_options": {
+        "description": "Refresh interval for the Picnic account and how many days already delivered orders stay listed. Around the delivery the integration polls more often by itself.",
+        "data": {
+          "update_interval_minutes": "Refresh interval (minutes)",
+          "picnic_history_days": "Show delivered orders (days, 0 = none)"
         }
       }
     },

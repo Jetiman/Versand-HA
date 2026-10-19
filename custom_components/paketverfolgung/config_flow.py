@@ -36,17 +36,29 @@ from .const import (
     CONF_NAMES,
     CONF_DPD_PASSWORD,
     CONF_DPD_USERNAME,
+    CONF_PICNIC_CODE,
+    CONF_PICNIC_COUNTRY,
+    CONF_PICNIC_HISTORY_DAYS,
+    CONF_PICNIC_PASSWORD,
+    CONF_PICNIC_TOKEN,
+    CONF_PICNIC_USERNAME,
     CONF_PROVIDER,
     CONF_TRACKING_NUMBERS,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_PICNIC_HISTORY_DAYS,
     DEFAULT_UPDATE_INTERVAL_MINUTES,
     DOMAIN,
+    MAX_PICNIC_HISTORY_DAYS,
     MIN_UPDATE_INTERVAL_MINUTES,
+    PICNIC_COUNTRIES,
+    PICNIC_DEFAULT_COUNTRY,
+    PICNIC_SESSION_KWARGS,
     PROVIDER_AMAZON,
     PROVIDER_DHL_ACCOUNT,
     PROVIDER_DPD,
     PROVIDER_HERMES,
     PROVIDER_NUMBERS,
+    PROVIDER_PICNIC,
 )
 from .dhl_account import (
     DhlAccountClient,
@@ -58,6 +70,13 @@ from .dhl_account import (
 )
 from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError
 from .hermes_account import HermesAccountClient, HermesAccountError, HermesAuthError
+from .picnic_account import (
+    PicnicAccountClient,
+    PicnicAccountError,
+    PicnicAuthError,
+    PicnicTwoFactorError,
+    PicnicTwoFactorRequired,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -131,6 +150,34 @@ _AMAZON_LOGIN_SCHEMA = vol.Schema(
     }
 )
 
+_PICNIC_COUNTRY_SELECTOR = selector.SelectSelector(
+    selector.SelectSelectorConfig(
+        options=list(PICNIC_COUNTRIES),
+        mode=selector.SelectSelectorMode.DROPDOWN,
+    )
+)
+
+
+def _picnic_login_schema(
+    username: str = "", country: str = PICNIC_DEFAULT_COUNTRY
+) -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required(CONF_PICNIC_USERNAME, default=username): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.EMAIL)
+            ),
+            vol.Required(CONF_PICNIC_PASSWORD): selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+            ),
+            vol.Required(CONF_PICNIC_COUNTRY, default=country): _PICNIC_COUNTRY_SELECTOR,
+        }
+    )
+
+
+_PICNIC_CODE_SCHEMA = vol.Schema(
+    {vol.Required(CONF_PICNIC_CODE): selector.TextSelector(selector.TextSelectorConfig())}
+)
+
 _AMAZON_OTP_SCHEMA = vol.Schema(
     {vol.Required(CONF_AMAZON_OTP): selector.TextSelector(selector.TextSelectorConfig())}
 )
@@ -147,6 +194,8 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
 
     _verifier: str | None = None
     _reauth_entry: ConfigEntry | None = None
+    _picnic_client: PicnicAccountClient | None = None
+    _picnic_login: dict[str, str] | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -160,6 +209,8 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_hermes()
             if user_input[CONF_PROVIDER] == PROVIDER_DHL_ACCOUNT:
                 return await self.async_step_dhl_account()
+            if user_input[CONF_PROVIDER] == PROVIDER_PICNIC:
+                return await self.async_step_picnic()
             return await self.async_step_dhl()
 
         return self.async_show_form(
@@ -176,6 +227,7 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
                                 PROVIDER_DPD,
                                 PROVIDER_AMAZON,
                                 PROVIDER_HERMES,
+                                PROVIDER_PICNIC,
                             ],
                             translation_key="provider",
                         )
@@ -276,6 +328,136 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="hermes", data_schema=_HERMES_LOGIN_SCHEMA, errors=errors
         )
 
+    async def async_step_picnic(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Sign in to a Picnic account (grocery deliveries).
+
+        Only the session token is stored, never the password. Accounts with
+        two-factor authentication get an SMS code in the next step.
+        """
+        return await self._picnic_login_step("picnic", user_input)
+
+    async def _picnic_login_step(
+        self, step_id: str, user_input: dict[str, Any] | None
+    ) -> Any:
+        errors: dict[str, str] = {}
+        entry = self._reauth_entry
+        username_default = (
+            entry.data.get(CONF_PICNIC_USERNAME, "") if entry is not None else ""
+        )
+        country_default = (
+            entry.data.get(CONF_PICNIC_COUNTRY, PICNIC_DEFAULT_COUNTRY)
+            if entry is not None
+            else PICNIC_DEFAULT_COUNTRY
+        )
+        if user_input is not None:
+            username = user_input[CONF_PICNIC_USERNAME].strip()
+            country = user_input[CONF_PICNIC_COUNTRY]
+            client = PicnicAccountClient(
+                async_create_clientsession(self.hass, **PICNIC_SESSION_KWARGS),
+                country=country,
+            )
+            self._picnic_login = {"username": username, "country": country}
+            try:
+                await client.login(username, user_input[CONF_PICNIC_PASSWORD])
+            except PicnicTwoFactorRequired:
+                try:
+                    await client.generate_2fa_code()
+                except PicnicTwoFactorError as err:
+                    _LOGGER.debug("Picnic 2FA code not sent: %s", err)
+                    errors["base"] = "picnic_code_send"
+                except PicnicAccountError as err:
+                    _LOGGER.debug("Picnic 2FA error: %s", err)
+                    errors["base"] = "picnic_connect"
+                else:
+                    self._picnic_client = client
+                    return await self._picnic_code_form(None)
+            except PicnicAuthError as err:
+                _LOGGER.debug("Picnic login failed: %s", err)
+                errors["base"] = "picnic_auth"
+            except PicnicAccountError as err:
+                _LOGGER.debug("Picnic login error: %s", err)
+                errors["base"] = "picnic_connect"
+            else:
+                return await self._picnic_finish(client)
+
+        return self.async_show_form(
+            step_id=step_id,
+            data_schema=_picnic_login_schema(username_default, country_default),
+            errors=errors,
+        )
+
+    async def _picnic_code_form(self, errors: dict[str, str] | None) -> Any:
+        return self.async_show_form(
+            step_id="picnic_code",
+            data_schema=_PICNIC_CODE_SCHEMA,
+            errors=errors or {},
+        )
+
+    async def async_step_picnic_code(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Second factor: the code Picnic sent by SMS."""
+        client = self._picnic_client
+        if client is None or self._picnic_login is None:
+            return await self.async_step_picnic()
+        if user_input is None:
+            return await self._picnic_code_form(None)
+        try:
+            await client.verify_2fa_code(user_input[CONF_PICNIC_CODE])
+        except PicnicTwoFactorError as err:
+            _LOGGER.debug("Picnic 2FA rejected: %s", err)
+            return await self._picnic_code_form({"base": "picnic_code"})
+        except PicnicAccountError as err:
+            _LOGGER.debug("Picnic 2FA error: %s", err)
+            return await self._picnic_code_form({"base": "picnic_connect"})
+        return await self._picnic_finish(client)
+
+    async def _picnic_finish(self, client: PicnicAccountClient) -> Any:
+        """The session works - create the entry (or update it on reauth)."""
+        login = self._picnic_login or {}
+        username = login.get("username", "")
+        country = login.get("country", PICNIC_DEFAULT_COUNTRY)
+        try:
+            # Make sure the token can actually list deliveries.
+            await client.fetch_deliveries()
+        except PicnicAuthError:
+            return self.async_show_form(
+                step_id="picnic",
+                data_schema=_picnic_login_schema(username, country),
+                errors={"base": "picnic_auth"},
+            )
+        except PicnicAccountError:
+            return self.async_show_form(
+                step_id="picnic",
+                data_schema=_picnic_login_schema(username, country),
+                errors={"base": "picnic_connect"},
+            )
+        data = {
+            CONF_PROVIDER: PROVIDER_PICNIC,
+            CONF_PICNIC_USERNAME: username,
+            CONF_PICNIC_COUNTRY: country,
+            CONF_PICNIC_TOKEN: client.token,
+        }
+        self._picnic_client = None
+        entry = self._reauth_entry
+        if entry is not None:
+            self.hass.config_entries.async_update_entry(
+                entry, data={**entry.data, **data}
+            )
+            await self.hass.config_entries.async_reload(entry.entry_id)
+            return self.async_abort(reason="reauth_successful")
+        await self.async_set_unique_id(f"{PROVIDER_PICNIC}_{username.lower()}")
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(title=f"Picnic ({username})", data=data)
+
+    async def async_step_picnic_reauth(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """The Picnic session was rejected - sign in again."""
+        return await self._picnic_login_step("picnic_reauth", user_input)
+
     async def async_step_dhl_account(
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
@@ -314,6 +496,9 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> Any:
         """The DHL session was rejected - sign in again."""
         entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        if entry is not None and entry.data.get(CONF_PROVIDER) == PROVIDER_PICNIC:
+            self._reauth_entry = entry
+            return await self.async_step_picnic_reauth()
         if entry is None or entry.data.get(CONF_PROVIDER) != PROVIDER_DHL_ACCOUNT:
             return self.async_abort(reason="reauth_unsupported")
         self._reauth_entry = entry
@@ -464,6 +649,8 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
             return await self.async_step_hermes_options(user_input)
         if provider == PROVIDER_DHL_ACCOUNT:
             return await self.async_step_dhl_account_options(user_input)
+        if provider == PROVIDER_PICNIC:
+            return await self.async_step_picnic_options(user_input)
         return await self.async_step_dhl_options(user_input)
 
     def _current(self, key, default=None):
@@ -611,3 +798,33 @@ class PaketverfolgungOptionsFlow(OptionsFlow):
                 self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
             ),
         )
+
+    async def async_step_picnic_options(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
+        """Picnic: refresh interval and how many days of delivered orders to
+        keep listed (they are archived 24 h after delivery, as for any parcel)."""
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data={
+                    **self._entry.options,
+                    CONF_UPDATE_INTERVAL: user_input[CONF_UPDATE_INTERVAL],
+                    CONF_PICNIC_HISTORY_DAYS: user_input[CONF_PICNIC_HISTORY_DAYS],
+                },
+            )
+        schema = _update_interval_schema(
+            self._current(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL_MINUTES)
+        ).extend(
+            {
+                vol.Required(
+                    CONF_PICNIC_HISTORY_DAYS,
+                    default=self._current(
+                        CONF_PICNIC_HISTORY_DAYS, DEFAULT_PICNIC_HISTORY_DAYS
+                    ),
+                ): vol.All(
+                    vol.Coerce(int), vol.Range(min=0, max=MAX_PICNIC_HISTORY_DAYS)
+                ),
+            }
+        )
+        return self.async_show_form(step_id="picnic_options", data_schema=schema)
