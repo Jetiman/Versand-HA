@@ -34,6 +34,9 @@ from .hermes_tracking_api import HermesTrackingApiClient, HermesTrackingApiError
 
 _LOGGER = logging.getLogger(__name__)
 
+# Network-level failures that must not blank the Hermes sensors.
+_TRANSIENT_ERRORS = (HermesAccountError, TimeoutError)
+
 # In-flight parcels are refreshed every poll; delivered ones only backfilled
 # once, a few per poll, so an account with many old parcels stays cheap.
 _DETAIL_FETCHES_PER_POLL = 12
@@ -92,6 +95,39 @@ class HermesAccountDataUpdateCoordinator(_BaseCoordinator):
         self._logged_in = False
         self._details: dict[str, dict] = {}
 
+    async def _fetch_entries(self) -> list[dict]:
+        """Log in if needed and return the account's shipment list."""
+        if not self._logged_in:
+            await self._login()
+        try:
+            return await self.client.fetch_shipments()
+        except HermesAuthError:
+            _LOGGER.info("Hermes session expired, logging in again")
+            self._logged_in = False
+            await self._login()
+            try:
+                return await self.client.fetch_shipments()
+            except HermesAuthError as err:
+                raise ConfigEntryAuthFailed(str(err)) from err
+
+    def _transient(self, msg: str, err: BaseException) -> dict[str, dict]:
+        """Survive a transient Hermes/network hiccup.
+
+        Raising UpdateFailed would flip every Hermes sensor to ``unavailable``
+        until the next successful poll, and the cards then drop the parcels
+        entirely (a DNS blip made a parcel waiting at the PaketShop vanish).
+        With data from an earlier poll we keep serving it instead; only the
+        very first poll, without anything to show, still fails.
+        """
+        if self.data:
+            _LOGGER.warning(
+                "Paketverfolgung: %s, verwende zuletzt bekannte Hermes-Sendungen: %s",
+                msg,
+                err,
+            )
+            return self.data
+        raise UpdateFailed(f"{msg}: {err}") from err
+
     async def _login(self) -> None:
         try:
             await self.client.login(
@@ -100,30 +136,15 @@ class HermesAccountDataUpdateCoordinator(_BaseCoordinator):
             )
         except HermesAuthError as err:
             raise ConfigEntryAuthFailed(str(err)) from err
-        except HermesAccountError as err:
-            raise UpdateFailed(f"Hermes login failed: {err}") from err
         self._logged_in = True
 
     async def _poll(self) -> dict[str, dict]:
         self._mark_polled()
         await self._load_archive()
-        if not self._logged_in:
-            await self._login()
-
         try:
-            entries = await self.client.fetch_shipments()
-        except HermesAuthError:
-            _LOGGER.info("Hermes session expired, logging in again")
-            self._logged_in = False
-            await self._login()
-            try:
-                entries = await self.client.fetch_shipments()
-            except HermesAuthError as err:
-                raise ConfigEntryAuthFailed(str(err)) from err
-            except HermesAccountError as err:
-                raise UpdateFailed(f"Error fetching Hermes parcels: {err}") from err
-        except HermesAccountError as err:
-            raise UpdateFailed(f"Error fetching Hermes parcels: {err}") from err
+            entries = await self._fetch_entries()
+        except _TRANSIENT_ERRORS as err:
+            return self._transient("Hermes-Abfrage fehlgeschlagen", err)
 
         names = {
             str(k).strip(): str(v).strip()
