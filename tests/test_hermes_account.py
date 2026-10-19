@@ -255,3 +255,63 @@ def test_placeholder_sender_is_not_used_as_name():
     detail = {"id": "H300", "carrier": "hermes", "name": "H300", "status": "x",
               "group": const.GROUP_DELIVERED, "events": [], "delivered": True}
     assert hc.merge_shipment(entry, detail)["name"] == "H300"
+
+
+def _bare_coordinator(hc, data):
+    coord = object.__new__(hc.HermesAccountDataUpdateCoordinator)
+    coord.data = data
+    coord._logged_in = True
+    coord._mark_polled = lambda: None
+
+    async def _noop():
+        return None
+
+    coord._load_archive = _noop
+    return coord
+
+
+def test_transient_error_keeps_last_data():
+    import asyncio
+    hc = _coordinator_module()
+    known = {"H1": {"id": "H1", "group": const.GROUP_OUT_FOR_DELIVERY}}
+
+    for exc in (account.HermesAccountError("dns"), TimeoutError()):
+        coord = _bare_coordinator(hc, known)
+
+        async def boom(exc=exc):
+            raise exc
+
+        coord._fetch_entries = boom
+        assert asyncio.run(coord._poll()) is known  # not blanked
+
+    # nothing known yet: the first poll still fails loudly
+    coord = _bare_coordinator(hc, None)
+    coord._fetch_entries = boom
+    try:
+        asyncio.run(coord._poll())
+    except Exception as err:  # UpdateFailed is stubbed as Exception
+        assert "Hermes" in str(err)
+    else:
+        raise AssertionError("expected failure without previous data")
+
+
+def test_auth_error_is_not_swallowed():
+    import asyncio
+    hc = _coordinator_module()
+    coord = _bare_coordinator(hc, {"H1": {}})
+
+    class AuthFailed(Exception):
+        pass
+
+    hc.ConfigEntryAuthFailed = AuthFailed
+
+    async def boom():
+        raise hc.ConfigEntryAuthFailed("bad password")
+
+    coord._fetch_entries = boom
+    try:
+        asyncio.run(coord._poll())
+    except AuthFailed:
+        pass
+    else:
+        raise AssertionError("auth failures must propagate")
