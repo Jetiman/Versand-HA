@@ -1,5 +1,5 @@
 
-<p align="center"><img src="custom_components/paketverfolgung/brand/icon@2x.png" width="320" alt="Wattix"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/Jetiman/Versand-HA/master/custom_components/paketverfolgung/brand/icon@2x.png" width="320" alt="Paketverfolgung"></p>
 
 # Paketverfolgung für Home Assistant
 
@@ -12,7 +12,7 @@ Zeigt den Status deiner Paketsendungen als Sensoren und als eigene Seitenleisten
 - **Amazon.de-Konto** (optional) – Login mit deinem Amazon-Konto, laufende Lieferungen werden automatisch erkannt (inkl. tatsächlichem Zusteller). ⚠️ Sicherheitshinweis unten beachten.
 - **Picnic-Konto** (optional, *experimentell*) – Login mit deinem Picnic-Konto, deine Lebensmittel-Lieferungen werden mit Lieferfenster und Live-Ankunftszeit erkannt.
 
-<p align="center"><img src="docs/panel.jpg" width="320" alt="Paketverfolgung-Oberfläche in der Home-Assistant-Seitenleiste"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/Jetiman/Versand-HA/master/docs/panel.jpg" width="320" alt="Paketverfolgung-Oberfläche in der Home-Assistant-Seitenleiste"></p>
 
 ## Installation über HACS
 
