@@ -31,9 +31,24 @@ from .coordinator import _BaseCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 
+# An order that was refunded or cancelled will never be delivered; it counts
+# as finished (and moves into the archive like a delivered one) instead of
+# staying "registered" forever.
+_FINISHED_MARKERS = (
+    "erstattung",
+    "erstattet",
+    "storniert",
+    "cancelled",
+    "canceled",
+    "refund",
+)
+
+
 def _group_from_status(status: str, short_status: str | None = None) -> str:
     text = f"{short_status or ''} {status or ''}".lower()
     if any(marker in text for marker in ("zugestellt", "delivered")):
+        return GROUP_DELIVERED
+    if any(marker in text for marker in _FINISHED_MARKERS):
         return GROUP_DELIVERED
     if any(
         marker in text

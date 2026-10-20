@@ -417,7 +417,7 @@ class PaketverfolgungPanel extends HTMLElement {
 
     const archiveBlock = archived.length
       ? `<details class="pv-archive"${this._archiveOpen ? " open" : ""}>
-          <summary data-archive-toggle>Archiv (${archived.length}) · zugestellt vor über 24 h</summary>
+          <summary data-archive-toggle>Archiv (${archived.length}) · zugestellt vor über 24 h oder erledigt</summary>
           <div class="pv-list pv-archive-list">
             ${archived.map((s, i) => this._rowHtml(s, i + 1)).join("")}
           </div>
@@ -643,10 +643,11 @@ class PaketverfolgungPanel extends HTMLElement {
         hat bisher Daten dazu geliefert. Sie bleibt in der Liste und wird bei jeder Aktualisierung
         erneut geprüft, bis du sie löschst oder oben den Anbieter manuell festlegst.</div>`;
     } else if (s.archived) {
-      note = `<div class="pv-note">Archiviert – vor über 24 Stunden zugestellt. Diese Sendung
-        wird nicht mehr abgefragt, bleibt aber im Archiv abrufbar.</div>`;
+      note = `<div class="pv-note">Archiviert – ${
+        s.delivered ? "vor über 24 Stunden zugestellt" : "als erledigt markiert"
+      }. Diese Sendung wird nicht mehr abgefragt, bleibt aber im Archiv abrufbar – oben lässt sie sich wieder aus dem Archiv holen.</div>`;
     } else if (s.delivered) {
-      note = `<div class="pv-note">Zugestellt – wandert automatisch 24 Stunden nach der Zustellung
+      note = `<div class="pv-note">Zugestellt bzw. erledigt – wandert automatisch 24 Stunden danach
         ins Archiv, oder direkt über den Button oben.</div>`;
     } else if (!s.events.length && s.provider === "UPS") {
       note = `<div class="pv-note">UPS erlaubt nur wenige Abfragen pro Stunde und antwortet
@@ -677,8 +678,15 @@ class PaketverfolgungPanel extends HTMLElement {
             : ""
         }
         ${
-          s.delivered && !s.archived
-            ? `<button data-archive-now="${esc(s.tracking_id)}">Ins Archiv verschieben</button>`
+          !s.archived && s.provider !== "?"
+            ? `<button data-archive-now="${esc(s.tracking_id)}">${
+                s.delivered ? "Ins Archiv verschieben" : "Als erledigt archivieren"
+              }</button>`
+            : ""
+        }
+        ${
+          s.archived
+            ? `<button data-unarchive="${esc(s.tracking_id)}">Aus dem Archiv holen</button>`
             : ""
         }
         ${
@@ -832,6 +840,15 @@ class PaketverfolgungPanel extends HTMLElement {
       });
       archiveNow.disabled = true;
       archiveNow.textContent = "Wird archiviert …";
+      return;
+    }
+    const unarchive = ev.target.closest("[data-unarchive]");
+    if (unarchive) {
+      this._hass.callService("paketverfolgung", "unarchive", {
+        tracking_number: unarchive.getAttribute("data-unarchive"),
+      });
+      unarchive.disabled = true;
+      unarchive.textContent = "Wird zurückgeholt …";
       return;
     }
     const del = ev.target.closest("[data-delete]");

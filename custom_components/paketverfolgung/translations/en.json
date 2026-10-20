@@ -203,6 +203,16 @@
         }
       }
     },
+    "unarchive": {
+      "name": "Restore from archive",
+      "description": "Takes a shipment back out of the archive. It stays active (it is not archived automatically again after 24 hours) until it is archived again.",
+      "fields": {
+        "tracking_number": {
+          "name": "Tracking number",
+          "description": "The shipment/tracking number (for Amazon the order number)."
+        }
+      }
+    },
     "set_tracking_name": {
       "name": "Set name",
       "description": "Gives a shipment a custom label. Leave empty to clear it.",
@@ -267,7 +277,7 @@
     },
     "archive_now": {
       "name": "Archive now",
-      "description": "Moves an already-delivered shipment into the archive right away, instead of waiting out the 24-hour grace period.",
+      "description": "Moves a shipment into the archive right away. Delivered shipments skip the 24-hour grace period; undelivered ones (e.g. refunded or cancelled orders) are marked as done.",
       "fields": {
         "tracking_number": {
           "name": "Tracking number",

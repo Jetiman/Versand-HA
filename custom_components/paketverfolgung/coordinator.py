@@ -503,12 +503,18 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
     async def _apply_archive(self, item: dict) -> None:
         """Set ``item['archived']`` and ``item['delivered_at']`` (ISO)."""
         sid = str(item.get("id") or "")
+        # True = archived by hand, False = taken back out of the archive by
+        # hand (stays active), missing = automatic (24 h after delivery).
+        override = (self.entry.options.get(CONF_MANUAL_ARCHIVE, {}) or {}).get(sid)
+        manual = override is True
         if not item.get("delivered"):
             if sid in self._delivered_since:
                 del self._delivered_since[sid]
                 self._archive_dirty = True
             item["delivered_at"] = None
-            item["archived"] = False
+            # Only a manual "erledigt" archives a shipment that was never
+            # delivered (refunded / cancelled order, parcel that went astray).
+            item["archived"] = manual
             return
 
         moment = _delivery_moment(item)  # a dated carrier event is best
@@ -522,8 +528,9 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
                 moment = dt_util.parse_datetime(iso) or dt_util.utcnow()
 
         item["delivered_at"] = moment.isoformat()
-        manual = sid in (self.entry.options.get(CONF_MANUAL_ARCHIVE, {}) or {})
-        item["archived"] = manual or dt_util.utcnow() - moment >= ARCHIVE_AFTER
+        item["archived"] = manual or (
+            override is None and dt_util.utcnow() - moment >= ARCHIVE_AFTER
+        )
 
     async def _estimate_delivery_moment(self, sid: str, item: dict) -> datetime:
         """Best guess at when an already-delivered parcel (no dated event)
@@ -631,6 +638,8 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             prev = self._archived_items.get(n)
             if not prev or overrides.get(n) not in (None, prev.get("carrier")):
                 return None
+            if (self.entry.options.get(CONF_MANUAL_ARCHIVE, {}) or {}).get(n) is False:
+                return None  # just taken out of the archive
             checked = dt_util.parse_datetime(self._archived_checked.get(n) or "")
             if checked is None or dt_util.utcnow() - checked >= ARCHIVED_RECHECK:
                 return None

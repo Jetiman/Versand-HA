@@ -83,8 +83,23 @@ set_tracking_direction:
 archive_now:
   name: Jetzt archivieren
   description: >-
-    Verschiebt eine bereits zugestellte Sendung sofort ins Archiv, statt die
-    24-Stunden-Frist abzuwarten.
+    Verschiebt eine Sendung sofort ins Archiv. Zugestellte Sendungen müssen
+    die 24-Stunden-Frist nicht abwarten; nicht zugestellte (z. B. erstattete
+    oder stornierte Bestellungen) werden als erledigt markiert.
+  fields:
+    tracking_number:
+      name: Sendungsnummer
+      description: Die Sendungs-/Trackingnummer (bei Amazon die Bestellnummer).
+      required: true
+      example: "00340434123456789012"
+      selector:
+        text:
+
+unarchive:
+  name: Aus dem Archiv holen
+  description: >-
+    Holt eine Sendung wieder aus dem Archiv. Sie bleibt aktiv (wird auch nicht
+    nach 24 Stunden erneut automatisch archiviert), bis sie wieder archiviert wird.
   fields:
     tracking_number:
       name: Sendungsnummer

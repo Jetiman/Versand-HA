@@ -62,6 +62,7 @@ from .const import (
     SERVICE_SET_NAME,
     SERVICE_SET_NOTIFICATIONS,
     SERVICE_TEST_NOTIFICATION,
+    SERVICE_UNARCHIVE,
 )
 from .coordinator import (
     DhlAccountDataUpdateCoordinator,
@@ -246,6 +247,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async def _async_archive_now(call: ServiceCall) -> ServiceResponse:
             return await _archive_now(hass, call.data[ATTR_TRACKING_NUMBER])
 
+        async def _async_unarchive(call: ServiceCall) -> ServiceResponse:
+            return await _archive_now(hass, call.data[ATTR_TRACKING_NUMBER], archive=False)
+
         async def _async_set_notifications(call: ServiceCall) -> None:
             _set_notifications(
                 hass,
@@ -292,6 +296,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             DOMAIN,
             SERVICE_ARCHIVE_NOW,
             _async_archive_now,
+            schema=_ADD_TRACKING_NUMBER_SCHEMA,
+            supports_response=SupportsResponse.OPTIONAL,
+        )
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_UNARCHIVE,
+            _async_unarchive,
             schema=_ADD_TRACKING_NUMBER_SCHEMA,
             supports_response=SupportsResponse.OPTIONAL,
         )
@@ -477,20 +488,28 @@ async def _set_direction(
     return {"tracking_number": cleaned, "direction": direction}
 
 
-async def _archive_now(hass: HomeAssistant, tracking_number: str) -> ServiceResponse:
-    """Move an already-delivered shipment into the archive right away,
-    instead of waiting for the ARCHIVE_AFTER_HOURS grace period."""
+async def _archive_now(
+    hass: HomeAssistant, tracking_number: str, archive: bool = True
+) -> ServiceResponse:
+    """Move a shipment into the archive right away (delivered ones need not
+    wait out ARCHIVE_AFTER_HOURS, undelivered ones are marked as done), or
+    with ``archive=False`` take it back out; it then stays active until
+    archived again."""
     cleaned = tracking_number.strip()
     entry = _entry_for_shipment(hass, cleaned)
     manual = dict(entry.options.get(CONF_MANUAL_ARCHIVE, {}))
-    manual[cleaned] = True
+    manual[cleaned] = archive
     hass.config_entries.async_update_entry(
         entry, options={**entry.options, CONF_MANUAL_ARCHIVE: manual}
     )
     coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
     if coordinator is not None and hasattr(coordinator, "async_request_refresh"):
         await coordinator.async_request_refresh()
-    _LOGGER.info("Paketverfolgung: %s -> manuell archiviert", cleaned)
+    _LOGGER.info(
+        "Paketverfolgung: %s -> %s",
+        cleaned,
+        "manuell archiviert" if archive else "aus dem Archiv geholt",
+    )
     return {"tracking_number": cleaned}
 
 

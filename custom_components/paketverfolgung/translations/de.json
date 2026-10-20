@@ -203,6 +203,16 @@
         }
       }
     },
+    "unarchive": {
+      "name": "Aus dem Archiv holen",
+      "description": "Holt eine Sendung wieder aus dem Archiv. Sie bleibt aktiv (wird auch nicht nach 24 Stunden erneut automatisch archiviert), bis sie wieder archiviert wird.",
+      "fields": {
+        "tracking_number": {
+          "name": "Sendungsnummer",
+          "description": "Die Sendungs-/Trackingnummer (bei Amazon die Bestellnummer)."
+        }
+      }
+    },
     "set_tracking_name": {
       "name": "Name festlegen",
       "description": "Gibt einer Sendung einen eigenen Namen (Label). Leer lassen, um den Namen wieder zu entfernen.",
@@ -267,7 +277,7 @@
     },
     "archive_now": {
       "name": "Jetzt archivieren",
-      "description": "Verschiebt eine bereits zugestellte Sendung sofort ins Archiv, statt die 24-Stunden-Frist abzuwarten.",
+      "description": "Verschiebt eine Sendung sofort ins Archiv. Zugestellte Sendungen müssen die 24-Stunden-Frist nicht abwarten; nicht zugestellte (z. B. erstattete oder stornierte Bestellungen) werden als erledigt markiert.",
       "fields": {
         "tracking_number": {
           "name": "Sendungsnummer",
