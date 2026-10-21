@@ -8,7 +8,7 @@ shipments enter and leave the coordinators' data.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -18,7 +18,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.util import slugify
+from homeassistant.util import dt as dt_util, slugify
 
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .hermes_coordinator import HermesAccountDataUpdateCoordinator
@@ -61,6 +61,14 @@ _SHIPMENT_COORDINATORS = (
 _DELIVERY_TODAY_UID = f"{DOMAIN}_out_for_delivery_today"
 _NEXT_REFRESH_UID = f"{DOMAIN}_next_refresh"
 _CANONICAL_UIDS = {_DELIVERY_TODAY_UID, _NEXT_REFRESH_UID}
+
+# A shipment sensor whose shipment has been missing from the provider's data
+# for this long loses its registry entry as well (see ``_expire_missing``). A
+# provider that only hiccups for a moment (Amazon sometimes returns an
+# incomplete order list) must not cost anyone their entities.
+STALE_ENTITY_GRACE = timedelta(hours=3)
+# unique-id suffixes of this entry's sensors that are not shipments
+_NON_SHIPMENT_IDS = {"dhl_account_status", "out_for_delivery_today", "next_refresh"}
 
 
 def _cleanup_singletons(hass: HomeAssistant, owner_id: str) -> None:
@@ -128,10 +136,44 @@ def _migrate_amazon_entity_ids(hass: HomeAssistant, entry_id: str, coordinator) 
             registry.async_remove(entity.entity_id)
 
 
+def _shipment_item_id(entry_id: str, entity) -> str | None:
+    """The shipment id behind a registry entry of this entry, or None if the
+    entry is not a shipment sensor (status/summary sensors, other domains)."""
+    prefix = f"{entry_id}_"
+    uid = entity.unique_id
+    if entity.domain != "sensor" or not uid.startswith(prefix):
+        return None
+    item_id = uid[len(prefix):]
+    return None if item_id in _NON_SHIPMENT_IDS else item_id
+
+
+def _drop_stale_shipment_entities(
+    hass: HomeAssistant, entry: ConfigEntry, coordinator
+) -> None:
+    """Remove registry entries of shipments the DHL account no longer lists.
+
+    DHL drops a shipment from the account list once it is archived in the DHL
+    app. Its sensor then has nothing to show; without this it would stay
+    behind as a "restored" / unavailable entity after every restart. Only the
+    dedicated DHL-account entry does this, and only after a successful poll,
+    so a DHL hiccup never deletes live shipments.
+    """
+    if not isinstance(coordinator, DhlAccountDataUpdateCoordinator):
+        return
+    if not coordinator.last_update_success or not isinstance(coordinator.data, dict):
+        return
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        item_id = _shipment_item_id(entry.entry_id, entity)
+        if item_id is not None and item_id not in coordinator.data:
+            registry.async_remove(entity.entity_id)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
+    _drop_stale_shipment_entities(hass, entry, coordinator)
     if isinstance(coordinator, AmazonAccountDataUpdateCoordinator):
         _migrate_amazon_entity_ids(hass, entry.entry_id, coordinator)
     _setup_dynamic_entities(entry, coordinator, async_add_entities)
@@ -160,12 +202,63 @@ async def async_setup_entry(
         )
 
 
+def _remove_registry_entry(hass: HomeAssistant, entry: ConfigEntry, item_id: str) -> bool:
+    """Remove the registry entry (and with it the entity) of one shipment."""
+    registry = er.async_get(hass)
+    entity_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_{item_id}"
+    )
+    if not entity_id:
+        return False
+    registry.async_remove(entity_id)
+    return True
+
+
+def _forget_stale_entity(coordinator, entry: ConfigEntry, item_id: str) -> bool:
+    """DHL account only: a shipment that left the list also leaves the registry
+    at once (see ``_drop_stale_shipment_entities``), not just the state machine.
+    Returns True if the registry entry (and with it the entity) was removed."""
+    if not isinstance(coordinator, DhlAccountDataUpdateCoordinator):
+        return False
+    if not coordinator.last_update_success:
+        return False
+    return _remove_registry_entry(coordinator.hass, entry, item_id)
+
+
+def _expire_missing(
+    coordinator, entry: ConfigEntry, missing_since: dict[str, datetime], now: datetime
+) -> None:
+    """Drop the registry entries of shipments that have been missing for
+    ``STALE_ENTITY_GRACE`` - only judged after a successful poll."""
+    if not coordinator.last_update_success or not isinstance(coordinator.data, dict):
+        return
+    for item_id, since in list(missing_since.items()):
+        if now - since >= STALE_ENTITY_GRACE:
+            _remove_registry_entry(coordinator.hass, entry, item_id)
+            del missing_since[item_id]
+
+
 def _setup_dynamic_entities(
     entry: ConfigEntry, coordinator, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Add one entity per item key in coordinator.data, kept in sync."""
     known_ids: set[str] = set()
     entities: dict[str, ShipmentSensor] = {}
+    # shipment id -> since when it has been missing from the provider's data.
+    # Everything but the DHL account (which drops entries at once, see
+    # ``_forget_stale_entity``) waits ``STALE_ENTITY_GRACE`` before the
+    # registry entry goes: leftovers from before a restart start counting
+    # now, shipments that vanish while running from that moment on.
+    graceful = not isinstance(coordinator, DhlAccountDataUpdateCoordinator)
+    missing_since: dict[str, datetime] = {}
+    if graceful:
+        now = dt_util.utcnow()
+        registry = er.async_get(coordinator.hass)
+        data = coordinator.data or {}
+        for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+            item_id = _shipment_item_id(entry.entry_id, entity)
+            if item_id is not None and item_id not in data:
+                missing_since[item_id] = now
 
     @callback
     def _sync_entities() -> None:
@@ -186,8 +279,18 @@ def _setup_dynamic_entities(
         for item_id in removed_ids:
             entity = entities.pop(item_id, None)
             known_ids.discard(item_id)
-            if entity is not None:
+            if entity is not None and not _forget_stale_entity(
+                coordinator, entry, item_id
+            ):
                 coordinator.hass.async_create_task(entity.async_remove())
+
+        if graceful:
+            now = dt_util.utcnow()
+            for item_id in removed_ids:
+                missing_since.setdefault(item_id, now)
+            for item_id in current_ids:
+                missing_since.pop(item_id, None)  # it is back
+            _expire_missing(coordinator, entry, missing_since, now)
 
     entry.async_on_unload(coordinator.async_add_listener(_sync_entities))
     _sync_entities()

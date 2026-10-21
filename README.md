@@ -78,6 +78,7 @@ Wird die Sitzung von DHL irgendwann abgelehnt, fragt Home Assistant nach einer *
 
 - Der Eintrag ist unabhängig von „Sendungsnummern“. Steht dieselbe Sendung dort **und** im DHL-Konto, gibt es zwei Sensoren – dann die Nummer im Eintrag „Sendungsnummern“ entfernen.
 - **Retouren** („Rücksendung an den Absender“) werden vom DHL-Konto gar nicht erst angelegt.
+- **Archiv:** Sobald eine Sendung in der DHL-App archiviert ist, führt DHL sie nicht mehr in der Kontoliste, und die Integration zeigt sie nicht mehr an. Ihr Sensor wird dann **automatisch samt Registry-Eintrag gelöscht** (auch beim Start, falls er als „nicht verfügbar“ übrig geblieben ist), damit keine Reste entstehen. Bei einem kurzen DHL-Ausfall wird nichts gelöscht.
 - Als Name einer Sendung dient der **Sendungsname aus der DHL-App** (meist der Absender/Verkäufer, bzw. was du dort selbst eingetragen hast), sonst `DHL <Sendungsnummer>`. Ein in Home Assistant vergebener eigener Name hat weiterhin Vorrang. Der Name steht nur in der Kontoliste von DHL, nicht in der öffentlichen Suche – er gilt daher nur für Sendungen des Eintrags „DHL-Konto“, nicht für von Hand eingetragene Sendungsnummern.
 - Der Diagnose-Sensor **„DHL-Konto Erkennung“** zeigt das Ergebnis der letzten Abfrage (`N Sendung(en) erkannt` oder eine Fehlermeldung).
 - Der frühere Schalter beim Eintrag „Sendungsnummern“ (Zahnrad-Menü) ist entfernt; die DHL-Verbindung läuft nur noch über den eigenen Eintrag „DHL-Konto“. Ein noch aktiver Altschalter läuft bis zum nächsten Speichern der Optionen weiter und wird dann abgeschaltet – danach den Eintrag „DHL-Konto“ anlegen.
@@ -114,6 +115,8 @@ Pro Sendung ein Sensor mit:
 
 - **Zustand:** Klartext-Status (z. B. „In Zustellung“, „Zugestellt“)
 - **Attribute:** `tracking_id`, `carrier` (`dhl`/`dpd`/`hermes`/`ups`/`amazon`), `delivery_carrier` (bei Amazon der tatsächliche Zusteller), `group` (Phase), `direction`, `delivered`, `archived` (zugestellt vor über 24 h), `delivered_at` (Zeitpunkt der Zustellung), `tracking_url`, `events` (kompletter Verlauf, neueste zuerst), bei DHL zusätzlich `delivery_window_from`/`_to`
+
+**Aufräumen:** Taucht eine Sendung in den Daten des Anbieters nicht mehr auf (z. B. eine ältere Amazon-Bestellung, die aus der Liste fällt, oder eine entfernte Sendungsnummer), verschwindet ihr Sensor. Damit er nicht nach jedem Neustart als „nicht verfügbar“ in der Entitätenliste stehen bleibt, wird auch sein Registry-Eintrag gelöscht – bei Amazon, Hermes, DPD, Picnic und eingetragenen Nummern erst, wenn die Sendung **3 Stunden** am Stück gefehlt hat und der letzte Abruf erfolgreich war (ein kurzer Aussetzer des Anbieters kostet also keine Sensoren), beim DHL-Konto sofort. Eigene Namen oder Archiv-Markierungen solcher Sendungen bleiben in den Optionen stehen.
 
 Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
