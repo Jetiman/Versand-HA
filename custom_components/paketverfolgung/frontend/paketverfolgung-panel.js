@@ -170,6 +170,7 @@ class PaketverfolgungPanel extends HTMLElement {
         delivered_at: a.delivered_at || null,
         protected: a.protected === true,
         removable: a.removable === true,
+        vanished: a.vanished === true,
         forced: a.forced_carrier || null,
         custom_name: a.custom_name || null,
         out_for_delivery: group === "out_for_delivery" && !delivered,
@@ -214,6 +215,7 @@ class PaketverfolgungPanel extends HTMLElement {
       onStatusChange: a.notify_on_status_change !== false,
       ofdOnly: a.notify_out_for_delivery_only === true,
       shortName: a.notify_short_name === true,
+      keepVanished: a.keep_vanished === true,
     };
   }
 
@@ -417,7 +419,7 @@ class PaketverfolgungPanel extends HTMLElement {
 
     const archiveBlock = archived.length
       ? `<details class="pv-archive"${this._archiveOpen ? " open" : ""}>
-          <summary data-archive-toggle>Archiv (${archived.length}) · zugestellt vor über 24 h oder erledigt</summary>
+          <summary data-archive-toggle>Archiv (${archived.length}) · zugestellt vor über 24 h, erledigt oder beim Anbieter verschwunden</summary>
           <div class="pv-list pv-archive-list">
             ${archived.map((s, i) => this._rowHtml(s, i + 1)).join("")}
           </div>
@@ -477,6 +479,15 @@ class PaketverfolgungPanel extends HTMLElement {
           Zeigt beim Eintrag „Sendungsnummern“ über das Zahnrad alle Optionen
           (u. a. die DHL-Konto-Anmeldung). Ein DPD- oder Amazon-Konto fügst du
           dort über „Eintrag hinzufügen“ hinzu.
+        </div>
+        <div class="pv-set-title">Archiv</div>
+        <label class="pv-switch">
+          <input type="checkbox" data-keep-vanished ${nc.keepVanished ? "checked" : ""} />
+          <span>Verschwundene Sendungen im Archiv behalten</span>
+        </label>
+        <div class="pv-footer-hint pv-hint-tight">
+          Sendungen, die ein Konto-Anbieter nicht mehr liefert, bleiben mit ihrem
+          letzten Stand im Archiv, bis du sie löschst.
         </div>
         <div class="pv-set-title">Benachrichtigungen</div>
         <label class="pv-switch">
@@ -642,6 +653,9 @@ class PaketverfolgungPanel extends HTMLElement {
       note = `<div class="pv-note">Diese Sendung wird noch geprüft – kein Anbieter (DHL, DPD, Hermes, UPS, Amazon)
         hat bisher Daten dazu geliefert. Sie bleibt in der Liste und wird bei jeder Aktualisierung
         erneut geprüft, bis du sie löschst oder oben den Anbieter manuell festlegst.</div>`;
+    } else if (s.vanished) {
+      note = `<div class="pv-note">Archiviert – der Anbieter führt diese Sendung nicht mehr in
+        seiner Liste. Angezeigt wird der zuletzt bekannte Stand; sie bleibt, bis du sie löschst.</div>`;
     } else if (s.archived) {
       note = `<div class="pv-note">Archiviert – ${
         s.delivered ? "vor über 24 Stunden zugestellt" : "als erledigt markiert"
@@ -876,6 +890,12 @@ class PaketverfolgungPanel extends HTMLElement {
   }
 
   _onChange(ev) {
+    if (ev.target.matches("[data-keep-vanished]")) {
+      this._hass.callService("paketverfolgung", "set_keep_vanished", {
+        enabled: ev.target.checked,
+      });
+      return;
+    }
     if (ev.target.matches("[data-notify-toggle]")) {
       const nc = this._notifyConfig();
       this._setNotifications(

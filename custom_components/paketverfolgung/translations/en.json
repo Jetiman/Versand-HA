@@ -228,6 +228,16 @@
         }
       }
     },
+    "set_keep_vanished": {
+      "name": "Keep vanished shipments",
+      "description": "Turns on or off whether shipments an account provider no longer lists stay in the archive with their last known state until they are deleted.",
+      "fields": {
+        "enabled": {
+          "name": "Enabled",
+          "description": "Keep vanished shipments in the archive."
+        }
+      }
+    },
     "set_notifications": {
       "name": "Set notifications",
       "description": "Turns notifications on or off, separately for new shipments and status changes, and sets the targets.",

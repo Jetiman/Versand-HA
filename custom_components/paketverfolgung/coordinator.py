@@ -45,6 +45,7 @@ from .const import (
     CONF_DHL_AUTO_DISCOVERY,
     CONF_DHL_SESSION,
     CONF_DIRECTION_OVERRIDES,
+    CONF_KEEP_VANISHED,
     CONF_MANUAL_ARCHIVE,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
@@ -314,6 +315,10 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
 
     last_poll: datetime | None = None
     entry: ConfigEntry
+    # Account providers set this: shipments that vanish from the provider's
+    # data can then be kept in the archive (option ``keep_vanished``). Typed-in
+    # tracking numbers never do - removing a number must really remove it.
+    _keeps_vanished = False
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -326,6 +331,10 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         self._archive_store: Store | None = None
         self._archive_dirty = False
         self._notify_primed = False
+        # Every shipment seen (live ones refreshed each poll, vanished ones
+        # frozen at their last state) - only kept while ``keep_vanished`` is on.
+        self._known: dict[str, dict] = {}
+        self._known_store: Store | None = None
 
     async def _async_update_data(self) -> dict[str, dict]:
         try:
@@ -494,6 +503,104 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
             )
             stored = await self._archive_store.async_load()
             self._delivered_since = dict(stored) if stored else {}
+        if self._known_store is None and self._keeps_vanished:
+            self._known_store = Store(
+                self.hass, 1, f"{DOMAIN}.known.{self.entry.entry_id}"
+            )
+            stored = await self._known_store.async_load()
+            self._known = dict(stored) if isinstance(stored, dict) else {}
+
+    def _keep_vanished(self, result: dict[str, dict]) -> None:
+        """Keep shipments the provider stopped listing, archived, until deleted.
+
+        Runs on the finished poll result. A shipment that was known before and
+        is missing now stays in ``result`` with its last state, flagged
+        ``archived`` and ``vanished`` (so the panel offers "Löschen"). When it
+        reappears it is simply live again. With the option off nothing is kept
+        and anything stored is dropped.
+        """
+        if not self._keeps_vanished:
+            return
+        if not self._keep_enabled():
+            if self._known:
+                self._known.clear()
+                self._save_known()
+            return
+        names = {
+            str(k).strip(): str(v).strip()
+            for k, v in (self.entry.options.get(CONF_NAMES, {}) or {}).items()
+            if str(v).strip()
+        }
+        changed = False
+        for sid, item in result.items():
+            live = {k: v for k, v in item.items() if k != "vanished"}
+            if self._known.get(sid) != live:
+                self._known[sid] = live
+                changed = True
+        for sid, old in list(self._known.items()):
+            if sid in result:
+                continue
+            frozen = dict(old)
+            frozen["archived"] = True
+            frozen["vanished"] = True
+            if names.get(sid):
+                frozen["custom_name"] = names[sid]
+                frozen["name"] = names[sid]
+            if self._known.get(sid) != frozen:
+                self._known[sid] = frozen
+                changed = True
+            result[sid] = dict(frozen)
+        if changed:
+            self._save_known()
+
+    def _keep_enabled(self) -> bool:
+        """The global switch; an entry added after it was set follows the others."""
+        value = self.entry.options.get(CONF_KEEP_VANISHED)
+        if value is None and getattr(self, "hass", None) is not None:
+            value = any(
+                e.options.get(CONF_KEEP_VANISHED)
+                for e in self.hass.config_entries.async_entries(DOMAIN)
+            )
+        return bool(value)
+
+    def apply_keep_vanished(self, enabled: bool) -> None:
+        """The panel switch changed: act on it right away, not at the next poll.
+
+        On: remember what is live now, so a shipment that disappears before
+        the next poll is not lost. Off: forget the stored state and drop the
+        kept shipments from the data.
+        """
+        if not self._keeps_vanished:
+            return
+        data = self.data or {}
+        if enabled:
+            for sid, item in data.items():
+                if not item.get("vanished"):
+                    self._known[sid] = dict(item)
+            self._save_known()
+            return
+        self._known.clear()
+        self._save_known()
+        if any(i.get("vanished") for i in data.values()):
+            self.async_set_updated_data(
+                {k: v for k, v in data.items() if not v.get("vanished")}
+            )
+
+    def _save_known(self) -> None:
+        if self._known_store is not None:
+            self._known_store.async_delay_save(lambda: dict(self._known), 30)
+
+    async def async_forget_vanished(self, sid: str) -> bool:
+        """Delete a vanished shipment for good (the panel's "Löschen")."""
+        item = (self.data or {}).get(sid)
+        if not item or not item.get("vanished"):
+            return False
+        self._known.pop(sid, None)
+        self._save_known()
+        self.async_set_updated_data(
+            {k: v for k, v in (self.data or {}).items() if k != sid}
+        )
+        return True
 
     async def _save_archive(self, live_ids: set[str]) -> None:
         for stale in [i for i in self._delivered_since if i not in live_ids]:
@@ -760,6 +867,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             self._archived_checked.pop(stale, None)
         await self._save_numbers_state()
         self._apply_direction_overrides(result)
+        self._keep_vanished(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
         return result
@@ -999,6 +1107,8 @@ class DhlAccountDataUpdateCoordinator(TrackingNumbersDataUpdateCoordinator):
     user to sign in again (reauth) instead of silently showing nothing.
     """
 
+    _keeps_vanished = True
+
     def _config(self, key, default=None):
         if key == CONF_TRACKING_NUMBERS:
             return []  # nothing typed in - the account is the only source
@@ -1058,6 +1168,8 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
     known parcels instead of blanking every sensor.
     """
 
+    _keeps_vanished = True
+
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
         super().__init__(
             hass, _LOGGER, name=f"{DOMAIN}_dpd", update_interval=update_interval
@@ -1102,6 +1214,7 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
             result[parcel_id] = item
 
         self._apply_direction_overrides(result)
+        self._keep_vanished(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
         _LOGGER.debug("Paketverfolgung (DPD): %d parcel(s) fetched", len(result))

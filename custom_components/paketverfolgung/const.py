@@ -101,6 +101,7 @@ SERVICE_SET_CARRIER = "set_tracking_carrier"
 SERVICE_SET_NAME = "set_tracking_name"
 SERVICE_SET_DIRECTION = "set_tracking_direction"
 SERVICE_ARCHIVE_NOW = "archive_now"
+SERVICE_SET_KEEP_VANISHED = "set_keep_vanished"
 SERVICE_UNARCHIVE = "unarchive"
 ATTR_TRACKING_NUMBER = "tracking_number"
 ATTR_CARRIER = "carrier"
@@ -121,6 +122,10 @@ DIRECTIONS = (DIRECTION_SEND, DIRECTION_RECEIVE)
 # user move a delivered shipment into the archive right away instead of
 # waiting for the ARCHIVE_AFTER_HOURS grace period.
 CONF_MANUAL_ARCHIVE = "manual_archive"
+# Global switch (panel, stored on every entry): keep a shipment that vanished
+# from the provider's data (old Amazon order, DHL archive, ...) in the archive
+# with its last known state until the user deletes it.
+CONF_KEEP_VANISHED = "keep_vanished"
 
 # Carrier a tracking number was detected to belong to. Kept per number in
 # the tracking-number coordinator (in memory - re-detected after a

@@ -719,3 +719,87 @@ def test_returns_do_not_trigger_notifications():
         }
     )
     assert pushed == ["P1"]
+
+
+# --- keep_vanished: shipments the provider dropped stay in the archive -------
+def _keeper(keep=True, names=None):
+    coord = object.__new__(coordinator.DhlAccountDataUpdateCoordinator)
+    coord.entry = types.SimpleNamespace(
+        options={const.CONF_KEEP_VANISHED: keep, const.CONF_NAMES: names or {}}
+    )
+    coord._known = {}
+    coord._known_store = None  # nothing is written to disk in these tests
+    return coord
+
+
+def test_vanished_shipment_is_kept_archived_until_deleted():
+    coord = _keeper()
+    first = {"A": {"id": "A", "name": "Shop", "status": "Unterwegs", "archived": False}}
+    coord._keep_vanished(first)
+    second: dict = {}  # the provider no longer lists A
+    coord._keep_vanished(second)
+    kept = second["A"]
+    assert kept["archived"] is True and kept["vanished"] is True
+    assert kept["status"] == "Unterwegs"  # last known state
+    third: dict = {}
+    coord._keep_vanished(third)  # still there on every later poll
+    assert "A" in third
+
+
+def test_vanished_shipment_that_returns_is_live_again():
+    coord = _keeper()
+    coord._keep_vanished({"A": {"id": "A", "status": "x"}})
+    coord._keep_vanished({})
+    back = {"A": {"id": "A", "status": "y", "archived": False}}
+    coord._keep_vanished(back)
+    assert "vanished" not in back["A"] and back["A"]["archived"] is False
+    again: dict = {}
+    coord._keep_vanished(again)
+    assert again["A"]["status"] == "y"  # frozen at the newer state
+
+
+def test_vanished_keeps_a_custom_name():
+    coord = _keeper(names={"A": "Mein Paket"})
+    coord._keep_vanished({"A": {"id": "A", "name": "Shop"}})
+    gone: dict = {}
+    coord._keep_vanished(gone)
+    assert gone["A"]["name"] == "Mein Paket"
+
+
+def test_option_off_keeps_nothing_and_forgets():
+    coord = _keeper(keep=False)
+    coord._known = {"A": {"id": "A"}}
+    result: dict = {}
+    coord._keep_vanished(result)
+    assert result == {} and coord._known == {}
+
+
+def test_typed_in_numbers_never_keep_vanished():
+    coord = object.__new__(coordinator.TrackingNumbersDataUpdateCoordinator)
+    assert coord._keeps_vanished is False
+
+
+def test_forgetting_a_vanished_shipment():
+    coord = _keeper()
+    coord._known = {"A": {"id": "A", "vanished": True}}
+    published = []
+    coord.data = {"A": {"id": "A", "vanished": True}, "B": {"id": "B"}}
+    coord.async_set_updated_data = published.append
+    assert run(coord.async_forget_vanished("A")) is True
+    assert published == [{"B": {"id": "B"}}] and "A" not in coord._known
+    assert run(coord.async_forget_vanished("B")) is False  # a live shipment
+
+
+def test_switching_the_option_acts_immediately():
+    coord = _keeper()
+    coord._keeps_vanished = True
+    coord.data = {"A": {"id": "A", "status": "x"}}
+    coord.apply_keep_vanished(True)
+    assert coord._known["A"]["status"] == "x"  # remembered before it can vanish
+
+    kept = {"A": {"id": "A", "vanished": True}, "B": {"id": "B"}}
+    coord.data = kept
+    published = []
+    coord.async_set_updated_data = published.append
+    coord.apply_keep_vanished(False)
+    assert coord._known == {} and published == [{"B": {"id": "B"}}]

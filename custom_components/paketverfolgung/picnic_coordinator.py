@@ -58,6 +58,8 @@ _DETAIL_REFRESH_SECONDS = 30 * 60
 class PicnicAccountDataUpdateCoordinator(_BaseCoordinator):
     """Fetches the deliveries of one Picnic customer account."""
 
+    _keeps_vanished = True
+
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
         super().__init__(
             hass, _LOGGER, name=f"{DOMAIN}_picnic", update_interval=update_interval
@@ -153,6 +155,7 @@ class PicnicAccountDataUpdateCoordinator(_BaseCoordinator):
         for stale in [k for k in self._details if k not in result]:
             self._details.pop(stale, None)
         self._apply_direction_overrides(result)
+        self._keep_vanished(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
         self._tune_interval(result)

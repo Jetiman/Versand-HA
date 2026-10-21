@@ -228,6 +228,16 @@
         }
       }
     },
+    "set_keep_vanished": {
+      "name": "Verschwundene Sendungen behalten",
+      "description": "Schaltet an oder aus, ob Sendungen, die ein Konto-Anbieter nicht mehr liefert, mit ihrem letzten Stand im Archiv bleiben, bis sie gelöscht werden.",
+      "fields": {
+        "enabled": {
+          "name": "Aktiviert",
+          "description": "Verschwundene Sendungen im Archiv behalten."
+        }
+      }
+    },
     "set_notifications": {
       "name": "Benachrichtigungen einstellen",
       "description": "Schaltet die Benachrichtigungen an oder aus, einzeln für neue Sendung und Statusänderung, und legt die Ziele fest.",

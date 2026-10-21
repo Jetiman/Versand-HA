@@ -125,6 +125,8 @@ def normalize_amazon_shipment(raw: dict) -> dict:
 class AmazonAccountDataUpdateCoordinator(_BaseCoordinator):
     """Fetch active deliveries from one authenticated Amazon.de account."""
 
+    _keeps_vanished = True
+
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
         super().__init__(
             hass,
@@ -216,6 +218,7 @@ class AmazonAccountDataUpdateCoordinator(_BaseCoordinator):
             result[shipment_id] = item
 
         self._apply_direction_overrides(result)
+        self._keep_vanished(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
         self._tune_interval(result)

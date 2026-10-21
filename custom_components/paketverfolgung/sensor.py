@@ -25,6 +25,7 @@ from .hermes_coordinator import HermesAccountDataUpdateCoordinator
 from .picnic_coordinator import PicnicAccountDataUpdateCoordinator
 from .const import (
     CONF_DHL_AUTO_DISCOVERY,
+    CONF_KEEP_VANISHED,
     CONF_NOTIFY_ENABLED,
     CONF_NOTIFY_ON_NEW,
     CONF_NOTIFY_ON_STATUS_CHANGE,
@@ -347,14 +348,16 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
             # Only typed-in numbers can be removed/re-assigned. The DHL-account
             # coordinator is a subclass of the number coordinator, but its
             # shipments come from the account, so it is excluded.
-            "removable": isinstance(
-                self.coordinator, TrackingNumbersDataUpdateCoordinator
+            "removable": (
+                isinstance(self.coordinator, TrackingNumbersDataUpdateCoordinator)
+                and not isinstance(self.coordinator, DhlAccountDataUpdateCoordinator)
             )
-            and not isinstance(self.coordinator, DhlAccountDataUpdateCoordinator),
+            or bool(s.get("vanished")),
             "direction": s.get("direction"),
             "forced_direction": s.get("forced_direction"),
             "delivered": s.get("delivered"),
             "archived": bool(s.get("archived")),
+            "vanished": bool(s.get("vanished")),
             "delivered_at": s.get("delivered_at"),
             "protected": s.get("protected"),
             "delivery_window_from": s.get("delivery_from"),
@@ -490,6 +493,7 @@ class CombinedOutForDeliveryTodaySensor(_AllCoordinatorsSensor):
                 opts.get(CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY)
             ),
             "notify_short_name": bool(opts.get(CONF_NOTIFY_SHORT_NAME)),
+            "keep_vanished": bool(opts.get(CONF_KEEP_VANISHED)),
             "integration_version": INTEGRATION_VERSION,
             "integration_commit": INTEGRATION_COMMIT,
         }

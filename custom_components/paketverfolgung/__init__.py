@@ -11,6 +11,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 
 from .amazon_coordinator import AmazonAccountDataUpdateCoordinator
 from .hermes_coordinator import HermesAccountDataUpdateCoordinator
@@ -27,6 +28,7 @@ from .const import (
     CONF_CARRIER_OVERRIDES,
     CONF_DHL_SESSION,
     CONF_DIRECTION_OVERRIDES,
+    CONF_KEEP_VANISHED,
     CONF_MANUAL_ARCHIVE,
     CONF_NAMES,
     CONF_NOTIFY_ENABLED,
@@ -59,6 +61,7 @@ from .const import (
     SERVICE_REMOVE_TRACKING_NUMBER,
     SERVICE_SET_CARRIER,
     SERVICE_SET_DIRECTION,
+    SERVICE_SET_KEEP_VANISHED,
     SERVICE_SET_NAME,
     SERVICE_SET_NOTIFICATIONS,
     SERVICE_TEST_NOTIFICATION,
@@ -153,6 +156,8 @@ def _as_str_list(value) -> list[str]:
         return [value]
     return [str(v) for v in value]
 
+
+_SET_KEEP_VANISHED_SCHEMA = vol.Schema({vol.Optional("enabled", default=True): vol.Coerce(bool)})
 
 _SET_NOTIFICATIONS_SCHEMA = vol.Schema(
     {
@@ -250,6 +255,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async def _async_unarchive(call: ServiceCall) -> ServiceResponse:
             return await _archive_now(hass, call.data[ATTR_TRACKING_NUMBER], archive=False)
 
+        async def _async_set_keep_vanished(call: ServiceCall) -> None:
+            _set_keep_vanished(hass, bool(call.data.get("enabled", True)))
+
         async def _async_set_notifications(call: ServiceCall) -> None:
             _set_notifications(
                 hass,
@@ -320,6 +328,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             schema=_SET_NOTIFICATIONS_SCHEMA,
         )
         hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_KEEP_VANISHED,
+            _async_set_keep_vanished,
+            schema=_SET_KEEP_VANISHED_SCHEMA,
+        )
+        hass.services.async_register(
             DOMAIN, SERVICE_TEST_NOTIFICATION, _async_test_notification
         )
 
@@ -372,6 +386,25 @@ async def _add_tracking_number(
     return {"added": True, "tracking_number": cleaned}
 
 
+async def _forget_vanished(hass: HomeAssistant, number: str) -> bool:
+    """Delete a shipment the provider stopped listing but that was kept in the
+    archive (option "keep_vanished"), registry entry included."""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        coordinator = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+        forget = getattr(coordinator, "async_forget_vanished", None)
+        if forget is None or not await forget(number):
+            continue
+        registry = er.async_get(hass)
+        entity_id = registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{entry.entry_id}_{number}"
+        )
+        if entity_id:
+            registry.async_remove(entity_id)
+        _LOGGER.info("Paketverfolgung: %s wurde aus dem Archiv gelöscht", number)
+        return True
+    return False
+
+
 async def _remove_tracking_number(
     hass: HomeAssistant, tracking_number: str
 ) -> ServiceResponse:
@@ -380,8 +413,10 @@ async def _remove_tracking_number(
     Returns whether it was actually tracked, so callers can give an
     accurate confirmation.
     """
-    entry = _numbers_entry(hass)
     cleaned = tracking_number.strip()
+    if await _forget_vanished(hass, cleaned):
+        return {"removed": True, "tracking_number": cleaned}
+    entry = _numbers_entry(hass)
     current = _current_numbers(entry)
     if cleaned not in current:
         return {"removed": False, "tracking_number": cleaned}
@@ -553,6 +588,24 @@ def _set_notifications(
     )
 
 
+def _set_keep_vanished(hass: HomeAssistant, enabled: bool) -> None:
+    """Store the "keep vanished shipments in the archive" switch on every entry
+    (it is read live, so it does not reload anything) and apply it now."""
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_KEEP_VANISHED: enabled}
+        )
+    for coordinator in hass.data.get(DOMAIN, {}).values():
+        if hasattr(coordinator, "apply_keep_vanished"):
+            coordinator.apply_keep_vanished(enabled)
+        if hasattr(coordinator, "async_update_listeners"):
+            coordinator.async_update_listeners()
+    _LOGGER.info(
+        "Paketverfolgung: verschwundene Sendungen im Archiv behalten: %s",
+        "an" if enabled else "aus",
+    )
+
+
 async def _test_notification(hass: HomeAssistant) -> None:
     """Send a sample notification to the configured targets, in the exact
     format a real one would use (respects the current options)."""
@@ -611,6 +664,7 @@ def _reload_relevant(entry: ConfigEntry) -> str:
         CONF_NOTIFY_ON_STATUS_CHANGE,
         CONF_NOTIFY_OUT_FOR_DELIVERY_ONLY,
         CONF_NOTIFY_SHORT_NAME,
+        CONF_KEEP_VANISHED,
     )
     data = {k: v for k, v in entry.data.items() if k not in skip_data}
     options = {k: v for k, v in entry.options.items() if k not in skip_options}
