@@ -64,6 +64,9 @@ class _Plain:
     def __init__(self, *args, **kwargs):
         pass
 
+    async def async_remove(self):
+        pass
+
     def __class_getitem__(cls, item):
         return cls
 
@@ -569,6 +572,113 @@ def test_live_removal_forgets_the_registry_entry(monkeypatch):
     assert sensor._forget_stale_entity(coord, entry, "GONE") is True
     assert registry.removed == ["sensor.dhl_GONE"]
     assert sensor._forget_stale_entity(coord, entry, "UNKNOWN") is False
+
+
+# --- other providers: registry entries go after a grace period ---------------
+from datetime import datetime, timedelta, timezone
+
+
+class _Clock:
+    def __init__(self):
+        self.now = datetime(2026, 10, 21, 12, 0, tzinfo=timezone.utc)
+
+    def utcnow(self):
+        return self.now
+
+    def advance(self, **kw):
+        self.now += timedelta(**kw)
+
+
+def _grace_setup(monkeypatch, registry_ids, data):
+    """Run ``_setup_dynamic_entities`` for a non-DHL coordinator.
+
+    Returns (coord, registry, clock, sync) - ``sync()`` is the coordinator
+    update listener the platform registered.
+    """
+    entry = types.SimpleNamespace(
+        entry_id="E1", async_on_unload=lambda cb: None
+    )
+    registry = _registry_for(monkeypatch, [_entity("E1", i) for i in registry_ids])
+    clock = _Clock()
+    monkeypatch.setattr(sensor, "dt_util", types.SimpleNamespace(utcnow=clock.utcnow))
+    coord = coordinator.TrackingNumbersDataUpdateCoordinator.__new__(
+        coordinator.TrackingNumbersDataUpdateCoordinator
+    )
+    coord.hass = types.SimpleNamespace(
+        async_create_task=lambda coro: coro.close()
+    )
+    coord.data = data
+    coord.last_update_success = True
+    listeners = []
+    coord.async_add_listener = lambda cb: listeners.append(cb)
+    sensor._setup_dynamic_entities(entry, coord, lambda entities: None)
+    return coord, registry, clock, listeners[0]
+
+
+def test_leftovers_from_before_a_restart_go_after_the_grace_period(monkeypatch):
+    coord, registry, clock, sync = _grace_setup(
+        monkeypatch, ["ALIVE", "OLD"], {"ALIVE": {"id": "ALIVE"}}
+    )
+    clock.advance(hours=1)
+    sync()
+    assert registry.removed == []  # not yet: the source may just be hiccuping
+    clock.advance(hours=2, minutes=1)
+    sync()
+    assert registry.removed == ["sensor.dhl_OLD"]
+    sync()
+    assert registry.removed == ["sensor.dhl_OLD"]  # only once
+
+
+def test_shipment_that_vanishes_is_forgotten_after_the_grace_period(monkeypatch):
+    coord, registry, clock, sync = _grace_setup(
+        monkeypatch, ["A", "B"], {"A": {"id": "A"}, "B": {"id": "B"}}
+    )
+    coord.data = {"B": {"id": "B"}}
+    sync()
+    assert registry.removed == []  # the entity is gone, its registry entry stays
+    clock.advance(hours=3)
+    sync()
+    assert registry.removed == ["sensor.dhl_A"]
+
+
+def test_shipment_that_comes_back_is_kept(monkeypatch):
+    coord, registry, clock, sync = _grace_setup(
+        monkeypatch, ["A"], {"A": {"id": "A"}}
+    )
+    coord.data = {}
+    sync()
+    clock.advance(hours=2)
+    coord.data = {"A": {"id": "A"}}  # incomplete answer was a blip
+    sync()
+    clock.advance(hours=5)
+    sync()
+    assert registry.removed == []
+
+
+def test_nothing_is_forgotten_while_the_provider_fails(monkeypatch):
+    coord, registry, clock, sync = _grace_setup(
+        monkeypatch, ["OLD"], {"X": {"id": "X"}}
+    )
+    coord.last_update_success = False
+    clock.advance(hours=10)
+    sync()
+    assert registry.removed == []
+    coord.last_update_success = True
+    sync()
+    assert registry.removed == ["sensor.dhl_OLD"]
+
+
+def test_summary_and_status_sensors_are_not_shipments(monkeypatch):
+    entry = types.SimpleNamespace(entry_id="E1")
+    for suffix in ("dhl_account_status", "out_for_delivery_today", "next_refresh"):
+        e = types.SimpleNamespace(
+            entity_id="sensor.x", unique_id=f"E1_{suffix}", domain="sensor"
+        )
+        assert sensor._shipment_item_id("E1", e) is None
+    other = types.SimpleNamespace(entity_id="b", unique_id="E1_A", domain="binary_sensor")
+    assert sensor._shipment_item_id("E1", other) is None
+    foreign = types.SimpleNamespace(entity_id="s", unique_id="E2_A", domain="sensor")
+    assert sensor._shipment_item_id("E1", foreign) is None
 
 
 # --- returns ("Retouren") are ignored ---------------------------------------

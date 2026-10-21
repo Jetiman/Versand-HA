@@ -116,6 +116,8 @@ Pro Sendung ein Sensor mit:
 - **Zustand:** Klartext-Status (z. B. „In Zustellung“, „Zugestellt“)
 - **Attribute:** `tracking_id`, `carrier` (`dhl`/`dpd`/`hermes`/`ups`/`amazon`), `delivery_carrier` (bei Amazon der tatsächliche Zusteller), `group` (Phase), `direction`, `delivered`, `archived` (zugestellt vor über 24 h), `delivered_at` (Zeitpunkt der Zustellung), `tracking_url`, `events` (kompletter Verlauf, neueste zuerst), bei DHL zusätzlich `delivery_window_from`/`_to`
 
+**Aufräumen:** Taucht eine Sendung in den Daten des Anbieters nicht mehr auf (z. B. eine ältere Amazon-Bestellung, die aus der Liste fällt, oder eine entfernte Sendungsnummer), verschwindet ihr Sensor. Damit er nicht nach jedem Neustart als „nicht verfügbar“ in der Entitätenliste stehen bleibt, wird auch sein Registry-Eintrag gelöscht – bei Amazon, Hermes, DPD, Picnic und eingetragenen Nummern erst, wenn die Sendung **3 Stunden** am Stück gefehlt hat und der letzte Abruf erfolgreich war (ein kurzer Aussetzer des Anbieters kostet also keine Sensoren), beim DHL-Konto sofort. Eigene Namen oder Archiv-Markierungen solcher Sendungen bleiben in den Optionen stehen.
+
 Zusätzlich zwei **anbieterübergreifende** Sammel-Sensoren:
 
 - **„In Zustellung“** (`sensor.heute_in_zustellung`): Zustand ist die Gesamtzahl der Sendungen, die gerade im Zustellfahrzeug sind; Attribut `shipments` enthält die Liste (inkl. Anbieter), `next_update` den nächsten Abfragezeitpunkt.
