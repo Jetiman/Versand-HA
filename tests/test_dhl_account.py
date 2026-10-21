@@ -58,6 +58,16 @@ class _AuthFailed(Exception):
     pass
 
 
+class _Plain:
+    """Stand-in base class for HA entity classes (sensor.py subclasses them)."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __class_getitem__(cls, item):
+        return cls
+
+
 class _UpdateFailed(Exception):
     pass
 
@@ -70,6 +80,10 @@ def _load():
     uc.UpdateFailed = _UpdateFailed
     importlib.import_module("homeassistant.exceptions").ConfigEntryAuthFailed = _AuthFailed
     importlib.import_module("homeassistant.core").callback = lambda f: f
+    uc.CoordinatorEntity = type("CoordinatorEntity", (_Plain,), {})
+    importlib.import_module("homeassistant.components.sensor").SensorEntity = type(
+        "SensorEntity", (_Plain,), {}
+    )
     pkg = types.ModuleType(PKG)
     pkg.__path__ = [str(PKG_DIR)]
     sys.modules[PKG] = pkg
@@ -77,10 +91,11 @@ def _load():
         importlib.import_module(f"{PKG}.dhl_account"),
         importlib.import_module(f"{PKG}.coordinator"),
         importlib.import_module(f"{PKG}.const"),
+        importlib.import_module(f"{PKG}.sensor"),
     )
 
 
-account, coordinator, const = _load()
+account, coordinator, const, sensor = _load()
 
 
 def run(coro):
@@ -466,6 +481,94 @@ def test_app_name_only_for_dhl_shipments_the_account_knows():
     unknown = {"id": "Z", "carrier": const.CARRIER_DHL, "name": "DHL Z"}
     coord._apply_dhl_account_name("Z", unknown)
     assert "carrier_name" not in unknown
+
+
+# --- shipments DHL no longer lists lose their registry entry ----------------
+class FakeRegistry:
+    def __init__(self, entities):
+        self.entities = entities  # list of SimpleNamespace(entity_id, unique_id, domain)
+        self.removed = []
+
+    def async_get_entity_id(self, domain, platform, unique_id):
+        for e in self.entities:
+            if e.unique_id == unique_id:
+                return e.entity_id
+        return None
+
+    def async_remove(self, entity_id):
+        self.removed.append(entity_id)
+
+
+def _entity(entry_id, item_id, domain="sensor"):
+    return types.SimpleNamespace(
+        entity_id=f"sensor.dhl_{item_id}",
+        unique_id=f"{entry_id}_{item_id}",
+        domain=domain,
+    )
+
+
+def _registry_for(monkeypatch, entities):
+    registry = FakeRegistry(entities)
+    fake_er = types.SimpleNamespace(
+        async_get=lambda hass: registry,
+        async_entries_for_config_entry=lambda reg, eid: list(reg.entities),
+    )
+    monkeypatch.setattr(sensor, "er", fake_er)
+    return registry
+
+
+def test_stale_dhl_entities_are_removed_at_setup(monkeypatch):
+    entry = types.SimpleNamespace(entry_id="E1")
+    registry = _registry_for(
+        monkeypatch,
+        [
+            _entity("E1", "ALIVE"),
+            _entity("E1", "GONE"),
+            types.SimpleNamespace(
+                entity_id="sensor.dhl_konto_erkennung",
+                unique_id="E1_dhl_account_status",
+                domain="sensor",
+            ),
+        ],
+    )
+    coord = make_coordinator(FakeAccount(), SESSION, data={"ALIVE": {"id": "ALIVE"}})
+    coord.last_update_success = True
+    sensor._drop_stale_shipment_entities(coord.hass, entry, coord)
+    # the vanished shipment goes, the live one and the diagnostic sensor stay
+    assert registry.removed == ["sensor.dhl_GONE"]
+
+
+def test_stale_cleanup_waits_for_a_good_poll(monkeypatch):
+    entry = types.SimpleNamespace(entry_id="E1")
+    registry = _registry_for(monkeypatch, [_entity("E1", "GONE")])
+    coord = make_coordinator(FakeAccount(), SESSION, data={})
+    coord.last_update_success = False  # DHL hiccup: nothing is deleted
+    sensor._drop_stale_shipment_entities(coord.hass, entry, coord)
+    coord.last_update_success = True
+    coord.data = None
+    sensor._drop_stale_shipment_entities(coord.hass, entry, coord)
+    assert registry.removed == []
+
+
+def test_other_providers_keep_their_registry_entries(monkeypatch):
+    entry = types.SimpleNamespace(entry_id="E1")
+    registry = _registry_for(monkeypatch, [_entity("E1", "GONE")])
+    other = types.SimpleNamespace(
+        hass=None, last_update_success=True, data={}, entry=entry
+    )
+    sensor._drop_stale_shipment_entities(None, entry, other)
+    assert registry.removed == []
+    assert sensor._forget_stale_entity(other, entry, "GONE") is False
+
+
+def test_live_removal_forgets_the_registry_entry(monkeypatch):
+    entry = types.SimpleNamespace(entry_id="E1")
+    registry = _registry_for(monkeypatch, [_entity("E1", "GONE")])
+    coord = make_coordinator(FakeAccount(), SESSION, data={})
+    coord.last_update_success = True
+    assert sensor._forget_stale_entity(coord, entry, "GONE") is True
+    assert registry.removed == ["sensor.dhl_GONE"]
+    assert sensor._forget_stale_entity(coord, entry, "UNKNOWN") is False
 
 
 # --- returns ("Retouren") are ignored ---------------------------------------

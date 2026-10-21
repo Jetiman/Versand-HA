@@ -128,10 +128,37 @@ def _migrate_amazon_entity_ids(hass: HomeAssistant, entry_id: str, coordinator) 
             registry.async_remove(entity.entity_id)
 
 
+def _drop_stale_shipment_entities(
+    hass: HomeAssistant, entry: ConfigEntry, coordinator
+) -> None:
+    """Remove registry entries of shipments the DHL account no longer lists.
+
+    DHL drops a shipment from the account list once it is archived in the DHL
+    app. Its sensor then has nothing to show; without this it would stay
+    behind as a "restored" / unavailable entity after every restart. Only the
+    dedicated DHL-account entry does this, and only after a successful poll,
+    so a DHL hiccup never deletes live shipments.
+    """
+    if not isinstance(coordinator, DhlAccountDataUpdateCoordinator):
+        return
+    if not coordinator.last_update_success or not isinstance(coordinator.data, dict):
+        return
+    registry = er.async_get(hass)
+    prefix = f"{entry.entry_id}_"
+    status_uid = f"{entry.entry_id}_dhl_account_status"
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        uid = entity.unique_id
+        if entity.domain != "sensor" or not uid.startswith(prefix) or uid == status_uid:
+            continue
+        if uid[len(prefix):] not in coordinator.data:
+            registry.async_remove(entity.entity_id)
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     coordinator = hass.data[DOMAIN][entry.entry_id]
+    _drop_stale_shipment_entities(hass, entry, coordinator)
     if isinstance(coordinator, AmazonAccountDataUpdateCoordinator):
         _migrate_amazon_entity_ids(hass, entry.entry_id, coordinator)
     _setup_dynamic_entities(entry, coordinator, async_add_entities)
@@ -160,6 +187,24 @@ async def async_setup_entry(
         )
 
 
+def _forget_stale_entity(coordinator, entry: ConfigEntry, item_id: str) -> bool:
+    """DHL account only: a shipment that left the list also leaves the registry
+    (see ``_drop_stale_shipment_entities``), not just the state machine.
+    Returns True if the registry entry (and with it the entity) was removed."""
+    if not isinstance(coordinator, DhlAccountDataUpdateCoordinator):
+        return False
+    if not coordinator.last_update_success:
+        return False
+    registry = er.async_get(coordinator.hass)
+    entity_id = registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_{item_id}"
+    )
+    if not entity_id:
+        return False
+    registry.async_remove(entity_id)
+    return True
+
+
 def _setup_dynamic_entities(
     entry: ConfigEntry, coordinator, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -186,7 +231,9 @@ def _setup_dynamic_entities(
         for item_id in removed_ids:
             entity = entities.pop(item_id, None)
             known_ids.discard(item_id)
-            if entity is not None:
+            if entity is not None and not _forget_stale_entity(
+                coordinator, entry, item_id
+            ):
                 coordinator.hass.async_create_task(entity.async_remove())
 
     entry.async_on_unload(coordinator.async_add_listener(_sync_entities))
