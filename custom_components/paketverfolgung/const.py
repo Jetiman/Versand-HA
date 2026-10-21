@@ -138,7 +138,7 @@ CARRIERS = (CARRIER_DHL, CARRIER_DPD, CARRIER_HERMES, CARRIER_UPS)
 # identifiable at a glance. INTEGRATION_VERSION carries the full label
 # incl. any beta suffix; INTEGRATION_COMMIT is stamped by the release
 # commit (see the release flow) - "0000000" on an unreleased working tree.
-INTEGRATION_VERSION = "1.18.2"
+INTEGRATION_VERSION = "1.18.3"
 INTEGRATION_COMMIT = "d20c225"
 
 # Custom sidebar panel (buildless web component served from ./frontend).
