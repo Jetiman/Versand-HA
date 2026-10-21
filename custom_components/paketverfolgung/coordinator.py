@@ -23,7 +23,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.aiohttp_client import (
+    async_create_clientsession,
+    async_get_clientsession,
+)
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -78,17 +81,13 @@ from .const import (
 )
 from .dhl_account import DhlAccountClient, DhlAuthError, DhlConnectionError
 from .dhl_api import DhlApiClient, DhlApiError
-from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError, DpdSession
+from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError, DpdCaptchaError
 from .dpd_tracking_api import DpdTrackingApiClient, DpdTrackingApiError
 from .hermes_tracking_api import HermesTrackingApiClient, HermesTrackingApiError
 from .tracking_util import is_return
 from .ups_tracking_api import UpsBudget, UpsTrackingApiClient, UpsTrackingApiError
 
 _LOGGER = logging.getLogger(__name__)
-
-# Cap on DPD public-tracking calls per account poll (history enrichment),
-# so a large myDPD account doesn't fan out into dozens of HTTP requests.
-_HISTORY_FETCHES_PER_POLL = 12
 
 # A parcel's status can carry Amazon's live "N Stopps entfernt" van countdown.
 # That number changes every few minutes and must not, on its own, count as a
@@ -218,7 +217,7 @@ def normalize_dhl_shipment(raw: dict) -> dict:
 
 
 def normalize_dpd_parcel(raw: dict, events: list[dict] | None) -> dict:
-    """Turn a raw myDPD SOAP parcel into the shared shipment shape."""
+    """Turn a parcel read from the myDPD account into the shared shipment shape."""
     group = DPD_STATUS_GROUP.get(raw.get("status_id"), GROUP_UNKNOWN)
     delivered = bool(raw.get("delivered")) or group == GROUP_DELIVERED
     parcel_id = raw["id"]
@@ -1020,74 +1019,51 @@ class DhlAccountDataUpdateCoordinator(TrackingNumbersDataUpdateCoordinator):
 
 
 class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
-    """Fetches every parcel on a myDPD account, with full scan history."""
+    """Fetches every parcel on a myDPD account (read like the website does).
+
+    The history comes with the parcels: the account's detail panel carries
+    DPD's milestones with their day, so no separate lookup is needed (DPD's
+    public tracking page was switched off in 2026). A temporary problem -
+    DPD unreachable, a CAPTCHA at login, an unexpected page - keeps the last
+    known parcels instead of blanking every sensor.
+    """
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, update_interval) -> None:
         super().__init__(
             hass, _LOGGER, name=f"{DOMAIN}_dpd", update_interval=update_interval
         )
         self.entry = entry
-        session = async_get_clientsession(hass)
-        self.client = DpdApiClient(session)
-        self.tracking = DpdTrackingApiClient(session)
-        # Kept in memory only (see the note in the old coordinator): DPD
-        # rotates the token on most calls and persisting it would reload
-        # the entry on every poll.
-        self._session: DpdSession | None = None
-        self._events: dict[str, list[dict]] = {}
+        # Own session = own cookie jar: the account spans three hosts and
+        # lives on cookies, so the shared HA session must not be used.
+        self.client = DpdApiClient(
+            async_create_clientsession(hass),
+            entry.data[CONF_DPD_USERNAME],
+            entry.data[CONF_DPD_PASSWORD],
+        )
 
     async def _poll(self) -> dict[str, dict]:
         self._mark_polled()
         await self._load_archive()
-        if self._session is None:
-            await self._login()
 
         try:
-            parcels, self._session = await self.client.fetch_parcels(self._session)
-        except DpdAuthError:
-            _LOGGER.info("DPD session expired, logging in again")
-            await self._login()
-            try:
-                parcels, self._session = await self.client.fetch_parcels(self._session)
-            except DpdApiError as err:
-                raise UpdateFailed(f"Error fetching DPD parcels: {err}") from err
+            parcels = await self.client.fetch_parcels()
+        except DpdAuthError as err:
+            raise ConfigEntryAuthFailed(str(err)) from err
+        except DpdCaptchaError as err:
+            return self._transient("DPD verlangt beim Login ein CAPTCHA", err)
         except DpdApiError as err:
-            raise UpdateFailed(f"Error fetching DPD parcels: {err}") from err
+            return self._transient("DPD-Abruf fehlgeschlagen", err)
 
-        postcode = (
-            self.entry.options.get(CONF_DEFAULT_POSTCODE)
-            or self.entry.data.get(CONF_DEFAULT_POSTCODE)
-            or ""
-        ).strip() or None
         names = {
             str(k).strip(): str(v).strip()
             for k, v in (self.entry.options.get(CONF_NAMES, {}) or {}).items()
             if str(v).strip()
         }
 
-        # In-flight parcels first, then delivered ones - so a large account
-        # (mostly old delivered parcels) backfills its history a few per
-        # poll instead of firing dozens of HTTP calls at once.
-        ordered = sorted(
-            (p for p in parcels if p.get("id")),
-            key=lambda p: bool(p.get("delivered")),
-        )
-        budget = _HISTORY_FETCHES_PER_POLL
-
         result: dict[str, dict] = {}
-        for parcel in ordered:
+        for parcel in parcels:
             parcel_id = parcel["id"]
-            events = self._events.get(parcel_id, [])
-            # Refresh history for in-flight parcels; for delivered ones only
-            # backfill once (when we have nothing cached).
-            wants_history = not parcel.get("delivered") or not events
-            if wants_history and budget > 0:
-                budget -= 1
-                fetched = await self._history(parcel_id, postcode)
-                if fetched:
-                    events = fetched
-                    self._events[parcel_id] = fetched
-            item = normalize_dpd_parcel(parcel, events)
+            item = normalize_dpd_parcel(parcel, parcel.get("events"))
             item["forced"] = None
             item["carrier_name"] = item["name"]
             item["custom_name"] = names.get(parcel_id)
@@ -1095,29 +1071,26 @@ class DpdAccountDataUpdateCoordinator(_BaseCoordinator):
             await self._apply_archive(item)
             result[parcel_id] = item
 
-        for stale in [p for p in self._events if p not in result]:
-            self._events.pop(stale, None)
         self._apply_direction_overrides(result)
         await self._save_archive(set(result))
         self._notify_changes(result)
         _LOGGER.debug("Paketverfolgung (DPD): %d parcel(s) fetched", len(result))
         return result
 
-    async def _history(self, parcel_id: str, postcode: str | None) -> list[dict]:
-        try:
-            detail = await self.tracking.fetch(parcel_id, postcode)
-        except DpdTrackingApiError as err:
-            _LOGGER.debug("DPD history for %s failed: %s", parcel_id, err)
-            return []
-        return detail.get("events", []) if detail else []
+    def _transient(self, msg: str, err: BaseException) -> dict[str, dict]:
+        """Keep serving the last known parcels through a temporary problem.
 
-    async def _login(self) -> None:
-        username = self.entry.data[CONF_DPD_USERNAME]
-        password = self.entry.data[CONF_DPD_PASSWORD]
-        try:
-            self._session = await self.client.login(username, password)
-        except DpdAuthError as err:
-            raise ConfigEntryAuthFailed(str(err)) from err
+        Raising UpdateFailed would flip every DPD sensor to ``unavailable``;
+        only a first poll without anything to show still fails.
+        """
+        if self.data:
+            _LOGGER.warning(
+                "Paketverfolgung: %s, verwende zuletzt bekannte DPD-Sendungen: %s",
+                msg,
+                err,
+            )
+            return self.data
+        raise UpdateFailed(f"{msg}: {err}") from err
 
 
 # Backwards-compatible aliases (old names used elsewhere / in the wild).

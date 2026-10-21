@@ -90,6 +90,7 @@
     "error": {
       "invalid_auth": "Anmeldung fehlgeschlagen. Bitte Benutzername und Passwort prüfen.",
       "cannot_connect": "Verbindung zu DPD fehlgeschlagen. Bitte später erneut versuchen.",
+      "dpd_captcha": "DPD verlangt beim Login ein CAPTCHA, das hier nicht beantwortet werden kann. Bitte einmal im Browser auf dpd.com anmelden und es später erneut versuchen.",
       "amazon_auth": "Amazon-Anmeldung fehlgeschlagen. Bitte E-Mail-Adresse und Passwort prüfen.",
       "amazon_otp": "Der Amazon-Bestätigungscode wurde nicht akzeptiert.",
       "amazon_captcha": "Amazon verlangt eine CAPTCHA-/Browser-Bestätigung. Dieser Login kann derzeit nicht automatisch abgeschlossen werden.",

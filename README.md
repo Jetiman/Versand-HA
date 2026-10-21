@@ -38,11 +38,11 @@ Liegt die Erkennung mal daneben, lässt sich der Anbieter pro Sendung fest vorge
 Jeder Sendung lässt sich ein **eigener Name** geben (Detailseite → Feld „Name", oder Dienst `paketverfolgung.set_tracking_name`) – gilt auch für Sendungen aus dem DPD-Konto. Leeres Feld = Anbieter-Name.
 
 - **DHL:** öffentliche Sendungsverfolgungs-Suche (kein Login), inkl. komplettem Verlauf und Zustellzeitfenster.
-- **DPD:** öffentliche „Parcel Life Cycle“-Verfolgung von tracking.dpd.de, inkl. Verlauf.
+- **DPD:** versucht die frühere öffentliche „Parcel Life Cycle“-Verfolgung von tracking.dpd.de. **DPD hat diese Verfolgung im April 2026 abgeschaltet** – die Nummernsuche liefert daher meist nichts mehr. Für DPD bitte das **DPD-Konto** (siehe unten) nutzen.
 - **Hermes:** öffentliche Sendungsverfolgung von myhermes.de (v2-API `api.my-deliveries.de`), inkl. Verlauf und Zustellzeitfenster (Beitrag von [@dominikramachers](https://github.com/dominikramachers), [#4](https://github.com/Jetiman/Versand-HA/pull/4)).
 - **UPS:** öffentliche Sendungsverfolgung von ups.com (kein Konto, kein API-Schlüssel), inkl. Verlauf mit Ort. **Achtung, stark begrenzt:** UPS beantwortet pro Internetanschluss nur etwa 3 Abfragen und danach nur noch rund **eine alle 75 Minuten** – für alle UPS-Sendungen zusammen. Updates kommen also im Stundentakt, nicht im Minutentakt; mehrere UPS-Sendungen teilen sich das Kontingent reihum. Zugestellte Sendungen werden nicht mehr abgefragt. Nach einem Fehler oder Hänger pausiert UPS für 2 Stunden, denn zu frühes Nachfragen verlängert UPS' Schweigen. Das Kontingent wird gespeichert, ein Neustart füllt es nicht auf. Nummern, die nicht mit `1Z` beginnen, lassen sich über „Anbieter“ fest auf UPS setzen.
 
-> ℹ️ `tracking.dpd.de` blockt Anfragen aus manchen Rechenzentren/VPS-Netzen (TCP-Reset). Läuft dein Home Assistant auf einem gehosteten Server, funktioniert die **DPD-Nummernsuche** dort evtl. nicht (DHL und Hermes sind nicht betroffen; das DPD-**Konto** liefert weiterhin den aktuellen Status, nur den nachgeladenen Verlauf nicht).
+> ℹ️ Die DPD-**Nummernsuche** hängt an `tracking.dpd.de`, das DPD 2026 abgeschaltet hat (das neue Portal `my.dpd.de` fragt Postleitzahl und ein Bild-CAPTCHA ab und lässt sich nicht automatisieren). DHL, Hermes und UPS sind nicht betroffen.
 
 **Nummern später hinzufügen/entfernen:** Zahnrad-Symbol beim Eintrag „Sendungsnummern“ – dort auch PLZ und Aktualisierungsintervall (Standard: 15 Minuten). Oder über den Dienst `paketverfolgung.add_tracking_number` bzw. das Eingabefeld in der Oberfläche.
 
@@ -50,7 +50,13 @@ Eine Nummer, die keinem Anbieter zugeordnet werden kann, bleibt mit dem Status *
 
 ## DPD-Konto
 
-Meldet sich mit deinem **myDPD-Konto** an (SOAP-API der offiziellen DPD-App „Paketnavigator“) und zeigt automatisch **alle** Sendungen (gesendet, empfangen, Retouren) an – keine manuelle Eingabe nötig. Der vollständige Verlauf wird zusätzlich über die öffentliche DPD-Verfolgung nachgeladen; bei geschützten Sendungen hilft die in den Optionen hinterlegte PLZ.
+Meldet sich mit deinem **myDPD-Konto** an – so wie du es auf der DPD-Webseite tust – und zeigt automatisch **alle** Sendungen deines Kontos (gesendet, empfangen, Retouren) an, keine manuelle Eingabe nötig. Der Verlauf stammt aus den Stationen, die DPD im Konto anzeigt (Auftrag übergeben, unterwegs, im Zustellzentrum, in Zustellung, zugestellt); DPD nennt dort nur den **Tag**, keine Uhrzeit. Die frühere Anbindung über die App-Schnittstelle gibt es nicht mehr: DPD verlangt dort seit Oktober 2026 einen Geräte-Nachweis von Google, den nur die echte App liefern kann.
+
+Sendungen erscheinen im Konto, wenn DPD sie deiner E-Mail-Adresse zuordnet (z. B. über die Paketankündigung) oder du sie in myDPD hinzufügst.
+
+> ℹ️ Verlangt DPD beim Login ein **CAPTCHA**, kann Home Assistant das nicht beantworten (und umgeht es nicht). Die Integration behält dann die zuletzt bekannten Sendungen, wartet **6 Stunden** bis zum nächsten Anmeldeversuch und schreibt eine Warnung ins Log; einmal im Browser auf dpd.com anzumelden kann das CAPTCHA beseitigen. Beim Einrichten oder Neu-Einrichten wird immer sofort ein echter Versuch gemacht.
+
+*Danke an [ha-parcel-integrations/ha-dpd](https://github.com/ha-parcel-integrations/ha-dpd) (MIT): Der Ablauf (Login, Portal, Paketliste) und die Seitenkennungen stammen aus der Arbeit an dessen Deutschland-Anbindung.*
 
 Das Passwort wird nur lokal in Home Assistant gespeichert (wie bei jeder anderen Cloud-Integration).
 
@@ -158,7 +164,7 @@ Beitrag von [@dominikramachers](https://github.com/dominikramachers).
 
 - Alle Schnittstellen sind inoffiziell und können bei anbieterseitigen Änderungen brechen. Bitte in diesem Fall ein Issue öffnen.
 - Hermes: optionale Konto-Anmeldung (siehe oben, inoffizielle Web-Schnittstelle); ohne Konto müssen Sendungsnummern eingetragen werden. DHL bietet eine optionale Konto-Anmeldung (siehe oben), die aber auf einer inoffiziellen App-Schnittstelle beruht.
-- DPD: manche Sendungen sind ohne Empfänger-PLZ nicht öffentlich abrufbar; nur ein myDPD-Konto pro Eintrag. `tracking.dpd.de` ist aus manchen Server-/VPS-Netzen nicht erreichbar (siehe Hinweis oben).
+- DPD: die Konto-Anbindung liest die Webseiten von myDPD (inoffiziell, kann bei Seitenänderungen brechen); nur ein myDPD-Konto pro Eintrag, Verlauf nur mit Datum. Die Nummernsuche über `tracking.dpd.de` ist seit der Abschaltung durch DPD (April 2026) praktisch wirkungslos (siehe Hinweis oben).
 - Hermes: die genutzte Schnittstelle (`api.my-deliveries.de`) ist undokumentiert; falls sich das Antwortformat ändert, fehlt ggf. der Verlauf.
 - UPS: inoffizielle Schnittstelle hinter einem Bot-Schutz (Akamai), die nur wenige Abfragen pro Anschluss zulässt (siehe oben). Antwortet UPS gar nicht mehr, steht ein Hinweis im Log; das Kontingent füllt sich mit der Zeit wieder. Bricht der Schutz die Abfrage ab (z. B. aus Rechenzentrums-Netzen), fehlen die UPS-Daten.
 - Amazon: kein API, sondern Auslesen der Bestell-/Trackingseiten. Login scheitert aus VPS-/Rechenzentrums-Netzen oft an einem CAPTCHA; die Sitzung läuft regelmäßig ab und muss dann neu eingerichtet werden; Amazon-Seitenänderungen können die Erkennung brechen. Die Amazon-Sitzungscookies liegen im Klartext im Config-Entry/Backup. Nur ein Amazon-Konto pro Installation.
