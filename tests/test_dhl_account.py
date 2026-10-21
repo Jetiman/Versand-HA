@@ -139,9 +139,15 @@ def test_connection_error_is_an_auth_error_for_old_callers():
 # --- client against a simulated server -----------------------------------
 SEARCH = {
     "sendungen": [
-        {"id": "00340434111111111111", "sendungsinfo": {"sendungsliste": "AKTIV"}},
+        {
+            "id": "00340434111111111111",
+            "sendungsinfo": {"sendungsliste": "AKTIV", "sendungsname": "  Beispiel Shop GmbH "},
+        },
         {"id": "00340434222222222222", "sendungsinfo": {}},
-        {"id": "00340434333333333333", "sendungsinfo": {"sendungsliste": "ARCHIVIERT"}},
+        {
+            "id": "00340434333333333333",
+            "sendungsinfo": {"sendungsliste": "ARCHIVIERT", "sendungsname": "Archiv Versand"},
+        },
         {"id": "00340434111111111111"},
         {
             "id": "00340434444444444444",
@@ -215,6 +221,27 @@ def test_exchange_and_list(state):
     # archived shipments, duplicates and entries without id are skipped
     assert ids == ["00340434111111111111", "00340434222222222222"]
     assert state["cookies"][0] == f"dhli={tokens['id_token']}"
+
+
+def test_account_names_come_from_the_list(state):
+    """The app's shipment name (``sendungsname``) is only in the account list."""
+    tokens = {"id_token": make_token(), "refresh_token": "r"}
+
+    async def go():
+        server, session, client = await _client(state)
+        try:
+            return await client.fetch_account(tokens)
+        finally:
+            await session.close()
+            await server.close()
+
+    ids, names = run(go())
+    assert ids == ["00340434111111111111", "00340434222222222222"]
+    # trimmed; archived shipments keep their name; no name -> no entry
+    assert names == {
+        "00340434111111111111": "Beispiel Shop GmbH",
+        "00340434333333333333": "Archiv Versand",
+    }
 
 
 @pytest.mark.parametrize("status", [400, 401, 403])
@@ -303,16 +330,17 @@ def test_expiring_token_is_refreshed(state):
 
 # --- the dedicated coordinator ---------------------------------------------
 class FakeAccount:
-    def __init__(self, ids=None, error=None, fresh=None):
+    def __init__(self, ids=None, error=None, fresh=None, names=None):
         self.ids, self.error, self.fresh = ids or [], error, fresh
+        self.names = names or {}
 
     async def ensure_fresh(self, session):
         return self.fresh or session
 
-    async def fetch_shipment_ids(self, session):
+    async def fetch_account(self, session):
         if self.error:
             raise self.error
-        return self.ids
+        return self.ids, self.names
 
 
 def make_coordinator(client, session=None, data=None):
@@ -332,6 +360,7 @@ def make_coordinator(client, session=None, data=None):
     coord.dhl_account = client
     coord.carriers = {}
     coord.data = data
+    coord.dhl_account_names = {}
     coord.dhl_account_status = None
     coord.updates = updates
     return coord
@@ -394,6 +423,49 @@ def test_dhl_hiccup_on_first_poll_is_retried_later():
     )
     with pytest.raises(_UpdateFailed):
         run(coord._merge_dhl_account_numbers([]))
+
+
+def test_account_names_are_kept_for_the_poll():
+    names = {"A": "Beispiel Shop GmbH"}
+    coord = make_coordinator(FakeAccount(ids=["A", "B"], names=names), SESSION)
+    run(coord._merge_dhl_account_numbers([]))
+    assert coord.dhl_account_names == names
+
+
+def test_dhl_hiccup_keeps_the_known_names():
+    err = account.DhlConnectionError("timeout")
+    coord = make_coordinator(
+        FakeAccount(error=err), SESSION, data={"A": {"id": "A"}}
+    )
+    coord.dhl_account_names = {"A": "Beispiel Shop GmbH"}
+    run(coord._merge_dhl_account_numbers([]))
+    assert coord.dhl_account_names == {"A": "Beispiel Shop GmbH"}
+
+
+def test_app_name_replaces_the_number_placeholder():
+    coord = make_coordinator(FakeAccount(), SESSION)
+    coord.dhl_account_names = {"A": "Beispiel Shop GmbH"}
+    raw = {"id": "A", "sendungsinfo": {}, "sendungsdetails": {}}
+    item = coordinator.normalize_dhl_shipment(raw)
+    assert item["name"] == "DHL A"  # the anonymous lookup has no name
+    item["carrier"] = const.CARRIER_DHL
+    coord._apply_dhl_account_name("A", item)
+    assert item["carrier_name"] == "Beispiel Shop GmbH"
+    # an already archived item with the old placeholder is corrected, too
+    old = {"id": "A", "carrier": const.CARRIER_DHL, "name": "DHL A", "carrier_name": "DHL A"}
+    coord._apply_dhl_account_name("A", old)
+    assert old["carrier_name"] == "Beispiel Shop GmbH"
+
+
+def test_app_name_only_for_dhl_shipments_the_account_knows():
+    coord = make_coordinator(FakeAccount(), SESSION)
+    coord.dhl_account_names = {"A": "Beispiel Shop GmbH"}
+    other = {"id": "A", "carrier": const.CARRIER_DPD, "name": "DPD A"}
+    coord._apply_dhl_account_name("A", other)
+    assert "carrier_name" not in other  # another carrier's parcel is untouched
+    unknown = {"id": "Z", "carrier": const.CARRIER_DHL, "name": "DHL Z"}
+    coord._apply_dhl_account_name("Z", unknown)
+    assert "carrier_name" not in unknown
 
 
 # --- returns ("Retouren") are ignored ---------------------------------------

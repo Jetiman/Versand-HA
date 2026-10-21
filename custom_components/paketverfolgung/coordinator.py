@@ -165,7 +165,11 @@ def _delivery_failed(*texts: str | None) -> bool:
 
 
 def normalize_dhl_shipment(raw: dict) -> dict:
-    """Turn a raw DHL search result into the shared shipment shape."""
+    """Turn a raw DHL search result into the shared shipment shape.
+
+    The app's shipment name (the sender) is not part of the anonymous search;
+    the coordinator adds it from the account list (``_apply_dhl_account_name``).
+    """
     info = raw.get("sendungsinfo", {})
     details = raw.get("sendungsdetails", {})
     verlauf = details.get("sendungsverlauf", {})
@@ -578,6 +582,8 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         self.carriers: dict[str, str] = {}
         # last DHL-account-discovery outcome, for diagnostics
         self.dhl_account_status: str | None = None
+        # shipment id -> name shown in the DHL app (from the account list)
+        self.dhl_account_names: dict[str, str] = {}
         # UPS allows only a few lookups per connection (see UpsBudget). The
         # balance, the last data per number and when each was last asked
         # live in a Store so a restart neither refills the budget nor
@@ -683,6 +689,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             if frozen is not None:
                 item = dict(frozen)
                 item["forced"] = forced
+                self._apply_dhl_account_name(number, item)
                 item.setdefault("carrier_name", item.get("name"))
                 item["custom_name"] = names.get(number)
                 item["name"] = names.get(number) or item["carrier_name"]
@@ -727,6 +734,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
 
             item["carrier"] = carrier
             item["forced"] = forced
+            self._apply_dhl_account_name(number, item)
             # Keep the carrier's own name so a cleared custom name reverts.
             item.setdefault("carrier_name", item.get("name"))
             item["custom_name"] = names.get(number)
@@ -756,6 +764,17 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
         self._notify_changes(result)
         return result
 
+    def _apply_dhl_account_name(self, number: str, item: dict) -> None:
+        """Use the name from the DHL app (usually the sender) as carrier name.
+
+        Only for DHL shipments the account list knows; everything else keeps
+        its own name (``DHL <number>`` if the carrier gives none). A name the
+        user set in Home Assistant still wins - it is applied afterwards.
+        """
+        name = self.dhl_account_names.get(number)
+        if name and item.get("carrier") == CARRIER_DHL:
+            item["carrier_name"] = name
+
     async def _merge_dhl_account_numbers(self, numbers: list[str]) -> list[str]:
         """If DHL account discovery is on, add the account's shipment ids."""
         if not self._config(CONF_DHL_AUTO_DISCOVERY):
@@ -773,7 +792,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
                     self.entry,
                     data={**self.entry.data, CONF_DHL_SESSION: fresh},
                 )
-            account_ids = await self.dhl_account.fetch_shipment_ids(fresh)
+            account_ids, account_names = await self.dhl_account.fetch_account(fresh)
         except DhlAuthError as err:
             self.dhl_account_status = str(err)
             _LOGGER.warning("Paketverfolgung: DHL-Kontoabfrage fehlgeschlagen: %s", err)
@@ -784,6 +803,7 @@ class TrackingNumbersDataUpdateCoordinator(_BaseCoordinator):
             if shipment_id not in merged:
                 merged.append(shipment_id)
                 self.carriers.setdefault(shipment_id, CARRIER_DHL)
+        self.dhl_account_names = account_names
         self.dhl_account_status = f"{len(account_ids)} Sendung(en) erkannt"
         _LOGGER.debug("Paketverfolgung: DHL-Konto -> %s", account_ids)
         return merged
@@ -1000,7 +1020,7 @@ class DhlAccountDataUpdateCoordinator(TrackingNumbersDataUpdateCoordinator):
                     self.entry,
                     data={**self.entry.data, CONF_DHL_SESSION: fresh},
                 )
-            account_ids = await self.dhl_account.fetch_shipment_ids(fresh)
+            account_ids, account_names = await self.dhl_account.fetch_account(fresh)
         except DhlConnectionError as err:
             self.dhl_account_status = str(err)
             if self.data:
@@ -1022,6 +1042,7 @@ class DhlAccountDataUpdateCoordinator(TrackingNumbersDataUpdateCoordinator):
             if shipment_id not in merged:
                 merged.append(shipment_id)
             self.carriers.setdefault(shipment_id, CARRIER_DHL)
+        self.dhl_account_names = account_names
         self.dhl_account_status = f"{len(account_ids)} Sendung(en) erkannt"
         _LOGGER.debug("Paketverfolgung: DHL-Konto -> %s", account_ids)
         return merged

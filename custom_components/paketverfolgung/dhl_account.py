@@ -201,8 +201,18 @@ class DhlAccountClient:
                 f"Netzwerkfehler bei der DHL-Anmeldung: {err}"
             ) from err
 
-    async def fetch_shipment_ids(self, dhl_session: dict[str, Any]) -> list[str]:
-        """Non-archived, non-return shipment IDs (piececodes) of the account."""
+    async def fetch_account(
+        self, dhl_session: dict[str, Any]
+    ) -> tuple[list[str], dict[str, str]]:
+        """The account's shipments: ``(ids, names)``.
+
+        ``ids`` are the non-archived, non-return shipment IDs (piececodes).
+        ``names`` maps shipment ID -> the name shown in the DHL app (the
+        ``sendungsname``: the sender's name unless the user renamed it).
+        Only this account-bound list carries that name - the anonymous
+        per-number lookup used for the status does not - so it is collected
+        here for *every* shipment of the list, archived ones included.
+        """
         id_token = dhl_session.get("id_token")
         if not id_token:
             raise DhlAuthError("DHL-Sitzung ohne ID-Token - bitte neu anmelden.")
@@ -232,16 +242,24 @@ class DhlAccountClient:
 
         _LOGGER.debug("DHL account discovery response: %s", payload)
         ids: list[str] = []
+        names: dict[str, str] = {}
         for shipment in (payload or {}).get("sendungen", []) or []:
             info = shipment.get("sendungsinfo") or {}
+            details = shipment.get("sendungsdetails") or {}
+            shipment_id = shipment.get("id")
+            name = info.get("sendungsname")
+            if shipment_id and isinstance(name, str) and name.strip():
+                names.setdefault(shipment_id, name.strip())
             if info.get("sendungsliste") == "ARCHIVIERT":
                 continue
-            details = shipment.get("sendungsdetails") or {}
             if details.get("ruecksendung") is True or details.get("retoure") is True:
                 # Returns ("Rücksendung an den Absender") never arrive at your
                 # door, so they are not tracked at all.
                 continue
-            shipment_id = shipment.get("id")
             if shipment_id and shipment_id not in ids:
                 ids.append(shipment_id)
-        return ids
+        return ids, names
+
+    async def fetch_shipment_ids(self, dhl_session: dict[str, Any]) -> list[str]:
+        """Non-archived, non-return shipment IDs (piececodes) of the account."""
+        return (await self.fetch_account(dhl_session))[0]
