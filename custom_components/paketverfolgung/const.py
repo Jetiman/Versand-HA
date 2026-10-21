@@ -170,25 +170,25 @@ CONF_DPD_PASSWORD = "dpd_password"
 CONF_HERMES_USERNAME = "hermes_username"
 CONF_HERMES_PASSWORD = "hermes_password"
 
-# DPD "Paketnavigator3" SOAP API (Android app v4.1.2, package de.dpd.mobile).
-# Partner credentials are public constants baked into the app, reverse
-# engineered via the open-source ioBroker.parcel adapter. Verified working
-# 2026-08-27. Used for the myDPD *account* login (auto-detects all of an
-# account's parcels). Tracking single numbers without an account goes
-# through DPD_PLC_URL above instead.
-DPD_NS = "https://cloud.dpd.com/"
-DPD_SERVICE_URL = "https://api.paketnavigator.de/services/v1/Navigator3Service.asmx"
-DPD_PARTNER_NAME = "Android Paketnavigator3"
-DPD_PARTNER_TOKEN = "A33363237662F5945576"
-DPD_PARTNER_PASSWORD = "272 WetFd2mpXrgD"
-DPD_API_VERSION = 100
-DPD_LANGUAGE = "de_DE"
-DPD_TRACKING_PAGE_URL = "https://tracking.dpd.de/status/de_DE/parcel/{id}"
+# myDPD *web account* (Germany), used for the "DPD-Konto" entry. DPD retired
+# its app SOAP API for third parties (it now needs a Play Integrity token) and
+# the public tracking page in 2026, so the account is read the way the website
+# does it: login on dpd.com -> portal.dpd.de -> parcel list on my.dpd.de.
+# See dpd_api.py. my.dpd.de resets connections from non-browser user agents.
+DPD_LOGIN_URL = "https://www.dpd.com/de/de/mydpd-anmelden-und-registrieren/?lng=DEU"
+DPD_PORTAL_HOME_URL = "https://portal.dpd.de/home_pn.aspx"
+DPD_INBOX_URL = "https://my.dpd.de/myParcel.aspx"
+DPD_WEB_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+)
+# Link to a parcel on DPD's page (asks for the postcode / CAPTCHA there).
+DPD_TRACKING_PAGE_URL = "https://my.dpd.de/redirect.aspx?action=12&parcelno={id}"
 
-# DPD's public "parcel life cycle" JSON endpoint - the one the consumer
-# tracking page (tracking.dpd.de) itself calls. Works by parcel number
-# without a login; some parcels are postcode-protected and need `?zip=`.
-# This gives the full scan history the SOAP account API doesn't return.
+# DPD's old public "parcel life cycle" JSON endpoint (tracking.dpd.de). DPD
+# switched the classic tracking off in April 2026 and the path no longer
+# answers reliably, so looking up a bare DPD *number* may fail; parcels of a
+# myDPD account are read through the account instead (see above).
 DPD_PLC_URL = "https://tracking.dpd.de/rest/plc/de_DE/{id}"
 
 # Hermes Germany's public tracking JSON endpoint (the v2 API the

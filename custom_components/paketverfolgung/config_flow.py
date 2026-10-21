@@ -68,7 +68,7 @@ from .dhl_account import (
     build_login,
     extract_code,
 )
-from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError
+from .dpd_api import DpdApiClient, DpdApiError, DpdAuthError, DpdCaptchaError
 from .hermes_account import HermesAccountClient, HermesAccountError, HermesAuthError
 from .picnic_account import (
     PicnicAccountClient,
@@ -268,12 +268,18 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             username = user_input[CONF_DPD_USERNAME].strip()
             password = user_input[CONF_DPD_PASSWORD]
-            client = DpdApiClient(async_get_clientsession(self.hass))
+            # Own session = own cookie jar: the account spans three hosts.
+            client = DpdApiClient(
+                async_create_clientsession(self.hass), username, password
+            )
             try:
-                await client.login(username, password)
+                await client.login()
             except DpdAuthError as err:
                 _LOGGER.debug("DPD login failed: %s", err)
                 errors["base"] = "invalid_auth"
+            except DpdCaptchaError as err:
+                _LOGGER.debug("DPD login needs a CAPTCHA: %s", err)
+                errors["base"] = "dpd_captcha"
             except DpdApiError as err:
                 _LOGGER.debug("DPD login error: %s", err)
                 errors["base"] = "cannot_connect"

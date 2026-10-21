@@ -90,6 +90,7 @@
     "error": {
       "invalid_auth": "Login failed. Please check your username and password.",
       "cannot_connect": "Could not connect to DPD. Please try again later.",
+      "dpd_captcha": "DPD is asking for a CAPTCHA at login, which cannot be answered here. Please sign in once at dpd.com in a browser and try again later.",
       "amazon_auth": "Amazon login failed. Please check your email address and password.",
       "amazon_otp": "The Amazon verification code was not accepted.",
       "amazon_captcha": "Amazon requires a CAPTCHA/browser verification. This login cannot currently be completed automatically.",

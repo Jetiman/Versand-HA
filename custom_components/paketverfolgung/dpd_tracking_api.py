@@ -2,9 +2,10 @@
 
 This is the JSON API the consumer tracking page at tracking.dpd.de calls.
 It works by parcel number without a login and returns the full scan
-history - unlike the myDPD SOAP account API (``dpd_api.py``), which only
-exposes the latest status. Some parcels are postcode-protected and need
-the recipient ZIP passed as ``?zip=``.
+history. NOTE: DPD switched the classic tracking page off in April 2026,
+so this lookup mostly returns nothing any more; parcels of a myDPD account
+are read through the account instead (``dpd_api.py``). Some parcels are
+postcode-protected and need the recipient ZIP passed as ``?zip=``.
 
 The response schema isn't officially documented, so parsing here is
 deliberately defensive: unknown/renamed keys degrade to ``None`` rather
