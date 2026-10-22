@@ -55,6 +55,7 @@ from .const import (
     PICNIC_CLIENT_ID,
     PICNIC_DEFAULT_COUNTRY,
     PICNIC_DEVICE_ID,
+    PICNIC_ETA_HOLD_MINUTES,
     PICNIC_ETA_ROUND_MINUTES,
     PICNIC_LIVE_INTERVAL,
     PICNIC_SLOT_INTERVAL,
@@ -313,6 +314,30 @@ def round_window(
     return a, b
 
 
+def hold_window(
+    start: datetime,
+    end: datetime,
+    previous_from: Any,
+    previous_to: Any,
+    minutes: int = PICNIC_ETA_HOLD_MINUTES,
+) -> tuple[datetime, datetime]:
+    """Keep the window shown so far unless the new one moved noticeably.
+
+    Rounding to a grid (``round_window``) still lets an ETA that sits on a
+    rounding edge flip between neighbouring steps from poll to poll. Anything
+    that follows the window (calendar entry, "window changed" push, cards)
+    would report every flip. So the previously shown window is kept as long as
+    both ends moved by less than ``minutes``; a real shift passes through.
+    """
+    prev_start, prev_end = parse_ts(previous_from), parse_ts(previous_to)
+    if prev_start is None or prev_end is None:
+        return start, end
+    limit = timedelta(minutes=minutes)
+    if abs(start - prev_start) < limit and abs(end - prev_end) < limit:
+        return prev_start, prev_end
+    return start, end
+
+
 def _iso(dt: datetime | None) -> str | None:
     return dt.astimezone(timezone.utc).isoformat() if dt else None
 
@@ -433,12 +458,17 @@ def normalize_delivery(
     detail: dict | None,
     position: dict | None,
     now: datetime,
+    previous: dict | None = None,
 ) -> dict | None:
     """Turn a Picnic delivery into the shared shipment shape.
 
     ``now`` must be timezone-aware and in the *local* zone (dates such as
     "today" are decided in it). Returns ``None`` for cancelled deliveries and
     for entries without an id.
+
+    ``previous`` is the item built for the same delivery on the last poll. It
+    steadies an open delivery's window (see ``hold_window``): small ETA
+    wobbles keep the window that was shown before.
 
     Status texts are deliberately plain and stable: the delivery window and the
     live ETA live in ``delivery_from``/``delivery_to``, so a drifting ETA does
@@ -472,6 +502,17 @@ def normalize_delivery(
         w_start, w_end = round_window(eta2_start, eta2_end)
     else:
         w_start, w_end = slot_start, slot_end
+
+    if (
+        not delivered
+        and w_start
+        and w_end
+        and isinstance(previous, dict)
+        and not previous.get("delivered")
+    ):
+        w_start, w_end = hold_window(
+            w_start, w_end, previous.get("delivery_from"), previous.get("delivery_to")
+        )
 
     slot_day = slot_start.astimezone(local).date() if slot_start else None
     today = now.date()

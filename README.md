@@ -156,7 +156,7 @@ Jede Lieferung wird ein Sensor `sensor.picnic_<lieferungs-id>` und verhält sich
 | --- | --- | --- | --- |
 | bestellt, Lieferung später | „Lieferung geplant am Di. 20.10.“ | registriert | gebuchtes Lieferfenster |
 | Liefertag, Wagen noch nicht unterwegs | „Lieferung heute geplant“ | unterwegs | gebuchtes Fenster bzw. Picnics Tagesschätzung |
-| Wagen unterwegs | „In Zustellung“ | in Zustellung | **Live-Ankunftsfenster** (auf 5 Minuten gerundet, damit sich Kalendereinträge nicht minütlich ändern) |
+| Wagen unterwegs | „In Zustellung“ | in Zustellung | **Live-Ankunftsfenster** (auf 5 Minuten gerundet und erst bei einer Verschiebung um mindestens 10 Minuten geändert, damit sich Kalendereinträge und „Zeitfenster geändert“-Meldungen nicht bei jedem Schwanken der Prognose ändern) |
 | zugestellt | „Zugestellt“ | zugestellt | gebuchtes Fenster; Zustellzeit im Verlauf |
 
 - **Dynamische Abfrage:** im eingestellten Intervall (Standard 15 min), rund um das gebuchte Fenster alle 3 Minuten, solange der Wagen unterwegs ist jede Minute. Das Zustellfenster steht damit jederzeit in den Sensorattributen, z. B. zum automatischen Anlegen und Verschieben eines Kalendereintrags.

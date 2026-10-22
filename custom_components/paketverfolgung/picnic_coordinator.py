@@ -140,8 +140,11 @@ class PicnicAccountDataUpdateCoordinator(_BaseCoordinator):
             if str(v).strip()
         }
         result: dict[str, dict] = {}
+        last = self.data if isinstance(self.data, dict) else {}
         for summary, detail, position in built:
-            item = normalize_delivery(summary, detail, position, now)
+            # The window shown on the last poll steadies a wobbling live ETA.
+            previous = last.get(str(summary.get("delivery_id") or summary.get("id") or ""))
+            item = normalize_delivery(summary, detail, position, now, previous)
             if not item:
                 continue
             sid = item["id"]
