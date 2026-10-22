@@ -262,6 +262,11 @@ PICNIC_USER_AGENT = "okhttp/3.12.2"
 # default 8190-byte header limit, so the client session needs more room.
 PICNIC_SESSION_KWARGS = {"max_line_size": 65536, "max_field_size": 65536}
 PICNIC_ETA_ROUND_MINUTES = 5
+# A shown ETA window only moves when it shifts by at least this many minutes
+# (start or end). Rounding alone is not enough: an ETA that wobbles around a
+# rounding edge jumps back and forth by one step (e.g. 11:40 / 11:45 / 11:35)
+# and every jump would be a "window changed" push on the user's side.
+PICNIC_ETA_HOLD_MINUTES = 10
 # Polling cadence while a delivery is close (see picnic_account.choose_interval).
 PICNIC_LIVE_INTERVAL = timedelta(minutes=1)
 PICNIC_SLOT_INTERVAL = timedelta(minutes=3)

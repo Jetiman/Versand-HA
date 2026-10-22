@@ -381,6 +381,67 @@ def test_eta_wobble_keeps_window_and_status_stable():
         b["delivery_from"], b["delivery_to"], b["status"])
 
 
+def _live(start_h, start_m, end_h, end_m, previous=None):
+    pos = {"eta_window": {"start": int(at(17, start_h, start_m).timestamp() * 1000),
+                          "end": int(at(17, end_h, end_m).timestamp() * 1000)}}
+    return account.normalize_delivery(TODAY, None, pos, NOW, previous)
+
+
+def test_eta_flipping_between_neighbouring_steps_keeps_the_shown_window():
+    # Real morning of 22.10.2026: the ETA jumped 11:40 -> 11:45 -> 11:40 -> 11:35
+    # -> 11:40 ... and every jump became a "window changed" push.
+    shown = _live(10, 40, 11, 0)
+    windows = set()
+    for start_h, start_m, end_h, end_m in [
+        (10, 45, 11, 5), (10, 40, 11, 0), (10, 35, 10, 55), (10, 40, 11, 0), (10, 45, 11, 5),
+    ]:
+        shown = _live(start_h, start_m, end_h, end_m, previous=shown)
+        windows.add((shown["delivery_from"], shown["delivery_to"]))
+    assert windows == {(iso(at(17, 10, 40).astimezone(timezone.utc)),
+                        iso(at(17, 11, 0).astimezone(timezone.utc)))}
+    # the timeline text names the window that is shown
+    assert "ca. 10:40–11:00 Uhr" in shown["events"][0]["status"]
+
+
+def test_eta_that_really_moves_changes_the_window():
+    shown = _live(10, 40, 11, 0)
+    later = _live(10, 50, 11, 10, previous=shown)  # +10 min: noticeable
+    assert later["delivery_from"] == iso(at(17, 10, 50).astimezone(timezone.utc))
+    assert later["delivery_to"] == iso(at(17, 11, 10).astimezone(timezone.utc))
+    # a window that only changes at one end by 10+ minutes counts, too
+    wider = _live(10, 40, 11, 15, previous=shown)
+    assert wider["delivery_to"] == iso(at(17, 11, 15).astimezone(timezone.utc))
+
+
+def test_slow_drift_is_measured_from_the_shown_window():
+    # Four 5-minute steps in a row must not be swallowed one by one.
+    shown = _live(10, 40, 11, 0)
+    for m in (45, 50):
+        shown = _live(10, m, 11, m - 40, previous=shown)
+    assert shown["delivery_from"] == iso(at(17, 10, 50).astimezone(timezone.utc))
+
+
+def test_hold_ignores_missing_or_delivered_previous():
+    shown = _live(10, 40, 11, 0)
+    assert _live(10, 45, 11, 5, previous=None)["delivery_from"] == iso(
+        at(17, 10, 45).astimezone(timezone.utc))
+    done_before = dict(shown, delivered=True)
+    assert _live(10, 45, 11, 5, previous=done_before)["delivery_from"] == iso(
+        at(17, 10, 45).astimezone(timezone.utc))
+    # a delivered parcel shows the booked slot, whatever was shown before
+    item = account.normalize_delivery(DONE, None, None, at(17, 9), shown)
+    assert item["delivery_from"] != shown["delivery_from"]
+
+
+def test_hold_window_helper():
+    a, b = at(17, 10, 40), at(17, 11, 0)
+    assert account.hold_window(a + timedelta(minutes=9), b, iso(a), iso(b)) == (a, b)
+    assert account.hold_window(a + timedelta(minutes=10), b, iso(a), iso(b)) == (
+        a + timedelta(minutes=10), b)
+    assert account.hold_window(a, b, None, None) == (a, b)
+    assert account.hold_window(a, b, "kaputt", iso(b)) == (a, b)
+
+
 def test_delivered_delivery():
     item = norm(DONE, now=at(17, 9))
     assert item["group"] == const.GROUP_DELIVERED
