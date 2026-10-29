@@ -165,6 +165,12 @@ def _delivery_failed(*texts: str | None) -> bool:
     return any(_DELIVERY_FAILED_RE.search(t or "") for t in texts)
 
 
+# A parcel waiting in a Packstation/Paketshop is as good as delivered: DHL
+# keeps reporting progress step 4 for it, only the text says "zur Abholung
+# bereit". The recipient's part is done, so it counts as delivered.
+_READY_FOR_PICKUP_RE = re.compile(r"zur\s+abholung\s+bereit", re.I)
+
+
 def normalize_dhl_shipment(raw: dict) -> dict:
     """Turn a raw DHL search result into the shared shipment shape.
 
@@ -201,6 +207,13 @@ def normalize_dhl_shipment(raw: dict) -> dict:
     ):
         group = GROUP_TRANSIT
 
+    delivered = fortschritt == 5 or bool(
+        _READY_FOR_PICKUP_RE.search(status)
+        or _READY_FOR_PICKUP_RE.search(events[0]["status"] if events else "")
+    )
+    if delivered:
+        group = GROUP_DELIVERED
+
     shipment_id = raw["id"]
     return {
         "id": shipment_id,
@@ -216,7 +229,7 @@ def normalize_dhl_shipment(raw: dict) -> dict:
         "delivery_to": zustellung.get("zustellzeitfensterBis"),
         "tracking_url": TRACKING_PAGE_URL.format(id=shipment_id),
         "events": events,
-        "delivered": fortschritt == 5,
+        "delivered": delivered,
         "protected": False,
     }
 

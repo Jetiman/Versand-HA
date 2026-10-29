@@ -475,6 +475,20 @@ def test_app_name_replaces_the_number_placeholder():
     assert old["carrier_name"] == "Beispiel Shop GmbH"
 
 
+def test_parcel_ready_in_packstation_counts_as_delivered():
+    text = "Die Sendung liegt in der Packstation zur Abholung bereit."
+    raw = {
+        "id": "A",
+        "sendungsinfo": {},
+        "sendungsdetails": {
+            "sendungsverlauf": {"fortschritt": 4, "kurzStatus": text, "events": []}
+        },
+    }
+    item = coordinator.normalize_dhl_shipment(raw)
+    assert item["delivered"] is True
+    assert item["group"] == const.GROUP_DELIVERED
+
+
 def test_app_name_only_for_dhl_shipments_the_account_knows():
     coord = make_coordinator(FakeAccount(), SESSION)
     coord.dhl_account_names = {"A": "Beispiel Shop GmbH"}
