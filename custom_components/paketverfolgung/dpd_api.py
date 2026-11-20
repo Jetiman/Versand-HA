@@ -101,6 +101,18 @@ _SLOT_STATUS_ID = {
     "CarLoad": "OUT_FOR_DELIVERY",
     "Delivered": "DELIVERED",
 }
+# How far along its way a StatusID is. When the milestones and the status
+# sentence of the list disagree, the further one wins: the list sentence is
+# refreshed by DPD before the detail panel's milestones are filled in.
+_STATUS_RANK = {
+    "DATA_TRANSMITTED": 0,
+    "START": 0,
+    "ON_THE_ROAD": 1,
+    "AT_DELIVERY_DEPOT": 2,
+    "OUT_FOR_DELIVERY": 3,
+    "AT_PARCELSHOP": 3,
+    "DELIVERED": 4,
+}
 _ICON_DELIVERED = 6  # images/status_6.svg
 
 _FORM_TAG = re.compile(r"<form\b[^>]*>", re.IGNORECASE)
@@ -334,17 +346,54 @@ def infer_dates(slots: list[dict[str, str]], today: date) -> list[date | None]:
 
 
 def _status_id_from_sentence(sentence: str) -> str | None:
-    """Last-resort status when a parcel has no dated milestone."""
+    """Status read from the list's status sentence.
+
+    Used when a parcel has no dated milestone, and as a cross-check against
+    the milestones: DPD updates the sentence before it fills in the panel.
+    The most advanced state is tested first.
+    """
     text = sentence.casefold()
     if "nicht zugestellt" in text:
         return None
     if any(w in text for w in ("paketshop", "abhol", "packstation")):
         return "AT_PARCELSHOP"
-    if any(w in text for w in ("in zustellung", "zustellfahrzeug", "heute zugestellt")):
+    if any(
+        w in text
+        for w in (
+            "in zustellung",
+            "zustellfahrzeug",
+            "heute zugestellt",
+            "wird zugestellt",
+            "zustellung heute",
+        )
+    ):
         return "OUT_FOR_DELIVERY"
     if "zugestellt" in text or "geliefert" in text:
         return "DELIVERED"
+    if any(w in text for w in ("zustelldepot", "zustellpaketzentrum")):
+        return "AT_DELIVERY_DEPOT"
+    if any(
+        w in text
+        for w in (
+            "unterwegs",
+            "paketzentrum",
+            "depot",
+            "abgeholt",
+            "sortier",
+            "transport",
+        )
+    ):
+        return "ON_THE_ROAD"
+    if any(w in text for w in ("auftragsdaten", "angek", "übermittelt", "avisiert")):
+        return "DATA_TRANSMITTED"
     return None
+
+
+def _furthest(first: str | None, second: str | None) -> str | None:
+    """The StatusID that is further along; ``first`` wins a tie."""
+    if first is None or second is None:
+        return first or second
+    return second if _STATUS_RANK.get(second, -1) > _STATUS_RANK.get(first, -1) else first
 
 
 def build_parcel(
@@ -370,12 +419,21 @@ def build_parcel(
     icon = row["status_icon"]
     if icon is None and detail:
         icon = detail["status_icon"]
+    sentence_id = _status_id_from_sentence(row["status_sentence"])
     if furthest:
-        status_id = _SLOT_STATUS_ID[furthest]
+        status_id = _furthest(_SLOT_STATUS_ID[furthest], sentence_id)
     elif icon == _ICON_DELIVERED:
         status_id = "DELIVERED"
     else:
-        status_id = _status_id_from_sentence(row["status_sentence"])
+        status_id = sentence_id
+    if status_id is None:
+        _LOGGER.debug(
+            "DPD status not recognised for %s: sentence=%r icon=%r detail=%s",
+            row["barcode"],
+            row["status_sentence"],
+            icon,
+            "yes" if detail else "no",
+        )
     return {
         "id": row["barcode"],
         "name": row["label"] or row["barcode"],
