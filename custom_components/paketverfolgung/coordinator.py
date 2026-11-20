@@ -171,6 +171,13 @@ def _delivery_failed(*texts: str | None) -> bool:
 _READY_FOR_PICKUP_RE = re.compile(r"zur\s+abholung\s+bereit", re.I)
 
 
+# A parcel redirected to a branch is not out for delivery any more, although
+# DHL keeps reporting progress step 4 ("Vsl. am nächsten Werktag in Filiale
+# abholbereit", "in die Filiale umgeleitet"). "zur Abholung bereit" is handled
+# above as delivered and wins over this.
+_REDIRECTED_RE = re.compile(r"filiale|umgeleitet|weitergeleitet|abholbereit", re.I)
+
+
 def normalize_dhl_shipment(raw: dict) -> dict:
     """Turn a raw DHL search result into the shared shipment shape.
 
@@ -202,8 +209,10 @@ def normalize_dhl_shipment(raw: dict) -> dict:
     # for this, which PROGRESS_GROUP maps to "transit" - override it.
     if group == GROUP_TRANSIT and "elektronisch ang" in status.lower():
         group = GROUP_REGISTERED
-    if group == GROUP_OUT_FOR_DELIVERY and _delivery_failed(
-        status, events[0]["status"] if events else None
+    last_event = events[0]["status"] if events else None
+    if group == GROUP_OUT_FOR_DELIVERY and (
+        _delivery_failed(status, last_event)
+        or any(_REDIRECTED_RE.search(t or "") for t in (status, last_event))
     ):
         group = GROUP_TRANSIT
 

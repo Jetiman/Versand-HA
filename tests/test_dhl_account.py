@@ -489,6 +489,26 @@ def test_parcel_ready_in_packstation_counts_as_delivered():
     assert item["group"] == const.GROUP_DELIVERED
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Vsl. am nächsten Werktag in Filiale abholbereit",
+        "Die Sendung wurde in die Filiale umgeleitet.",
+    ],
+)
+def test_parcel_redirected_to_branch_is_not_out_for_delivery(text):
+    raw = {
+        "id": "A",
+        "sendungsinfo": {},
+        "sendungsdetails": {
+            "sendungsverlauf": {"fortschritt": 4, "kurzStatus": text, "events": []}
+        },
+    }
+    item = coordinator.normalize_dhl_shipment(raw)
+    assert item["group"] == const.GROUP_TRANSIT
+    assert item["delivered"] is False
+
+
 def test_app_name_only_for_dhl_shipments_the_account_knows():
     coord = make_coordinator(FakeAccount(), SESSION)
     coord.dhl_account_names = {"A": "Beispiel Shop GmbH"}
