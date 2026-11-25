@@ -236,6 +236,25 @@ class PaketverfolgungConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
         )
 
+    async def async_step_import(self, import_data: dict[str, Any]) -> Any:
+        """Create the tracking-number entry from the add_tracking_number action.
+
+        Lets a number be added from the panel although only account entries
+        (DHL, DPD, Amazon …) were set up so far.
+        """
+        await self.async_set_unique_id(PROVIDER_NUMBERS)
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(
+            title="Sendungsnummern",
+            data={
+                CONF_PROVIDER: PROVIDER_NUMBERS,
+                CONF_TRACKING_NUMBERS: _clean_tracking_numbers(
+                    import_data.get(CONF_TRACKING_NUMBERS)
+                ),
+                CONF_DEFAULT_POSTCODE: "",
+            },
+        )
+
     # step_id stays "dhl" for config-entry / translation stability; it's
     # really the carrier-neutral tracking-number list now.
     async def async_step_dhl(

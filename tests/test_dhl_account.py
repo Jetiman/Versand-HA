@@ -2,6 +2,7 @@
 import asyncio
 import base64
 import importlib
+import importlib.util
 import json
 import sys
 import time
@@ -837,3 +838,84 @@ def test_switching_the_option_acts_immediately():
     coord.async_set_updated_data = published.append
     coord.apply_keep_vanished(False)
     assert coord._known == {} and published == [{"B": {"id": "B"}}]
+
+
+# --- add_tracking_number without a tracking-number entry --------------------
+class _ValidationError(Exception):
+    pass
+
+
+def _load_init():
+    importlib.import_module("homeassistant.exceptions").ServiceValidationError = (
+        _ValidationError
+    )
+    importlib.import_module("homeassistant.config_entries").SOURCE_IMPORT = "import"
+    spec = importlib.util.spec_from_file_location(
+        f"{PKG}.integration_init", PKG_DIR / "__init__.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+class _Entry:
+    def __init__(self, provider, numbers=None):
+        self.data = {const.CONF_PROVIDER: provider}
+        if numbers is not None:
+            self.data[const.CONF_TRACKING_NUMBERS] = numbers
+        self.options = {}
+
+
+class _Hass:
+    def __init__(self, entries, flow_type="create_entry"):
+        self.flow_calls = []
+        self.updated = []
+        hass = self
+
+        class _Flow:
+            async def async_init(self, domain, context=None, data=None):
+                hass.flow_calls.append((domain, context, data))
+                return {"type": flow_type}
+
+        class _Entries:
+            flow = _Flow()
+
+            def async_entries(self, domain):
+                return entries
+
+            def async_update_entry(self, entry, options):
+                hass.updated.append((entry, options))
+
+        self.config_entries = _Entries()
+
+
+def test_first_tracking_number_sets_up_the_number_list():
+    init = _load_init()
+    hass = _Hass([_Entry(const.PROVIDER_DPD), _Entry(const.PROVIDER_AMAZON)])
+    result = run(init._add_tracking_number(hass, " 01425118215590 "))
+    assert result == {"added": True, "tracking_number": "01425118215590"}
+    assert hass.flow_calls == [
+        (
+            const.DOMAIN,
+            {"source": "import"},
+            {const.CONF_TRACKING_NUMBERS: ["01425118215590"]},
+        )
+    ]
+
+
+def test_number_list_setup_refused_is_reported():
+    init = _load_init()
+    hass = _Hass([_Entry(const.PROVIDER_DPD)], flow_type="abort")
+    with pytest.raises(_ValidationError):
+        run(init._add_tracking_number(hass, "01425118215590"))
+
+
+def test_existing_number_list_gets_the_number():
+    init = _load_init()
+    entry = _Entry(const.PROVIDER_NUMBERS, ["A"])
+    hass = _Hass([_Entry(const.PROVIDER_DPD), entry])
+    result = run(init._add_tracking_number(hass, "B"))
+    assert result["added"] is True
+    assert hass.flow_calls == []
+    assert hass.updated == [(entry, {const.CONF_TRACKING_NUMBERS: ["A", "B"]})]

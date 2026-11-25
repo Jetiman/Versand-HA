@@ -8,7 +8,7 @@ from pathlib import Path
 import voluptuous as vol
 from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
@@ -340,13 +340,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-def _numbers_entry(hass: HomeAssistant):
+def _find_numbers_entry(hass: HomeAssistant):
     for entry in hass.config_entries.async_entries(DOMAIN):
         if entry.data.get(CONF_PROVIDER, PROVIDER_NUMBERS) == PROVIDER_NUMBERS:
             return entry
-    raise ServiceValidationError(
-        "Die Sendungsnummern-Verfolgung ist nicht eingerichtet."
-    )
+    return None
+
+
+def _numbers_entry(hass: HomeAssistant):
+    entry = _find_numbers_entry(hass)
+    if entry is None:
+        raise ServiceValidationError(
+            "Die Sendungsnummern-Verfolgung ist nicht eingerichtet."
+        )
+    return entry
 
 
 def _current_numbers(entry) -> list[str]:
@@ -367,11 +374,25 @@ async def _add_tracking_number(
     Telegram automation) can send an accurate confirmation instead of
     assuming success.
     """
-    entry = _numbers_entry(hass)
-
     cleaned = tracking_number.strip()
     if not cleaned:
         raise ServiceValidationError("Leere Sendungsnummer.")
+
+    entry = _find_numbers_entry(hass)
+    if entry is None:
+        # Only account entries so far: set up the tracking-number list with
+        # this first number instead of refusing it.
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_IMPORT},
+            data={CONF_TRACKING_NUMBERS: [cleaned]},
+        )
+        if result.get("type") != "create_entry":
+            raise ServiceValidationError(
+                "Die Sendungsnummern-Verfolgung konnte nicht eingerichtet werden."
+            )
+        _LOGGER.info("Paketverfolgung: Sendungsnummern eingerichtet mit %s", cleaned)
+        return {"added": True, "tracking_number": cleaned}
 
     current = _current_numbers(entry)
     if cleaned in current:
