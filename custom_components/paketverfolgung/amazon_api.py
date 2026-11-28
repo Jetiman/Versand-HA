@@ -219,11 +219,21 @@ _STOPS_AWAY_RE = re.compile(
 )
 
 
+# "Sie sind der nächste Stopp" / "You are the next stop": the van comes next,
+# the callout carries no number then. Counted as 0 stops away so the fast
+# polling keeps running until the parcel is delivered.
+_NEXT_STOP_RE = re.compile(
+    r"\bn(?:ä|ae)chste[rn]?\s+(?:Liefer)?(?:stopp|halt)\b|\bnext\s+stop\b", re.I
+)
+
+
 def _stops_away(callout: str | None) -> int | None:
     """Parse Amazon's "N Stopps entfernt" / "N stops away" van countdown from
     the map callout message. Returns None when there is no live stop count."""
     if not callout:
         return None
+    if _NEXT_STOP_RE.search(callout):
+        return 0
     match = _STOPS_AWAY_RE.search(callout)
     if not match:
         return None
