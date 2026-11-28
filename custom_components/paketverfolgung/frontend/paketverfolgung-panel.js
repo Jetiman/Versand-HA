@@ -165,6 +165,8 @@ class PaketverfolgungPanel extends HTMLElement {
         delivery_to: a.delivery_window_to || null,
         tracking_url: url || null,
         events,
+        stops_away: typeof a.stops_away === "number" ? a.stops_away : null,
+        vehicle: a.vehicle && typeof a.vehicle === "object" ? a.vehicle : null,
         delivered,
         archived: a.archived === true,
         delivered_at: a.delivered_at || null,
@@ -604,6 +606,14 @@ class PaketverfolgungPanel extends HTMLElement {
           : null,
       ],
       [
+        "Lieferwagen",
+        s.stops_away !== null && !s.delivered
+          ? s.stops_away === 0
+            ? "Du bist der nächste Stopp"
+            : `noch ${s.stops_away} ${s.stops_away === 1 ? "Stopp" : "Stopps"}`
+          : null,
+      ],
+      [
         "Zustellzeitraum",
         isDayRange(s.delivery_from, s.delivery_to)
           ? fmtDayRange(s.delivery_from, s.delivery_to)
@@ -629,7 +639,9 @@ class PaketverfolgungPanel extends HTMLElement {
           <div class="pv-ev-dot"></div>
           <div class="pv-ev-body">
             <div class="pv-ev-status">${esc(ev.status || "")}</div>
-            <div class="pv-ev-date">${esc(fmtDateTime(ev.datum))}</div>
+            <div class="pv-ev-date">${esc(fmtDateTime(ev.datum))}${
+              ev.location ? ` · ${esc(ev.location)}` : ""
+            }</div>
           </div>
         </li>`
         )
@@ -643,6 +655,19 @@ class PaketverfolgungPanel extends HTMLElement {
             <div class="pv-ev-date">${esc(fmtRelative(s.last_changed))}</div>
           </div>
         </li>`;
+    }
+
+    let vehicleNote = "";
+    const lat = s.vehicle ? Number(s.vehicle.latitude) : NaN;
+    const lon = s.vehicle ? Number(s.vehicle.longitude) : NaN;
+    if (!s.delivered && Number.isFinite(lat) && Number.isFinite(lon)) {
+      const at = s.vehicle.position_at || s.vehicle.fetched_at;
+      const map =
+        `https://www.openstreetmap.org/?mlat=${lat.toFixed(5)}&mlon=${lon.toFixed(5)}` +
+        `#map=16/${lat.toFixed(5)}/${lon.toFixed(5)}`;
+      vehicleNote = `<div class="pv-note">Position des Lieferwagens${
+        at ? ` (${esc(fmtRelative(at))})` : ""
+      }: <a href="${map}" target="_blank" rel="noopener noreferrer">auf der Karte zeigen</a></div>`;
     }
 
     let note = "";
@@ -771,6 +796,7 @@ class PaketverfolgungPanel extends HTMLElement {
 
       <div class="pv-meta">${meta}</div>
 
+      ${vehicleNote}
       ${note}
       ${
         timeline

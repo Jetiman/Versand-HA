@@ -118,6 +118,8 @@ def normalize_amazon_shipment(raw: dict) -> dict:
         "order_id": raw.get("order_id"),
         "short_status": short_status,
         "stops_away": raw.get("stops_away"),
+        # Live position of Amazon's own delivery van on the last stretch.
+        "vehicle": raw.get("vehicle") if not delivered else None,
         "forced": None,
     }
 

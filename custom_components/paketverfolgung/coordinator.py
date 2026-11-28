@@ -178,6 +178,11 @@ _READY_FOR_PICKUP_RE = re.compile(r"zur\s+abholung\s+bereit", re.I)
 _REDIRECTED_RE = re.compile(r"filiale|umgeleitet|weitergeleitet|abholbereit", re.I)
 
 
+# Not stored for vanished shipments: the van position changes every minute
+# and must not end up on disk.
+_NOT_KEPT = frozenset({"vanished", "vehicle"})
+
+
 def normalize_dhl_shipment(raw: dict) -> dict:
     """Turn a raw DHL search result into the shared shipment shape.
 
@@ -555,7 +560,7 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         }
         changed = False
         for sid, item in result.items():
-            live = {k: v for k, v in item.items() if k != "vanished"}
+            live = {k: v for k, v in item.items() if k not in _NOT_KEPT}
             if self._known.get(sid) != live:
                 self._known[sid] = live
                 changed = True
@@ -598,7 +603,9 @@ class _BaseCoordinator(DataUpdateCoordinator[dict[str, dict]]):
         if enabled:
             for sid, item in data.items():
                 if not item.get("vanished"):
-                    self._known[sid] = dict(item)
+                    self._known[sid] = {
+                        k: v for k, v in item.items() if k not in _NOT_KEPT
+                    }
             self._save_known()
             return
         self._known.clear()

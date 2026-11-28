@@ -919,3 +919,16 @@ def test_existing_number_list_gets_the_number():
     assert result["added"] is True
     assert hass.flow_calls == []
     assert hass.updated == [(entry, {const.CONF_TRACKING_NUMBERS: ["A", "B"]})]
+
+
+def test_van_position_is_not_stored_for_vanished_shipments():
+    coord = _keeper()
+    van = {"latitude": 50.8, "longitude": 6.8}
+    coord._keep_vanished({"A": {"id": "A", "status": "x", "vehicle": van}})
+    assert "vehicle" not in coord._known["A"]
+    # a new position alone is no change worth saving
+    coord._keep_vanished({"A": {"id": "A", "status": "x", "vehicle": {"latitude": 1}}})
+    assert "vehicle" not in coord._known["A"]
+    gone: dict = {}
+    coord._keep_vanished(gone)
+    assert "vehicle" not in gone["A"]

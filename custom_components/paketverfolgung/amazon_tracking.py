@@ -9,14 +9,17 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from aiohttp import ClientError
 from bs4 import BeautifulSoup
+from yarl import URL
 
-from .amazon_api import AmazonApiClient
+from .amazon_api import AMAZON_BASE, AMAZON_USER_AGENT, AmazonApiClient
 
 _LOGGER = logging.getLogger(__name__)
 _BERLIN = ZoneInfo("Europe/Berlin")
@@ -238,14 +241,26 @@ def _pick(mapping: dict[str, Any], keys: tuple[str, ...]) -> Any:
     return None
 
 
-def _append_event(events: list[dict[str, str]], date_value: Any, status_value: Any) -> None:
+_NO_LOCATION = {"-", "—", "unbekannt", "unknown", "n/a"}
+
+
+def _append_event(
+    events: list[dict[str, str]],
+    date_value: Any,
+    status_value: Any,
+    location_value: Any = None,
+) -> None:
     status = _clean(status_value)
     moment = _event_datetime(date_value)
     if not status or moment is None:
         return
     if status.lower() in {"details", "weitere details", "alle aktualisierungen"}:
         return
-    events.append({"datum": moment.isoformat(), "status": status})
+    event = {"datum": moment.isoformat(), "status": status}
+    location = _clean(location_value)
+    if location and len(location) <= 160 and location.casefold() not in _NO_LOCATION:
+        event["location"] = location
+    events.append(event)
 
 
 def _events_from_tracking_modal(soup: BeautifulSoup) -> list[dict[str, str]]:
@@ -284,7 +299,19 @@ def _events_from_tracking_modal(soup: BeautifulSoup) -> list[dict[str, str]]:
             )
             time_text = _clean(" ".join(time_node.stripped_strings)) if time_node else ""
             date_time = f"{date_text} {time_text}".strip()
-            _append_event(events, date_time, status)
+            # The place ("Erftstadt, DE") sits in the same row as the time;
+            # only taken when the row holds this one message.
+            location_node = (
+                event_row.select_one(".tracking-event-location")
+                if event_row is not None
+                and event_row is not group
+                and len(event_row.select(".tracking-event-message")) == 1
+                else None
+            )
+            location = (
+                " ".join(location_node.stripped_strings) if location_node else None
+            )
+            _append_event(events, date_time, status, location)
 
     return events
 
@@ -382,9 +409,123 @@ def parse_amazon_events(html: str) -> list[dict[str, str]]:
     unique: dict[tuple[str, str], dict[str, str]] = {}
     for event in events:
         key = (event["datum"], event["status"].casefold())
+        known = unique.get(key)
+        if known and known.get("location") and not event.get("location"):
+            event = {**event, "location": known["location"]}
         unique[key] = event
 
     return sorted(unique.values(), key=lambda event: event["datum"], reverse=True)
+
+
+# Amazon's own map on the tracking page asks this address for the delivery
+# van's position. Only Amazon's own vans report one, and only on the last
+# stretch, so it is asked only with a live stop countdown.
+MAP_TRACKING_URL = (
+    "https://www.amazon.de/progress-tracker/package/actions/map-tracking-deans-proxy"
+)
+VEHICLE_MAX_STOPS = 10
+_VEHICLE_STATES = {"PICKED_UP", "RENDERED", "SKIPPED_STOP", "YOU_ARE_NEXT"}
+_AMAZON_VANS = {"amazon", "amzl", "amazon logistics", "amazon shipping"}
+_CSRF_RE = re.compile(r"csrfToken\s*[=:]\s*[\"']([^\"']{8,4096})[\"']")
+_SESSION_ID_RE = re.compile(r"\d{3}-\d{7}-\d{7}")
+
+
+def vehicle_wanted(shipment: dict[str, Any]) -> bool:
+    """A live countdown on an Amazon van: worth asking for its position."""
+    stops = shipment.get("stops_away")
+    tracking_id = str(shipment.get("tracking_id") or "")
+    carrier = str(shipment.get("carrier") or "").strip().casefold()
+    if type(stops) is not int or not 0 <= stops <= VEHICLE_MAX_STOPS:
+        return False
+    if not re.fullmatch(r"[A-Z0-9-]{6,64}", tracking_id, re.I):
+        return False
+    return carrier in _AMAZON_VANS or (
+        not carrier and tracking_id.upper().startswith("DE")
+    )
+
+
+def map_request_form(html: str, tracking_id: str) -> dict[str, str] | None:
+    """Form for the map request, from the tracking page already loaded."""
+    soup = BeautifulSoup(html, "html.parser")
+    state: dict[str, Any] | None = None
+    for script in soup.select('script[data-a-state*="page-state"]'):
+        try:
+            value = json.loads(script.string or "")
+        except (TypeError, ValueError):
+            continue
+        if isinstance(value, dict) and isinstance(value.get("mapTracking"), dict):
+            state = value
+            break
+    if state is None:
+        return None
+    code = state.get("trackingId") or tracking_id
+    if not isinstance(code, str) or code.upper() != tracking_id.upper():
+        return None
+    token = state.get("csrfToken")
+    if not isinstance(token, str) or len(token) < 8:
+        tag = soup.select_one('input[name="csrfToken"]')
+        token = tag.get("value") if tag else None
+    if not isinstance(token, str) or len(token) < 8:
+        match = _CSRF_RE.search(html)
+        token = match.group(1) if match else None
+    if not isinstance(token, str) or not 8 <= len(token) <= 4096:
+        return None
+    return {"trackingId": code, "csrfToken": token}
+
+
+def parse_vehicle_position(
+    data: Any, tracking_id: str, now: datetime
+) -> dict[str, Any] | None:
+    """The van's current position from the map answer, or None.
+
+    Positions older than ten minutes (or from the future) are dropped, so a
+    stale point is never shown as live.
+    """
+    if not isinstance(data, dict) or data.get("success") is not True:
+        return None
+    details = data.get("packageLocationDetails")
+    if not isinstance(details, dict):
+        return None
+    if details.get("trackingObjectState") not in _VEHICLE_STATES:
+        return None
+    actual = details.get("trackingObjectId")
+    if actual is not None and (
+        not isinstance(actual, str) or actual.upper() != tracking_id.upper()
+    ):
+        return None
+    transporter = details.get("transporterDetails")
+    fix = transporter.get("geoLocation") if isinstance(transporter, dict) else None
+    if not isinstance(fix, dict):
+        return None
+    lat, lon = fix.get("latitude"), fix.get("longitude")
+    if any(type(v) not in (int, float) or not math.isfinite(v) for v in (lat, lon)):
+        return None
+    if not (-85.06 <= lat <= 85.06 and -180 <= lon <= 180) or (lat == 0 and lon == 0):
+        return None
+    position_at = None
+    stamp = fix.get("locationTime")
+    if stamp is not None:
+        if type(stamp) not in (int, float) or not math.isfinite(stamp):
+            return None
+        if stamp > 1e11:  # milliseconds
+            stamp /= 1000
+        try:
+            moment = datetime.fromtimestamp(stamp, timezone.utc)
+        except (ValueError, OverflowError, OSError):
+            return None
+        if not -120 <= (now - moment).total_seconds() <= 600:
+            return None
+        position_at = moment.isoformat()
+    accuracy = fix.get("accuracy")
+    if type(accuracy) not in (int, float) or not math.isfinite(accuracy) or accuracy < 0:
+        accuracy = None
+    return {
+        "latitude": lat,
+        "longitude": lon,
+        "position_at": position_at,
+        "accuracy": accuracy,
+        "fetched_at": now.isoformat(),
+    }
 
 
 class AmazonTrackingApiClient(AmazonApiClient):
@@ -400,9 +541,61 @@ class AmazonTrackingApiClient(AmazonApiClient):
         if not shipment:
             return None
         shipment["events"] = parse_amazon_events(html)
+        if vehicle_wanted(shipment):
+            shipment["vehicle"] = await self._fetch_vehicle(
+                html, final_url, shipment["tracking_id"]
+            )
         _LOGGER.debug(
             "Amazon: parsed %d tracking event(s) for %s",
             len(shipment["events"]),
             shipment.get("tracking_id"),
         )
         return shipment
+
+    async def _fetch_vehicle(
+        self, html: str, referer: str, tracking_id: str
+    ) -> dict[str, Any] | None:
+        """One extra request per poll for the van's position.
+
+        Never fails the poll: without a position the parcel is shown as before.
+        """
+        form = map_request_form(html, tracking_id)
+        if form is None:
+            _LOGGER.debug("Amazon: no map on the tracking page of %s", tracking_id)
+            return None
+        cookie = self._jar.filter_cookies(URL(MAP_TRACKING_URL)).get("session-id")
+        session_id = getattr(cookie, "value", None)
+        if not isinstance(session_id, str) or not _SESSION_ID_RE.fullmatch(session_id):
+            return None
+        headers = {
+            "accept": "application/json, text/javascript, */*; q=0.01",
+            "accept-language": "de-DE,de;q=0.9,en;q=0.7",
+            "content-type": "application/x-www-form-urlencoded",
+            "x-requested-with": "XMLHttpRequest",
+            "origin": AMAZON_BASE,
+            "referer": referer,
+            "user-agent": AMAZON_USER_AGENT,
+            "x-amzn-sessionid": session_id,
+        }
+        try:
+            async with self._session.post(
+                MAP_TRACKING_URL,
+                data=form,
+                headers=headers,
+                allow_redirects=False,
+                timeout=15,
+            ) as response:
+                if response.status != 200:
+                    _LOGGER.debug(
+                        "Amazon: map request for %s answered %s",
+                        tracking_id,
+                        response.status,
+                    )
+                    return None
+                data = await response.json(content_type=None)
+        except (ClientError, TimeoutError, ValueError) as err:
+            _LOGGER.debug(
+                "Amazon: map request for %s failed (%s)", tracking_id, type(err).__name__
+            )
+            return None
+        return parse_vehicle_position(data, tracking_id, datetime.now(timezone.utc))

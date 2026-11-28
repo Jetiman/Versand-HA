@@ -301,6 +301,8 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
     """A single tracked shipment/parcel (carrier-agnostic)."""
 
     _attr_has_entity_name = True
+    # The van position changes every minute: keep it out of the history.
+    _unrecorded_attributes = frozenset({"vehicle"})
 
     def __init__(self, coordinator, entry_id: str, item_id: str) -> None:
         super().__init__(coordinator)
@@ -366,6 +368,7 @@ class ShipmentSensor(CoordinatorEntity, SensorEntity):
             "order_id": s.get("order_id"),
             "short_status": s.get("short_status"),
             "stops_away": s.get("stops_away"),
+            "vehicle": s.get("vehicle"),
             "events": s.get("events", []),
         }
 
